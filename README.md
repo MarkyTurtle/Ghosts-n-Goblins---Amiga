@@ -15,6 +15,7 @@
 | `docs/` | `HOW_IT_WORKS.md` (a guided tour with diagrams: interrupts, the state machine, a frame, objects, spawning, drawing, level data), `GLOBALS.md` (every global, the memory map, object slot and per-type fields), `XREF.md` (which routines use each global, routine and table), `SPAWNS.md` (every level's spawn zones and scripts, decoded), `TODO.md` (planned enhancements: a shared file directory and own loader, automatic disk layout, corkscrew scrolling with a pristine buffer, zx0 / per-level files / caching / music on 512K, further space savings, emulator tests), sprite/BOB flipping spreadsheet |
 | `bin/tracks/` | All 131 decoded tracks (6,312 bytes each) used by the render scripts |
 | `bin/main_1mb.bin` | The expanded-memory build (tracks 17-32) |
+| `enhanced/` | (branch `enhanced/scroll`) The enhanced build: the incremental corkscrew scroller integrated into the 512K game, its tests (whole game in the emulator, side by side with the original) and a disk image builder - see `enhanced/docs/SCROLLER.md` |
 
 All three sources reassemble **byte-identical** to the originals:
 
@@ -357,7 +358,9 @@ programs). `--layout` prints what it found and which table each file comes from.
 resize a file, change its `FENTRY` in the source (in both builds if both load it), rebuild, and
 pass the new binaries; a file's length must match its entry and it must end before the next file
 starts (the builder stops with a message otherwise). A file at a new track is given with
-`--file TRACK=PATH`.
+`--file TRACK=PATH`. A file no table lists (for example a module that a patched program loads
+with its own entry) is added with `--add TRACK=PATH`; it is checked against the others like any
+file.
 
 ```
 python3 tools/disk/mkdisk.py -o gng.adf                      # the original disk

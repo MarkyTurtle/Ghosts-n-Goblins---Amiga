@@ -27,6 +27,11 @@
 ; Buffers: a pristine buffer holds the background only (drawn from the tiles); the
 ; two display buffers copy new edges from it and restore under their BOBs from it.
 ;
+; This file is the core only: it is included by module.s (the game module, loaded by the
+; enhanced build) and by scroll_test.s (the unit tests' build at $7A000). The includer
+; defines the custom-chip / globals equates (gng_equates.i), CellTiles, ItemBoxSizes,
+; SmallBobSizes and MASKBUF (a one-plane BOB mask, at most 64 x 80 pixels).
+;
 ; Calls (a6 = game globals, as everywhere in the game):
 ;   ScrFullDraw    a0 = buffer record, d0 = camera x, d1 = camera y
 ;   ScrScrollTo    a0 = buffer record, d0 = camera x, d1 = camera y
@@ -44,38 +49,15 @@ LINEBYTES       equ     ROWBYTES*5      ; 5 interleaved planes per line
 RING_LINES      equ     256
 COL_SLACK       equ     1040            ; corkscrew drift: 2 bytes per world column (levels <= 512 columns)
 BUF_SIZE        equ     LINEBYTES*RING_LINES+COL_SLACK
+COPY_W          equ     40              ; a whole buffer is one blit of COPY_H lines x 40 words
+COPY_H          equ     BUF_SIZE/(2*COPY_W)
+                ifne    BUF_SIZE-2*COPY_W*COPY_H
+                fail    "BUF_SIZE is not a whole number of 80-byte blit lines"
+                endif
 FETCH_BYTES     equ     34              ; 17 words fetched per line
 DISPLAY_TOP     equ     $44             ; first playfield line (the 16 lines above are the HUD strip)
 DISPLAY_END     equ     $124            ; first line after the display window
-
-CUSTOM          equ     $DFF000
-DMACONR         equ     $002
-BLTCON0         equ     $040
-BLTCON1         equ     $042
-BLTAFWM         equ     $044
-BLTCPTH         equ     $048
-BLTBPTH         equ     $04C
-BLTCMOD         equ     $060
-BLTBMOD         equ     $062
-BLTAPTH         equ     $050
-BLTDPTH         equ     $054
-BLTSIZE         equ     $058
-BLTAMOD         equ     $064
-BLTDMOD         equ     $066
-BPLCON1         equ     $102
-BPL1MOD         equ     $108
-BPL2MOD         equ     $10A
-BPL1PTH         equ     $0E0
-
-; game data used (512K build addresses; labels in gng_main.s)
-CELLTILES       equ     $1222C
-g_MapPtr        equ     $092
-g_Level         equ     $09A
-g_LevelFileAddr equ     $116
-g_SmallBobSets  equ     $11A
-g_Items         equ     $AE0
-ITEMBOXSIZES    equ     $540E
-SMALLBOBSIZES   equ     $A992
+VISIBLE_W       equ     17*16           ; fetched columns
 
 ; buffer record
                 rsreset
@@ -84,31 +66,31 @@ buf_ColL        rs.w    1               ; drawn tile columns, inclusive
 buf_ColR        rs.w    1
 buf_RowB        rs.w    1               ; drawn tile rows (Y up), inclusive
 buf_RowT        rs.w    1
-buf_Valid       rs.w    1               ; 0 = nothing drawn yet
-buf_Source      rs.l    1               ; pristine buffer record to copy from (0: draw tiles)
+buf_Valid       rs.w    1               ; 0 = contents unknown: the next update draws (or copies) it all
+buf_Source      rs.l    1               ; pristine buffer record to copy from (0: this is the pristine one)
 buf_RListBase   rs.l    1               ; restore list: 8-byte entries (address, BLTSIZE, modulo)
 buf_RList       rs.l    1               ; next free entry
 buf_ClipX0      rs.w    1               ; world x of the first fetched column
 buf_ClipY0      rs.w    1               ; visible world lines ClipY0 .. ClipY1-1
 buf_ClipY1      rs.w    1
 buf_CamX        rs.w    1               ; camera x of the last update
+buf_RListEnd    rs.l    1               ; end of the restore list storage (0: no limit)
+buf_Copper      rs.l    1               ; this buffer's copper list (used by the game glue)
 buf_SIZEOF      rs.b    0
-
-MASKBUF         equ     $79800          ; BOB mask (one plane, at most 64 x 64)
-VISIBLE_W       equ     17*16           ; fetched columns
 
 WAITBLIT        macro
 .wb\@:  btst    #6,CUSTOM+DMACONR
         bne.b   .wb\@
         endm
-
-;------------------------------------------------------------------------------
-                org     $7A000
-                bra.w   ScrFullDraw
-                bra.w   ScrScrollTo
-                bra.w   ScrBuildCopper
-                bra.w   ScrRestore
-                bra.w   ScrDrawBobs
+; blitter set-up that may run outside the interrupts (RedrawScreen runs in user mode while
+; the game logic, which also blits, can interrupt it): hold the interrupts off around it,
+; as the original RedrawScreen does
+INTSOFF         macro
+        move.w  #$4000,CUSTOM+INTENA
+        endm
+INTSON          macro
+        move.w  #$C000,CUSTOM+INTENA
+        endm
 
 ;------------------------------------------------------------------------------
 ; Window: d0 = camera x, d1 = camera y ->
@@ -131,11 +113,12 @@ Window:
 
 ;------------------------------------------------------------------------------
 ScrFullDraw:
-                movem.l d0-d7/a0-a5,-(a7)
+                tst.l   buf_Source(a0)          ; a display buffer: copy the (current) pristine one
+                beq.b   .draw
+                bra.w   CopyAll
+.draw:          movem.l d0-d7/a0-a5,-(a7)
+                clr.w   buf_Valid(a0)           ; (an interrupting update sees 'unknown' and redraws)
                 bsr.b   Window
-                movem.w d2-d5,buf_ColL(a0)      ; ColL, ColR, RowB, RowT
-                move.w  #1,buf_Valid(a0)
-                bsr.w   SetClip
                 move.w  d4,d0                   ; row
 .row:           move.w  d2,d1                   ; first column
                 move.w  d3,d6                   ; last column
@@ -143,10 +126,40 @@ ScrFullDraw:
                 addq.w  #1,d0
                 cmp.w   d5,d0
                 ble.b   .row
-                tst.l   buf_Source(a0)          ; the pristine buffer: add the scenery
-                bne.b   .ret
-                bsr.w   ScrDrawScenery
-.ret:           movem.l (a7)+,d0-d7/a0-a5
+                movem.w d2-d5,buf_ColL(a0)      ; ColL, ColR, RowB, RowT
+                move.w  2(a7),d0                ; camera (saved d0 / d1)
+                move.w  6(a7),d1
+                bsr.w   SetClip
+                move.w  #1,buf_Valid(a0)
+                bsr.w   ScrDrawScenery          ; the pristine buffer: add the scenery
+                movem.l (a7)+,d0-d7/a0-a5
+                rts
+
+;------------------------------------------------------------------------------
+; CopyAll - a0 = display buffer: copy the whole pristine buffer into it (one blit) and
+; take its window. Its BOBs are gone, so its restore list is emptied.
+;------------------------------------------------------------------------------
+CopyAll:
+                movem.l d0/a1-a2,-(a7)
+                movea.l buf_Source(a0),a1
+                lea     CUSTOM,a2
+                INTSOFF
+                WAITBLIT
+                move.l  #$09F00000,BLTCON0(a2)
+                move.l  #$FFFFFFFF,BLTAFWM(a2)
+                move.w  #0,BLTAMOD(a2)
+                move.w  #0,BLTDMOD(a2)
+                move.l  buf_Base(a1),BLTAPTH(a2)
+                move.l  buf_Base(a0),BLTDPTH(a2)
+                move.w  #(COPY_H<<6)|COPY_W,BLTSIZE(a2)
+                INTSON
+                move.l  buf_ColL(a1),buf_ColL(a0)       ; ColL, ColR
+                move.l  buf_RowB(a1),buf_RowB(a0)       ; RowB, RowT
+                move.l  buf_ClipX0(a1),buf_ClipX0(a0)   ; ClipX0, ClipY0
+                move.l  buf_ClipY1(a1),buf_ClipY1(a0)   ; ClipY1, CamX
+                move.l  buf_RListBase(a0),buf_RList(a0)
+                move.w  #1,buf_Valid(a0)
+                movem.l (a7)+,d0/a1-a2
                 rts
 
 ;------------------------------------------------------------------------------
@@ -157,7 +170,7 @@ ScrScrollTo:
                 movem.l d0-d7/a0-a5,-(a7)
                 tst.w   buf_Valid(a0)
                 beq.w   .full
-                bsr.b   Window
+                bsr.w   Window
                 move.w  d2,d7
                 sub.w   buf_ColL(a0),d7
                 bpl.b   .p1
@@ -170,7 +183,7 @@ ScrScrollTo:
                 neg.w   d7
 .p2:            cmp.w   #4,d7
                 bhi.w   .full
-                moveq   #0,d6                   ; d6 = something was drawn
+.edges:         moveq   #0,d6                   ; d6 = something was drawn
 ; columns entering on the right
 .right:         cmp.w   buf_ColR(a0),d3
                 ble.b   .left
@@ -235,8 +248,13 @@ ScrScrollTo:
 .nodraw:
                 movem.l (a7)+,d0-d7/a0-a5
                 rts
-.full:          movem.l (a7)+,d0-d7/a0-a5
+.full:          tst.l   buf_Source(a0)
+                bne.b   .copy
+                movem.l (a7)+,d0-d7/a0-a5
                 bra.w   ScrFullDraw
+.copy:          bsr.w   CopyAll                 ; a display buffer: copy the pristine one, then
+                bsr.w   Window                  ; bring it to this camera (normally nothing to do)
+                bra.w   .edges
 
 ; d0 = camera x, d1 = camera y, d2 = first column -> clip window for BOBs
 SetClip:        move.w  d0,buf_CamX(a0)
@@ -312,7 +330,7 @@ DrawTile:
                 moveq   #15,d4
                 and.w   d1,d4
                 add.w   d4,d5
-                lea     CELLTILES,a4
+                lea     CellTiles,a4
                 moveq   #0,d7
                 move.b  (a4,d5.w),d7
                 beq.b   .src                    ; tile 0
@@ -353,6 +371,7 @@ DrawTile:
                 moveq   #ROWBYTES-2,d5
 .blit:          ; ---- one blit: the tile's 80 plane lines (16 x 5) to rows 36 bytes apart
                 lea     CUSTOM,a2
+                INTSOFF
                 WAITBLIT
                 move.l  #$09F00000,BLTCON0(a2)  ; A -> D
                 move.l  #$FFFFFFFF,BLTAFWM(a2)
@@ -361,13 +380,16 @@ DrawTile:
                 move.l  a3,BLTAPTH(a2)
                 move.l  a4,BLTDPTH(a2)
                 move.w  #((16*5)<<6)|1,BLTSIZE(a2)
+                INTSON
                 movem.l (a7)+,d0-d7/a2-a4
                 rts
 
 ;------------------------------------------------------------------------------
 ; ScrBuildCopper - the playfield part of the copper list (jumped to at line $44):
-; bitplane pointers, modulos and fine scroll for the camera, and a pointer reload
-; where the 256-line ring wraps.
+; bitplane pointers and fine scroll for the camera - the same 11 moves as the original
+; list, so they are done before the first line's data fetch - and a pointer reload
+; where the 256-line ring wraps. The modulos are not set: they are 146 (180 - 34) as
+; InitHardware leaves them, the same as the original's.
 ;------------------------------------------------------------------------------
 ScrBuildCopper:
                 movem.l d0-d7/a0-a2,-(a7)
@@ -394,9 +416,7 @@ ScrBuildCopper:
                 move.l  d5,d7
                 add.l   d6,d7                   ; d7 = top line
                 bsr.b   .pointers
-                move.l  #(BPL1MOD<<16)|(LINEBYTES-FETCH_BYTES),(a1)+
-                move.l  #(BPL2MOD<<16)|(LINEBYTES-FETCH_BYTES),(a1)+
-                move.w  #BPLCON1,(a1)+
+                move.w  #BPLCON1,(a1)+          ; (the modulos stay 146, as the game sets them)
                 move.w  d2,(a1)+
                 tst.w   d4                      ; ring wraps inside the display?
                 beq.b   .end
@@ -489,7 +509,12 @@ ScrDrawBobs:
 ;------------------------------------------------------------------------------
 ScrDrawBob:
                 movem.l d0-d7/a0-a5,-(a7)
-                moveq   #15,d6
+                move.l  buf_RListEnd(a0),d0     ; restore list full (room for 2 entries)? then the
+                beq.b   .room                   ; BOB is not drawn (as the original's $3000 limit)
+                sub.l   buf_RList(a0),d0
+                cmp.l   #16,d0
+                blt.w   .out
+.room:          moveq   #15,d6
                 add.w   d3,d6
                 lsr.w   #4,d6                   ; d6 = graphics words per plane line
                 ; ---- vertical clip
@@ -603,7 +628,8 @@ ScrDrawBob:
                 sub.w   d0,d7
                 move.w  d7,(a3)+
                 move.l  a3,buf_RList(a0)
-.nolist:        move.w  d4,d2                   ; BLTSIZE for one plane
+.nolist:        INTSOFF                         ; (the mask buffer is shared: no interruption)
+                move.w  d4,d2                   ; BLTSIZE for one plane
                 lsl.w   #6,d2
                 or.w    d0,d2
                 move.w  d6,d1
@@ -658,6 +684,7 @@ ScrDrawBob:
                 adda.w  d1,a2
                 adda.w  #ROWBYTES,a4
                 dbra    d6,.plane
+                INTSON
                 movem.l (a7)+,d0-d7/a1-a5
                 rts
 
@@ -693,9 +720,9 @@ ScrDrawScenery:
                 add.w   $A(a5),d2
                 move.b  2(a5),d0                ; image = ItemBoxSizes[O_Param]
                 ext.w   d0
-                lea     ITEMBOXSIZES,a1
+                lea     ItemBoxSizes,a1
                 move.b  (a1,d0.w),d0
-                lea     SMALLBOBSIZES,a1
+                lea     SmallBobSizes,a1
                 add.w   d0,d0
                 move.b  (a1,d0.w),d3
                 ext.w   d3

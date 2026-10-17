@@ -16,10 +16,11 @@ Each line points to the item below with the details and measurements.
 - [ ] Font stored without its unused bytes: 3 KB less on disk (5)
 
 **Display and drawing**
-- [ ] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
+- [x] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
       redraw only the new edge instead of the whole screen; no freezes when falling (3).
-      Background part prototyped and tested on branch `enhanced/scroll` (interleaved, 141 KB)
-- [ ] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
+      Integrated into the 512K game on branch `enhanced/scroll`, with a disk image; tested in the
+      emulator side by side with the original. Still to do: real-machine timing (WinUAE)
+- [x] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
 - [ ] BOB masks: one-plane masks (+20%, stored or built on demand into a small cache) on 512K;
       fully pre-masked graphics for one-blit BOBs on 1MB (3)
 - [ ] Possibly draw at 50 fps once the redraw cost is gone (3)
@@ -108,7 +109,11 @@ would be opt-in.
 **Goal:** replace the full-redraw scrolling with incremental scrolling, to cut memory use and,
 more importantly, the scrolling cost.
 
-**Prototype (branch `enhanced/scroll`, `enhanced/docs/SCROLLER.md`).** The background part works:
+**Integrated (branch `enhanced/scroll`, `enhanced/docs/SCROLLER.md`).** The scroller, the
+pristine buffer and the BOBs now run in the 512K game (a module loaded from its own track plus
+in-place patches), with a disk image to try. The first prototype's findings:
+
+The background part works:
 a module that draws one tile column / row at a time, with a vertical ring and copper wrap,
 matches the original display at every camera position tested (560 frames, all levels), in an
 emulator harness that adds blitter, copper and display emulation. What it showed:

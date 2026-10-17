@@ -1,0 +1,95 @@
+"""Run the original and the enhanced game side by side in the emulator, with the same input,
+and compare what they show, frame by frame (the whole display, HUD included).
+
+In the emulator a background redraw always finishes at once, so the original camera almost
+always reaches its target just as the enhanced one does, and the two games stay in step:
+same logic, same pictures. A difference in the picture while the game state is still the same
+is a drawing difference. The reference has the DrawBob top-clip bug fixed (see test_bobs.py),
+since the enhanced build draws those BOBs correctly.
+
+  python3 compare_runs.py [frames] [seed] [--png DIR] [--level N] [--teleport N]"""
+import os, sys, time
+import numpy as np
+from game import GameRun, script_start, GLOBALS, G
+from check_game import play_script, BUILD
+
+STATE = ('g_GameState', 1), ('g_SubState', 1), ('g_Level', 2), ('g_ArthurX', 2), ('g_ArthurY', 2), \
+        ('g_ScrollTileX', 2), ('g_ScrollFineX', 2), ('g_ScrollTileY', 2), ('g_ScrollFineY', 2), \
+        ('g_Lives', 1), ('g_Score', 4)
+
+
+def camera(m):
+    return (m.g('g_ScrollTileX')*16 + m.g('g_ScrollFineX'), m.g('g_ScrollTileY')*16 + m.g('g_ScrollFineY'))
+
+
+def state(m):
+    s = {k: m.g(k, n) for k, n in STATE}
+    s['camera'] = camera(m)
+    s['origin'] = (s.pop('g_ScrollTileX'), s.pop('g_ScrollTileY'))
+    for k in ('g_ScrollFineX', 'g_ScrollFineY'): del s[k]
+    return s
+
+
+def main(frames=3000, seed=1, png=None, level=None, teleport=0):
+    orig = GameRun()
+    orig.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))      # DrawBob top-clip fix
+    orig.u.mem_write(0xC2EA, bytes.fromhex('c4c6'))      # and in DrawSceneryOnRedraw
+    enh = GameRun(os.path.join(BUILD, 'main_enh.bin'), {132: os.path.join(BUILD, 'module.bin')})
+    for m in (orig, enh): m.boot()
+    inputs = list(script_start()); play = play_script(seed)
+    same = differ = 0; diverged = None; t = time.time()
+    states = set(); levels = set(); first_diffs = []; ys = set()
+    started = False
+    import random; trnd = random.Random(seed)
+    for f in range(frames):
+        joy, fire = inputs[f] if f < len(inputs) else next(play)
+        for m in (orig, enh): m.frame(joy, fire)
+        if level is not None and not started and m.g('g_GameState', 1) == 0 and m.g('g_SubState', 1) == 2:
+            started = True                                 # --level: once level 0 has started, load that level
+            for m in (orig, enh):                          # instead; lives never run out (the game's cheat flag)
+                m.w16(G['g_Level'], level); m.w8(G['g_CheatOn'], 0xFF)
+                for k in ('g_SubState', 'g_SubState2', 'g_SubState3'): m.w8(G[k], 0)
+        if teleport and f % teleport == 0 and orig.g('g_GameState', 1) == 0 and orig.g('g_SubState', 1) == 2:
+            # --teleport N: every N frames put Arthur somewhere else in the level (both games), so
+            # the camera jumps and scrolls vertically too
+            w, h = orig.g('g_LevelWidth'), orig.g('g_LevelHeight')
+            x, y = trnd.randrange(32, max(33, w + 200)), trnd.randrange(40, max(41, h + 200))
+            for m in (orig, enh): m.w16(G['g_ArthurX'], x); m.w16(G['g_ArthurY'], y)
+        so, se = state(orig), state(enh)
+        if so != se or orig.rd(GLOBALS+0x88, 0x60) != enh.rd(GLOBALS+0x88, 0x60):
+            diverged = (f, so, se); break
+        states.add((so['g_GameState'], so['g_SubState'])); levels.add(so['g_Level'])
+        a, b = orig.render(), enh.render()
+        if (a == b).all(): same += 1
+        else:
+            differ += 1
+            if len(first_diffs) < 10:
+                first_diffs.append((f, int((a != b).sum()), so))
+                if png:
+                    os.makedirs(png, exist_ok=True)
+                    orig.save_png(a, f'{png}/f{f:05d}_orig.png'); enh.save_png(b, f'{png}/f{f:05d}_enh.png')
+        ys.add(so['camera'][1] >> 4)
+        if f % 500 == 0:
+            print(f'  frame {f}: state {so["g_GameState"]}/{so["g_SubState"]} level {so["g_Level"]} '
+                  f'camera {so["camera"]} lives {so["g_Lives"]}, {time.time()-t:.0f}s', flush=True)
+    n = same + differ
+    print(f'{n} frames in step (game states {sorted(states)}, levels {sorted(levels)}): '
+          f'{same} identical displays, {differ} different; camera tile rows visited: {len(ys)}')
+    for f, d, s in first_diffs:
+        print(f'  frame {f}: {d} pixels differ, state {s}')
+    if diverged:
+        f, so, se = diverged
+        print(f'the games went out of step at frame {f}:')
+        print('  original:', so); print('  enhanced:', se)
+    return 1 if differ else 0
+
+
+if __name__ == '__main__':
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    png = sys.argv[sys.argv.index('--png')+1] if '--png' in sys.argv else None
+    if png in args: args.remove(png)
+    lv = int(sys.argv[sys.argv.index('--level')+1]) if '--level' in sys.argv else None
+    if lv is not None: args.remove(str(lv))
+    tp = int(sys.argv[sys.argv.index('--teleport')+1]) if '--teleport' in sys.argv else 0
+    if tp: args.remove(str(tp))
+    sys.exit(main(int(args[0]) if args else 3000, int(args[1]) if len(args) > 1 else 1, png, lv, tp))

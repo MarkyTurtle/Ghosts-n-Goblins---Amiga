@@ -1,4 +1,4 @@
-"""Test the incremental scroller (src/scroll.s) against the original game.
+"""Test the incremental scroller (src/scroll.s, built by src/scroll_test.s) against the original game.
 
 For a random camera walk through each level, two buffers are updated alternately with
 ScrScrollTo (as double buffering would) and shown with ScrBuildCopper; every displayed
@@ -20,10 +20,11 @@ LIST = 0x79100
 BIN = os.path.join(HERE, '..', 'build', 'scroll.bin')
 
 def assemble():
-    src = os.path.join(HERE, '..', 'src', 'scroll.s')
+    src = os.path.join(HERE, '..', 'src')
     vasm = os.environ.get('VASM', 'vasmm68k_mot')
     os.makedirs(os.path.dirname(BIN), exist_ok=True)
-    subprocess.run([vasm, '-Fbin', '-m68000', '-quiet', '-o', BIN, src], check=True)
+    subprocess.run([vasm, '-Fbin', '-m68000', '-quiet', '-I', src, '-I', os.path.join(HERE, '..', '..'),
+                    '-o', BIN, os.path.join(src, 'scroll_test.s')], check=True)
 
 class Enhanced(Original):
     def __init__(self, level):

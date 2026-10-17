@@ -9,13 +9,11 @@ row at a time.
 | Step | State |
 |---|---|
 | Test harness: blitter, copper and display emulation on top of the 68000 emulator (`tools/amiga.py`) | done; reproduces the original display exactly (`tools/check_harness.py`: 16 of 16 views equal the level pictures) |
-| Background scroller: layout, tile drawing, edge columns / rows, copper list with ring wrap (`src/scroll.s`) | done as a standalone module; equal to the original at every camera position tested (`tools/test_scroll.py`: 560 of 560 frames over all 7 levels, random walks with steps of 1-40 px, two buffers updated alternately) |
-| Pristine buffer: tiles drawn once, display buffers copy new edges from it | done |
-| BOBs: `ScrDrawBob` / `ScrRestore` with the corkscrew addressing, restore from the pristine buffer, ring-wrap split | done; equal to the original's `DrawBobs` (`tools/test_bobs.py`: 280 of 280 frames with 3-10 BOBs each, moving camera, BOBs off every edge and across the ring wrap) |
-| Scenery drawn into the pristine buffer (`ScrDrawScenery`) | done; 401 of 401 frames of sweeps over the gravestones of levels 0 and 2 |
-| Text printed on the playfield (`PrintChar` into the screen buffer) | to do, at integration |
-| Integration into the game: camera / redraw logic, `SetBitplanePtrs`, `SwapScreens`, `ShowBackBuffer`, memory map | to do |
-| Full-emulator test (WinUAE / FS-UAE) for timing | to do |
+| Background scroller: layout, tile drawing, edge columns / rows, copper list with ring wrap (`src/scroll.s`) | done; equal to the original at every camera position tested (`tools/test_scroll.py`) |
+| Pristine buffer, BOBs, restores, scenery | done; equal to the original's `DrawBobs` / `DrawSceneryOnRedraw` (`tools/test_bobs.py`) |
+| Integration into the game (`src/module.s`, `src/patches.s`), a disk image (`tools/build_enh.py`) | done: a playable image, `build/gng_enhanced.adf` |
+| Whole game in the emulator against the original (`tools/compare_runs.py`) | done: see *Testing* below |
+| Real hardware / WinUAE timing | **not tested yet** - the emulator here has no timing |
 
 ## The corkscrew works with the interleaved layout
 
@@ -110,14 +108,128 @@ So about 43 KB saved on the screens, and the save areas go as well.
   test walks, the frames that needed drawing blitted a median of 1,440 words. A full draw (level
   start, big jumps) is 255 blits / 20,400 words, about the same as one original redraw.
 * With a pristine buffer, each edge is drawn once into the pristine buffer and copied into the two
-  display buffers (a column is one 1-word-wide blit, modulo 34). Today the
-  prototype draws each buffer's edges from the tiles directly; switching to the pristine copy is
-  part of the BOB step.
+  display buffers (a column is one 1-word-wide blit, modulo 34).
+* A whole display buffer can also be refreshed from the pristine one in a single blit (`CopyAll`,
+  589 lines of 40 words): used when the game starts a new screen (`SwapScreens`).
+
+## The enhanced game
+
+### What is built
+
+`tools/build_enh.py` makes everything in `build/`:
+
+* `module.bin` - `src/module.s` (which includes `src/scroll.s`), assembled at `$5C000`: the
+  scroller and the game glue, about 2.5 KB. Its storage (records, copper lists, restore lists)
+  follows it in memory but is not in the file (EnhInit clears it).
+* `main_enh.bin` - the original 512K program with the blocks of `src/patches.s` written over it
+  in place. Each block is assembled on its own at its address and checked to fit, so nothing
+  else in the program moves (the tables `scroll.s` uses, `CellTiles` and so on, stay where they
+  are). The labels come from the original's assembler listing (`orig_syms.i`, generated).
+* `boot_enh.bin` - the bootblock with two instructions changed so the load base is always 0:
+  the 512K program from track 110 on any machine (the 1MB program is not patched).
+* `gng_enhanced.adf` - an extended ADF made by `tools/disk/mkdisk.py`, with the module added
+  on track 132 (`--add`, a new option: a file no table lists). The build decodes the image again
+  and checks that the bootblock, main program and module read back exactly.
+
+### The patches
+
+| Original | Now |
+|---|---|
+| `Start` (`$5D32`, loading the copyright screen) | first loads the module (`EnhLoad`, a FileTable-style entry for track 132) and calls `EnhInit` |
+| `RedrawScreen` | full draw of the pristine buffer at `g_NewTileX/Y` (+ scenery); sets `g_RedrawDone` |
+| `RedrawEntry` (the background redraw the camera asks for at almost every step) | nothing to draw: sets `g_RedrawDone`; still lets the logic run again and idles |
+| `CameraJump` | the same fine-scroll rules and origin switch, without rotating buffers |
+| `SwapScreens` | adopts `g_NewTileX/Y`; marks both display buffers 'unknown' (they are copied from the pristine buffer when next used - not straight away, because the progress map calls `SwapScreens` with its picture in the same memory) |
+| `RestoreBackground` | brings the pristine buffer and the buffer being drawn to the camera (new edges only), then undoes that buffer's BOBs from the pristine one |
+| `DrawBobs` | the game's draw list, through `ScrDrawBobs` |
+| `SetBitplanePtrs` | `ScrBuildCopper` for the buffer being drawn |
+| `ShowBackBuffer` | waits for the copper interrupt, shows that list, swaps the two display buffers |
+| `PrintChar`, playfield text (`$B0D6`) | the 8 lines are copied from the ring to a scratch area laid out like the original buffer, the original code prints there, and they are copied back |
+
+The camera logic itself is the original's, so the tile origin (`g_ScrollTileX/Y`, which also
+selects the enemy spawn zones) moves exactly as before. (A first version set the camera
+straight to its target; it played, but the origin then changed a few pixels earlier or later
+than in the original and the enemy zones with it - found by the side-by-side test below.)
+What is gone is the work: no 288-blit redraw and 46 KB CPU copy at every origin change, no
+redraw racing the camera, and so no logic freezes waiting for one.
+
+### Memory
+
+| Address | |
+|---|---|
+| `$371E8` | BOB mask (the original's mask area) |
+| `$37468` | pristine buffer, 47,120 bytes |
+| `$42B78` | display buffer A |
+| `$4E288` | display buffer B (ends `$59998`) |
+| `$5C000` | the module, then its storage (to about `$5E200`) |
+| `$64468` | the HUD strip, as before |
+
+The original's four screen pointers keep their values: only the progress map still uses them, as
+raw memory (it unpacks its picture at `$4DC68`..`$5B6A8`, below the module), and the level loader
+still stages the enemy graphics at `$37468`..`$544AA`. Both happen while no playfield is shown,
+and the game draws the level again (`RedrawScreen`) afterwards. The original's background save
+areas (`$311E8`, `$341E8`) and the screen memory from `$59998` to `$5C000` and after the module
+are no longer used; nothing has been moved into them yet.
+
+### Testing
+
+`tools/game.py` runs the whole game in the emulator - the boot sequence's Start (without the
+copyright wait), then each frame the vertical-blank interrupt and, when it asks for it, the
+game's level-1 interrupt, with joystick input - for either build. `tools/compare_runs.py` runs
+the original and the enhanced game side by side with the same input and compares the whole
+display every frame, and the game state (`$88`-`$E7` of the globals: Arthur, the camera, score,
+lives...).
+
+In the emulator a background redraw finishes at once, so the original never waits for one
+and the two games stay in step - same logic, same pictures - which makes a direct comparison
+possible. Results (random walking, jumping, climbing and throwing; DrawBob's top-clip bug fixed
+in the reference):
+
+| Run | Level | Frames in step | Identical displays | Different |
+|---|---|---:|---:|---:|
+| walking, 3 input seeds (with deaths, the progress map, restarts) | 0 | 3 x 6,000 | 17,989 | 11 |
+| walking, started on each level | 1-6 | 6 x 3,000 | 17,980 | 20 |
+| teleporting Arthur every 150 frames (camera jumps, vertical scrolling: 29-51 tile rows on levels 1, 2, 4, 5) | 0-6 | 7 x 2,500 | 17,476 | 24 |
+| **total** | | **53,500** | **53,445** | **55** |
+
+The two games never went out of step (game state compared every frame), and none of the 55
+frames is a playfield difference:
+
+* 2-3 frames per run while a level's graphics load: both builds show the loading data passing
+  through screen memory, laid out differently;
+* the first frame of the progress map, 2-5 pixels at its top-left: the map's copper list starts
+  2 bytes before its picture, and those bytes belong to a different buffer in each build.
+
+Separately, `tools/test_scroll.py` and `tools/test_bobs.py` still pass (280 of 280 and 140 + 401
+of 401 frames) with the core as integrated. The deepest stack use in play went from about 120 to
+about 320 bytes below `$80000`; the highest level data (level 1's enemy graphics) ends at
+`$7F4DE`, so 2.4 KB remain.
+
+What this does not show: anything about timing (the emulator runs each frame's work at once),
+the real disk loader (LoadFile is replaced by a copy), sound, and how it looks on a real
+display. Those need WinUAE or a real Amiga.
+
+### Trying it
+
+Build (or use the image in the release), then in WinUAE: an A500 with 512K chip RAM (or more:
+the enhanced bootblock always loads the 512K program), Kickstart 1.3, and insert
+`gng_enhanced.adf` in DF0 (WinUAE reads extended ADFs). Keys as the original: F1 one player,
+F2 two, space to pause, Esc to abort.
+
+If something looks wrong, the most useful report is what was on screen and what Arthur was
+doing (walking, falling, climbing), and the level.
 
 ## Files
 
-* `src/scroll.s`: the scroller module (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`), assembled at
-  `$7A000` for the harness.
+* `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
+  `ScrDrawBobs`, `CopyAll`); `src/scroll_test.s` assembles it at `$7A000` for the unit tests.
+* `src/module.s`: the game module (scroller + glue); `src/patches.s`: the changes to the main
+  program.
+* `tools/build_enh.py`: builds the module, the patched program, the bootblock and the disk image.
+* `tools/game.py`: runs the whole game (either build) in the emulator.
+* `tools/compare_runs.py`: the original and the enhanced game side by side.
+* `tools/check_game.py`: each frame the enhanced game shows, against the original's display code
+  drawing the same state (a second check, independent of the two games staying in step).
 * `tools/amiga.py`: harness: 68000 + blitter + copper + display renderer.
 * `tools/original.py`: drives the original game's display code in the harness (the reference).
 * `tools/check_harness.py`: checks the harness against the level pictures in `render/out/`.
@@ -127,6 +239,8 @@ So about 43 KB saved on the screens, and the save areas go as well.
 
 ```
 cd enhanced/tools
+VASM=/path/to/vasmm68k_mot python3 build_enh.py         # -> ../build/gng_enhanced.adf
+python3 compare_runs.py 6000 1                           # frames, input seed [--level N] [--png DIR]
 python3 check_harness.py
 VASM=/path/to/vasmm68k_mot python3 test_scroll.py 80     # steps per level
 VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, then the scenery sweeps
@@ -134,19 +248,13 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
 
 ## Next steps
 
-1. **Integration:** a separate source tree derived from `gng_main.s` (for example
-   `enhanced/src/gng_enh.s`):
-   * replace the redraw request / switch logic of the camera code (`$6EF2`; `tools/verify/camera.py`
-     documents it) with `ScrScrollTo` every drawn frame, and drop `RedrawEntry`, `g_SkipLogic`
-     freezes, `CameraJump`'s buffer rotation and the 4-buffer pointers;
-   * `RestoreBackground` / `DrawBobs` / `DrawBob` become `ScrRestore` / `ScrDrawBobs`;
-     `SetBitplanePtrs` becomes `ScrBuildCopper`; `ShowBackBuffer` swaps the two display buffers;
-   * `PrintChar` on the playfield: write through the buffer's line address with the ring wrap,
-     into both display buffers and the pristine one (or as a BOB);
-   * the memory map: three buffers of 47,120 bytes where the four were, a staging area for the
-     level-start load, the HUD strip and copper lists;
-   * level start, checkpoint and restart: `ScrFullDraw` on all three buffers.
-2. **One-plane masks** stored per frame (or the on-demand cache) instead of the 2 mask-building
+1. **Real machine timing** in WinUAE / FS-UAE (cycle-exact A500): the image is ready.
+2. **Use the freed memory** (43 KB of screens, the 24 KB of save areas): the first step towards
+   music on 512K machines and the other items in `docs/TODO.md`.
+3. **One-plane masks** stored per frame (or the on-demand cache) instead of the 2 mask-building
    blits; fully pre-masked graphics for the 1MB build.
-3. **Real machine timing** in WinUAE / FS-UAE: the integrated build on a disk image from
-   `tools/disk/mkdisk.py`.
+4. **The 1MB build**: the same module on top of `gng_main_1mb.s` (its addresses differ).
+5. **Playfield text** goes into the buffer being drawn only, as the original; a BOB passing over
+   it restores the background from the pristine buffer, so text that is not printed again every
+   frame can lose pieces where a BOB crossed it. None was seen in the tests (the in-game messages
+   are printed every frame, or while nothing moves), but it is worth watching for.
