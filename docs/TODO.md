@@ -17,10 +17,11 @@ Each line points to the item below with the details and measurements.
 
 **Display and drawing**
 - [ ] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
-      redraw only the new edge instead of the whole screen; no freezes when falling (3)
+      redraw only the new edge instead of the whole screen; no freezes when falling (3).
+      Background part prototyped and tested on branch `enhanced/scroll`; separate bitplanes
 - [ ] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
-- [ ] Masked graphics for one-blit BOBs: fully pre-masked on 1MB machines; on 512K an on-demand
-      cache of masked frames (fixed 24-32 KB pool, least recently used), or one-plane masks (3)
+- [ ] BOB masks: with the separate-plane screen, a one-plane mask per frame (+20%), stored or built
+      on demand into a small cache (3)
 - [ ] Possibly draw at 50 fps once the redraw cost is gone (3)
 
 **Memory**
@@ -106,6 +107,22 @@ would be opt-in.
 
 **Goal:** replace the full-redraw scrolling with incremental scrolling, to cut memory use and,
 more importantly, the scrolling cost.
+
+**Prototype (branch `enhanced/scroll`, `enhanced/docs/SCROLLER.md`).** The background part works:
+a module that draws one tile column / row at a time, with a vertical ring and copper wrap,
+matches the original display at every camera position tested (560 frames, all levels), in an
+emulator harness that adds blitter, copper and display emulation. What it showed:
+
+* **A corkscrew can't use line-interleaved planes.** Moving the pointers one word right makes each
+  plane's fetch run into the next plane's row. The enhanced screen therefore uses separate
+  bitplanes. Tiles are drawn with 5 blits each (one per plane).
+* **This simplifies the masks.** With separate planes one one-plane mask serves all 5 planes, so
+  BOBs need only a one-plane mask per frame (+20%), not the 2x masked copies discussed below. The
+  frame cache below would hold one-plane masks.
+* **Measured memory:** 3 buffers of 51,280 bytes (with 1,040 bytes of corkscrew slack per plane) =
+  153,840 against 184,320: about 30 KB saved, not 36-41 KB.
+* **Cost:** a new column is 75 small blits (1,200 words) against the original's 288-blit,
+  23,040-word redraw plus a 46 KB CPU copy.
 
 **Where things stand now** (512K build; see README *Scrolling* and `tools/verify/camera.py`)
 
@@ -289,18 +306,16 @@ and counts the samples their lengths run into when they overrun):
 
 | Change | KB |
 |---|---:|
-| Corkscrew + pristine buffer (item 3): 3 buffers instead of 4, less corkscrew slack and vertical margin | +36 to +41 |
+| Corkscrew + pristine buffer (item 3): 3 buffers instead of 4, less the corkscrew slack (measured layout) | +30 |
 | Per-level map / tile tables instead of all levels | +30 |
 | Background save areas no longer needed (pristine restore); the MFM buffer and small BOBs stay | +8 |
 | Music: the tunes' samples and voice data, added to the 512K package | -43 |
 | One-plane BOB masks (worst level) | -13 |
-| **Margin** | **about +18 to +23** |
+| **Margin** | **about +12** |
 
 Full pre-masked BOBs as in the 1MB build (up to +65 KB on level 0) do **not** fit alongside the
-music on 512K. Use the on-demand frame cache of item 3 there, or the one-plane masks; keep full
-pre-masking for 1MB machines. A 24-32 KB cache pool in place of the 13 KB of one-plane masks
-leaves a margin of only about -1 to +12 KB, which is tight. Size the pool from measurements, and
-fall back to one-plane masks if it doesn't fit.
+music on 512K. With the separate-plane screen of the prototype (item 3), one-plane masks are all
+the BOBs need anyway, so the 13 KB here is the whole cost (less with an on-demand mask cache).
 
 ### Design
 
