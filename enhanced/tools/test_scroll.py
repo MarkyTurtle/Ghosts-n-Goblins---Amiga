@@ -13,8 +13,8 @@ from amiga import GLOBALS
 
 ORG = 0x7A000
 FULL, SCROLL, COPPER = ORG, ORG+4, ORG+8
-PLANE_SIZE = 36*256+1040
-BUFS = [0x37468, 0x37468+5*PLANE_SIZE]
+BUF_SIZE = 180*256+1040
+BUFS = [0x37468, 0x37468+BUF_SIZE]
 RECS = [0x79000, 0x79010]
 LIST = 0x79100
 BIN = os.path.join(HERE, '..', 'build', 'scroll.bin')
@@ -31,7 +31,7 @@ class Enhanced(Original):
         self.u.mem_write(ORG, open(BIN, 'rb').read())
         for r, b in zip(RECS, BUFS):
             self.u.mem_write(r, bytes(16)); self.w32(r, b)
-        self.u.mem_write(BUFS[0], bytes(10*PLANE_SIZE))
+        self.u.mem_write(BUFS[0], bytes(2*BUF_SIZE))
     def show_cam(self, k, cx, cy):
         self.blits = self.blit_words = 0
         self.call(SCROLL, a0=RECS[k], d0=cx & 0xFFFF, d1=cy & 0xFFFF)

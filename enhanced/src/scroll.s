@@ -5,18 +5,21 @@
 ; updated one tile column / row at a time as the camera moves.
 ;
 ; Screen layout (see enhanced/docs/SCROLLER.md):
-;  * Separate bitplanes, not line-interleaved. A corkscrew needs each plane to be a
-;    continuous run of 36-byte rows, so that scrolling the bitplane pointers one word
-;    to the right brings in the next row's first word; with line-interleaved planes
-;    that word would belong to the next plane.
+;  * Line-interleaved, as the original: each 180-byte line holds the 5 planes' 36-byte
+;    rows, so a tile is still one blit (16 lines x 5 planes).
 ;  * Horizontal: corkscrew. A world tile column C is always at byte 2*(C+1) of a
-;    row, so the whole level can scroll without moving data; each plane carries
-;    COL_SLACK spare bytes for the drift.
+;    plane row. Scrolling right moves the bitplane pointers on 2 bytes; a plane's
+;    fetch then runs into the start of the next plane row (or, for plane 4, the next
+;    line's plane 0) - bytes whose own column has just scrolled off the left, which is
+;    exactly where the new right-hand column is drawn. The buffer carries COL_SLACK
+;    spare bytes for the drift.
 ;  * Vertical: a ring of RING_LINES lines. World line y (Y up) is ring line
 ;    (-1-y) & 255; the copper reloads the bitplane pointers where the ring wraps.
 ;  * Address of (column C, world line y) in plane p:
-;       base + p*PLANE_SIZE + 2*(C+1) + 36*((-1-y) & 255)
+;       base + 2*(C+1) + 180*((-1-y) & 255) + 36*p
 ;    The same for every buffer, so a pristine copy can be blitted straight across.
+;  * (C, line, plane p) shares memory with (C+18, line, plane p-1), so at most 18
+;    columns are held.
 ;
 ; The tile lookup (map, CellTiles, cell $67, the level-1 second bank) is the same as
 ; the original RedrawScreen ($BFDE), so the picture is identical.
@@ -31,9 +34,10 @@
 ;==============================================================================
 
 ROWBYTES        equ     36              ; 288 px per plane row
+LINEBYTES       equ     ROWBYTES*5      ; 5 interleaved planes per line
 RING_LINES      equ     256
 COL_SLACK       equ     1040            ; corkscrew drift: 2 bytes per world column (levels <= 512 columns)
-PLANE_SIZE      equ     ROWBYTES*RING_LINES+COL_SLACK
+BUF_SIZE        equ     LINEBYTES*RING_LINES+COL_SLACK
 FETCH_BYTES     equ     34              ; 17 words fetched per line
 DISPLAY_TOP     equ     $44             ; first playfield line (the 16 lines above are the HUD strip)
 DISPLAY_END     equ     $124            ; first line after the display window
@@ -60,7 +64,7 @@ g_LevelFileAddr equ     $116
 
 ; buffer record
                 rsreset
-buf_Base        rs.l    1               ; plane 0; plane p at + p*PLANE_SIZE
+buf_Base        rs.l    1               ; start of the buffer
 buf_ColL        rs.w    1               ; drawn tile columns, inclusive
 buf_ColR        rs.w    1
 buf_RowB        rs.w    1               ; drawn tile rows (Y up), inclusive
@@ -221,7 +225,7 @@ DrawRow:
 
 ;------------------------------------------------------------------------------
 ; DrawTile - a0 = buffer record, d0 = tile row R (Y up), d1 = tile column C.
-; Source tile exactly as RedrawScreen; 5 blits, one per plane (16 lines x 1 word).
+; Source tile exactly as RedrawScreen; one blit (16 lines x 5 planes x 1 word).
 ;------------------------------------------------------------------------------
 DrawTile:
                 movem.l d0-d7/a2-a4,-(a7)
@@ -274,7 +278,7 @@ DrawTile:
                 neg.w   d4
                 lsl.w   #4,d4
                 andi.w  #$FF,d4                 ; ring line = (-16*(R+1)) & 255
-                mulu.w  #ROWBYTES,d4
+                mulu.w  #LINEBYTES,d4
                 move.w  d1,d5
                 addq.w  #1,d5
                 add.w   d5,d5
@@ -282,21 +286,16 @@ DrawTile:
                 add.l   d5,d4
                 movea.l buf_Base(a0),a4
                 adda.l  d4,a4
-                ; ---- one blit per plane: A = the tile's plane (modulo 8), D = the plane
+                ; ---- one blit: the tile's 80 plane lines (16 x 5) to rows 36 bytes apart
                 lea     CUSTOM,a2
                 WAITBLIT
                 move.l  #$09F00000,BLTCON0(a2)  ; A -> D
                 move.l  #$FFFFFFFF,BLTAFWM(a2)
-                move.w  #8,BLTAMOD(a2)
+                move.w  #0,BLTAMOD(a2)
                 move.w  #ROWBYTES-2,BLTDMOD(a2)
-                moveq   #4,d7
-.plane:         WAITBLIT
                 move.l  a3,BLTAPTH(a2)
                 move.l  a4,BLTDPTH(a2)
-                move.w  #(16<<6)|1,BLTSIZE(a2)
-                addq.l  #2,a3
-                adda.l  #PLANE_SIZE,a4
-                dbra    d7,.plane
+                move.w  #((16*5)<<6)|1,BLTSIZE(a2)
                 movem.l (a7)+,d0-d7/a2-a4
                 rts
 
@@ -326,12 +325,12 @@ ScrBuildCopper:
                 move.l  buf_Base(a0),d5
                 add.l   d3,d5                   ; d5 = row start of ring line 0
                 move.w  d4,d6
-                mulu.w  #ROWBYTES,d6
+                mulu.w  #LINEBYTES,d6
                 move.l  d5,d7
                 add.l   d6,d7                   ; d7 = top line
                 bsr.b   .pointers
-                move.l  #(BPL1MOD<<16)|(ROWBYTES-FETCH_BYTES),(a1)+
-                move.l  #(BPL2MOD<<16)|(ROWBYTES-FETCH_BYTES),(a1)+
+                move.l  #(BPL1MOD<<16)|(LINEBYTES-FETCH_BYTES),(a1)+
+                move.l  #(BPL2MOD<<16)|(LINEBYTES-FETCH_BYTES),(a1)+
                 move.w  #BPLCON1,(a1)+
                 move.w  d2,(a1)+
                 tst.w   d4                      ; ring wraps inside the display?
@@ -364,6 +363,6 @@ ScrBuildCopper:
                 move.w  d0,(a1)+
                 move.w  d7,(a1)+
                 addq.w  #2,d0
-                add.l   #PLANE_SIZE,d7
+                add.l   #ROWBYTES,d7            ; next plane: next 36-byte row
                 dbra    d1,.pp
                 rts
