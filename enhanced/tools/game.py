@@ -52,7 +52,7 @@ def copyright_wait(build):
 class GameRun(Amiga):
     """build: '512k' or '1mb'; binfile: the main program (default: the original); extra_files:
     {track: path} for files LoadFile reads that are not in disk/files (the modules)"""
-    def __init__(self, binfile=None, extra_files=None, build='512k'):
+    def __init__(self, binfile=None, extra_files=None, build='512k', machine=None):
         cfg = self.cfg = BUILDS[build]
         super().__init__(os.path.join(ROOT, BUILDS['512k']['orig']))
         if build != '512k':
@@ -62,6 +62,9 @@ class GameRun(Amiga):
         prog = open(binfile or os.path.join(ROOT, cfg['orig']), 'rb').read()
         self.u.mem_write(cfg['load'], prog)
         self.w32(4, cfg['load'] if build == '512k' else cfg['base'])   # $4.w as the bootblock leaves it
+        if machine:                            # the enhanced bootblock's machine description:
+            import test_bootinfo                # its own code, run on a fake exec memory list
+            self.u.mem_write(test_bootinfo.MACHINE_INFO, test_bootinfo.run(*machine))
         self.L = L = labels(build)
         self.entry, self.idle = L['ProgramEntry'], L['IdleLoop']
         self.copyright_wait = L[copyright_wait(build)]
@@ -154,10 +157,11 @@ class GameRun(Amiga):
 MODULE_TRACK = {'512k': 132, '1mb': 133}
 
 
-def enhanced(build='512k'):
-    """the enhanced game of a build (made by build_enh.py)"""
+def enhanced(build='512k', machine=None):
+    """the enhanced game of a build (made by build_enh.py); machine: (regions, vblank,
+    attnflags) as in test_bootinfo.MACHINES, to have the bootblock's description in memory"""
     d = os.path.join(BUILD, build)
-    return GameRun(os.path.join(d, 'main.bin'), {MODULE_TRACK[build]: os.path.join(d, 'module.bin')}, build)
+    return GameRun(os.path.join(d, 'main.bin'), {MODULE_TRACK[build]: os.path.join(d, 'module.bin')}, build, machine)
 
 
 def script_start():

@@ -56,6 +56,21 @@ MASKBUF         equ     $371E8          ; the original DrawBob's mask area (640 
 BUF_P           equ     $37468
                 endif
 RLIST_ENTRIES   equ     256             ; restore entries per display buffer
+TEXTQ_MAX       equ     64              ; playfield characters remembered per frame (TextReplay)
+TEXTQ_ENTRY     equ     14              ; font.l, ring.w, offset.l, shadow, ink, paper, pad
+MACHINE_INFO    equ     $7FB00          ; where the bootblock leaves the machine description
+
+; a call to a routine of the game program: an absolute address in the 512K program; in the
+; 1MB one, its label is an offset from g_BaseAddr
+GAMECALL        macro
+                ifd     BUILD_1MB
+                movea.l g_BaseAddr(a6),a0
+                adda.l  #\1,a0
+                jsr     (a0)
+                else
+                jsr     \1
+                endif
+                endm
 COPPER_BYTES    equ     128
 
                 org     MODULE_ORG
@@ -70,6 +85,7 @@ COPPER_BYTES    equ     128
                 bra.w   EnhPrintField           ; +28 (jumped to from inside PrintChar)
                 bra.w   EnhRedrawBackground     ; +32
                 bra.w   EnhCameraJump           ; +36
+                bra.w   EnhShowMachine          ; +40 (after DrawCreditsScreen)
 
                 include "scroll.s"
 
@@ -82,7 +98,14 @@ EnhInit:
                 move.w  #(ModuleEnd-ModuleFileEnd)/2-1,d0
 .clr:           clr.w   (a0)+
                 dbra    d0,.clr
-                lea     RecP(pc),a2
+                lea     MACHINE_INFO,a0         ; the bootblock's machine description, if it
+                cmpi.l  #'GNGM',(a0)            ; left one (boot_patches.s): kept here, as its
+                bne.b   .nomachine              ; address is only safe until the game starts
+                lea     EnhMachine(pc),a1
+                moveq   #7,d0
+.mach:          move.l  (a0)+,(a1)+
+                dbra    d0,.mach
+.nomachine:     lea     RecP(pc),a2
                 move.l  #BUF_P,buf_Base(a2)
                 lea     RecA(pc),a0
                 move.l  #BUF_P+BUF_SIZE,buf_Base(a0)
@@ -193,6 +216,8 @@ EnhSwapScreens:
                 clr.w   buf_Valid(a1)
                 lea     RecB(pc),a1
                 clr.w   buf_Valid(a1)
+                lea     TextQ(pc),a1
+                clr.w   (a1)
                 rts
 
 ;------------------------------------------------------------------------------
@@ -230,13 +255,16 @@ EnhShowBackBuffer:
                 movea.l g_SaveBufA(a6),a1
                 move.l  g_SaveBufB(a6),g_SaveBufA(a6)
                 move.l  a1,g_SaveBufB(a6)
+                lea     TextQ(pc),a1            ; this frame's text is on screen now
+                clr.w   (a1)
                 rts
 
 ;------------------------------------------------------------------------------
 EnhRestoreBackground:
                 bsr.w   EnsureCurrent
                 movea.l DrawRec(pc),a0
-                bra.w   ScrRestore
+                bsr.w   ScrRestore
+                bra.w   TextReplay
 
 ;------------------------------------------------------------------------------
 EnhDrawBobs:
@@ -260,7 +288,7 @@ EnhDrawBobs:
 ;------------------------------------------------------------------------------
 EnhPrintField:
                 move.l  52(a7),PrRet            ; come back here after the print
-                move.l  #.back,52(a7)
+                move.l  #PrintBack,52(a7)
                 bsr.w   EnsureCurrent
                 move.w  d2,d0
                 sub.w   #16,d0
@@ -276,7 +304,22 @@ EnhPrintField:
                 addq.w  #2,d3
                 ext.l   d3
                 move.l  d3,PrOff
-                moveq   #0,d6                   ; copy in
+                lea     TextQ(pc),a1            ; remember it, to print it again after the
+                move.w  (a1),d0                 ; restore (TextReplay)
+                cmp.w   #TEXTQ_MAX,d0
+                bhs.b   PrintCore
+                addq.w  #1,(a1)+
+                mulu.w  #TEXTQ_ENTRY,d0
+                adda.l  d0,a1
+                move.l  a0,(a1)+                ; font data
+                move.w  PrRing(pc),(a1)+
+                move.l  PrOff(pc),(a1)+
+                move.b  g_TextShadow(a6),(a1)+
+                move.b  g_TextInk(a6),(a1)+
+                move.b  g_TextPaper(a6),(a1)+
+; PrRing / PrOff set, a0 = font data, d7 = $FF, PrintChar's frame on the stack with
+; PrintBack as its return address and PrRet the real one
+PrintCore:      moveq   #0,d6                   ; copy in
                 bsr.w   PrCopy
                 lea     PrScratch(pc),a1
                 moveq   #0,d1
@@ -288,12 +331,84 @@ EnhPrintField:
                 else
                 jmp     PrintBody
                 endif
-.back:          movem.l d0-d7/a0-a5,-(a7)       ; (PrintChar's registers, as it returns them)
+PrintBack:      movem.l d0-d7/a0-a5,-(a7)       ; (PrintChar's registers, as it returns them)
                 moveq   #1,d6                   ; copy out
                 bsr.w   PrCopy
                 movem.l (a7)+,d0-d7/a0-a5
                 move.l  PrRet(pc),-(a7)
                 rts
+
+;------------------------------------------------------------------------------
+; TextReplay - after the restore of the buffer being drawn: print the characters printed
+; on the playfield since the last frame was shown again (the restore may have cut
+; through them, or the buffer been copied afresh), and add a restore entry for each, so
+; that text the game stops printing goes away like a BOB. (The original kept such text
+; until its next full redraw; the game prints its in-play messages every frame.) Text
+; printed on screens that are not redrawn (title, high scores, game over) is not
+; affected: they have no restore.
+;------------------------------------------------------------------------------
+TextReplay:
+                movem.l d0-d7/a0-a5,-(a7)
+                lea     TextQ(pc),a4
+                move.w  (a4)+,d5
+                beq.w   .out
+                subq.w  #1,d5
+.char:          movea.l (a4)+,a0
+                move.w  (a4)+,PrRing
+                move.l  (a4)+,PrOff
+                move.b  (a4)+,g_TextShadow(a6)
+                move.b  (a4)+,g_TextInk(a6)
+                move.b  (a4)+,g_TextPaper(a6)
+                addq.l  #1,a4                   ; (pad: entries stay word aligned)
+                movem.l d5/a4,-(a7)
+                move.l  #.printed,PrRet
+                move.l  #PrintBack,-(a7)        ; a PrintChar frame: return, a0-a5, d1-d7
+                movem.l a0-a5,-(a7)
+                movem.l d1-d7,-(a7)
+                moveq   #-1,d7                  ; transparent
+                bra.w   PrintCore
+.printed:       movem.l (a7)+,d5/a4
+                bsr.b   .restore
+                dbra    d5,.char
+.out:           movem.l (a7)+,d0-d7/a0-a5
+                rts
+; a restore entry for the character at PrRing / PrOff (its word, 8 lines; two entries
+; when it crosses the ring's wrap)
+.restore:       movea.l DrawRec(pc),a0
+                movea.l buf_RList(a0),a1
+                move.l  buf_RListEnd(a0),d0
+                sub.l   a1,d0
+                cmp.l   #16,d0
+                blt.b   .full
+                move.l  PrOff(pc),d1
+                bclr    #0,d1                   ; its word
+                add.l   buf_Base(a0),d1
+                move.w  PrRing(pc),d2
+                move.w  #RING_LINES,d3
+                sub.w   d2,d3                   ; lines before the wrap
+                moveq   #8,d4
+                cmp.w   d4,d3
+                bhs.b   .one
+                move.w  d4,d6
+                sub.w   d3,d6                   ; lines after it, from ring line 0
+                move.l  d1,(a1)+
+                move.w  d6,d7
+                mulu.w  #5,d7
+                lsl.w   #6,d7
+                addq.w  #1,d7
+                move.w  d7,(a1)+
+                move.w  #ROWBYTES-2,(a1)+
+                move.w  d3,d4
+.one:           mulu.w  #LINEBYTES,d2
+                add.l   d2,d1
+                move.l  d1,(a1)+
+                mulu.w  #5,d4
+                lsl.w   #6,d4
+                addq.w  #1,d4
+                move.w  d4,(a1)+
+                move.w  #ROWBYTES-2,(a1)+
+                move.l  a1,buf_RList(a0)
+.full:          rts
 
 ; d6 = 0: ring -> scratch, 1: scratch -> ring. 8 lines x 5 planes x 1 byte.
 PrCopy:         movea.l DrawRec(pc),a3
@@ -321,6 +436,78 @@ PrCopy:         movea.l DrawRec(pc),a3
                 rts
 
 ;------------------------------------------------------------------------------
+; EnhShowMachine - after DrawCreditsScreen (the title screen): one line in the free row
+; under the credits with the memory the bootblock found, for example
+;       CHIP 512K SLOW 512K FAST 0K
+; Nothing is printed when the bootblock left no description (the original bootblock).
+; Sizes: chip = its upper end; slow / fast = upper end - the 64K boundary below mh_Lower.
+;------------------------------------------------------------------------------
+EnhShowMachine:
+                movem.l d0-d7/a0-a5,-(a7)
+                lea     EnhMachine(pc),a4
+                cmpi.l  #'GNGM',(a4)
+                bne.b   .out
+                lea     MachText(pc),a3
+                lea     TxtChip(pc),a1
+                move.l  12(a4),d0               ; chip: upper end
+                bsr.b   .item
+                lea     TxtSlow(pc),a1
+                movem.l 16(a4),d0-d1            ; slow: lower, upper
+                bsr.b   .region
+                lea     TxtFast(pc),a1
+                movem.l 24(a4),d0-d1            ; fast
+                bsr.b   .region
+                clr.b   -(a3)                   ; (no space after the last item)
+                lea     MachText(pc),a0
+                suba.l  a0,a3                   ; length
+                moveq   #32,d1                  ; centred on the 32 columns shown
+                sub.w   a3,d1
+                bpl.b   .fits
+                moveq   #0,d1
+.fits:          lsr.w   #1,d1                   ; column
+                move.b  #$18,g_TextShadow(a6)   ; the credits' colours
+                move.b  #$0D,g_TextInk(a6)
+                move.b  #$1F,g_TextPaper(a6)
+                lea     MachText(pc),a3
+                moveq   #$78,d2                 ; the free line between SOUND and 'Press fire'
+                GAMECALL PrintString
+.out:           movem.l (a7)+,d0-d7/a0-a5
+                rts
+; d0 = mh_Lower, d1 = mh_Upper (0: none) -> d0 = size
+.region:        exg     d0,d1
+                tst.l   d0
+                beq.b   .item
+                clr.w   d1
+                sub.l   d1,d0
+; a1 = label, d0 = size in bytes: 'LABEL nnnK '
+.item:          move.b  (a1)+,(a3)+
+                bne.b   .item
+                subq.l  #1,a3
+                moveq   #10,d1
+                lsr.l   d1,d0                   ; KB (< 655360: one divu per digit is enough)
+                moveq   #0,d2                   ; digits pushed
+.div:           divu.w  #10,d0
+                swap    d0
+                add.b   #'0',d0
+                move.b  d0,-(a7)
+                addq.w  #1,d2
+                clr.w   d0
+                swap    d0
+                tst.l   d0
+                bne.b   .div
+.pop:           move.b  (a7)+,(a3)+
+                subq.w  #1,d2
+                bne.b   .pop
+                move.b  #'K',(a3)+
+                move.b  #' ',(a3)+
+                rts
+
+TxtChip:        dc.b    'CHIP ',0
+TxtSlow:        dc.b    'SLOW ',0
+TxtFast:        dc.b    'FAST ',0
+                even
+
+;------------------------------------------------------------------------------
                 cnop    0,4
 DrawRec:        dc.l    0               ; the buffer being drawn (the original's g_ScreenFront)
 ShowRec:        dc.l    0               ; the buffer on screen
@@ -338,6 +525,9 @@ CopperB         rs.b    COPPER_BYTES
 RListA          rs.b    8*RLIST_ENTRIES
 RListB          rs.b    8*RLIST_ENTRIES
 PrScratch       rs.b    2+8*LINEBYTES
+TextQ           rs.b    2+TEXTQ_MAX*TEXTQ_ENTRY
+EnhMachine      rs.b    32              ; the bootblock's machine description (or zeros)
+MachText        rs.b    48
 ModuleEnd       rs.b    0
                 ifgt    ModuleEnd-CLEAR_AREA
                 fail    "the module runs into the HUD area"

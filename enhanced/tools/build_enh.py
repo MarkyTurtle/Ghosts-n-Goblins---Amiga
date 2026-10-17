@@ -30,15 +30,18 @@ ENH = os.path.join(HERE, '..')
 ROOT = os.path.join(ENH, '..')
 SRC, OUT = os.path.join(ENH, 'src'), os.path.join(ENH, 'build')
 VASM = os.environ.get('VASM', 'vasmm68k_mot')
+BOOT_SHA1 = '0bf93a4078bf317fa2774b4b973e1c79c0060227'
 BUILDS = {
     '512k': dict(src='gng_main.s', equates='gng_equates.i', sha1='2628a93c164a5a8791272c146053b0afb3ddcf14',
                  load=0x80,            # labels are addresses; the file starts at $80
                  track=110, module_track=132, defs=(),
-                 names={'StartLoad': 0x5D32, 'StartLoadEnd': 0x5D3A, 'PrintField': 'l_0B0D6', 'PrintBody': 'l_0B0E2'}),
+                 names={'StartLoad': 0x5D32, 'StartLoadEnd': 0x5D3A, 'PrintField': 'l_0B0D6', 'PrintBody': 'l_0B0E2',
+                        'CreditsCall': 0x5EF0, 'CreditsCallEnd': 0x5EF4}),
     '1mb': dict(src='gng_main_1mb.s', equates='gng_equates_1mb.i', sha1='e44347679297d5d864ae7b0da689714970e261ad',
                 load=0,                # assembled at org 0: labels are file offsets
                 track=17, module_track=133, defs=(('BUILD_1MB', 1),),
-                names={'StartLoad': 0x5D88, 'StartLoadEnd': 0x5D90, 'PrintField': 'l_0B142', 'PrintBody': 'l_0B14E'}),
+                names={'StartLoad': 0x5D88, 'StartLoadEnd': 0x5D90, 'PrintField': 'l_0B142', 'PrintBody': 'l_0B14E',
+                       'CreditsCall': 0x5F46, 'CreditsCallEnd': 0x5F4A}),
 }
 
 
@@ -69,15 +72,51 @@ def write_syms(path, syms):
             f.write(f'{k}\tequ\t${v:X}\n')
 
 
-def patch_blocks():
-    """[(start, end, text)] from src/patches.s"""
-    blocks, cur = [], None
-    for line in open(os.path.join(SRC, 'patches.s')):
+def patch_blocks(path):
+    """(preamble, [(start, end, text)]) from a patch file: the text before the first block
+    (equates only) is put in front of every block"""
+    pre, blocks, cur = [], [], None
+    for line in open(path):
         m = re.match(r';@patch\s+(\S+)\s+(\S+)', line)
         if m:
             cur = [m.group(1), m.group(2), []]; blocks.append(cur)
         elif cur: cur[2].append(line)
-    return [(a, b, ''.join(t)) for a, b, t in blocks]
+        else: pre.append(line)
+    return ''.join(pre), [(a, b, ''.join(t)) for a, b, t in blocks]
+
+
+def apply_patches(prog, path, load, header, known, out, tag):
+    """assemble each block of a patch file at its address and write it into prog (a bytearray
+    holding the program as loaded at 'load'); header: assembler lines in front of each block;
+    known: the symbols already defined (block labels are collected after them)"""
+    pre, blocks = patch_blocks(path)
+    addr = lambda tok: int(tok[1:], 16) if tok.startswith('$') else known[tok]
+    tmp_s, tmp_b, tmp_l = (os.path.join(out, 'patch.' + e) for e in ('s', 'bin', 'lst'))
+    psyms = {}
+    for a, b, body in blocks:
+        write_syms(os.path.join(out, 'patch_syms.i'), psyms)
+        start, end = addr(a), addr(b)
+        with open(tmp_s, 'w') as f:
+            f.write(f'{header}\tinclude "patch_syms.i"\n{pre}\n\torg\t${start:X}\n{body}')
+        vasm(tmp_s, tmp_b, listing=tmp_l, inc=out)
+        psyms.update({k: v for k, v in symbols(tmp_l).items() if k not in known})
+        code = open(tmp_b, 'rb').read()
+        if len(code) > end - start:
+            sys.exit(f'{tag} patch {a}: {len(code)} bytes, only {end-start} available up to {b}')
+        prog[start-load:start-load+len(code)] = code
+        print(f'  {tag} patch {a:<14} ${start:05X}: {len(code):4d} of {end-start:4d} bytes')
+
+
+def build_boot(out):
+    """the enhanced bootblock: the original with src/boot_patches.s (the memory survey)"""
+    os.makedirs(out, exist_ok=True)
+    orig, lst = os.path.join(out, 'orig_boot.bin'), os.path.join(out, 'orig_boot.lst')
+    vasm(os.path.join(ROOT, 'gng_boot.s'), orig, listing=lst, inc=out)
+    boot = bytearray(open(orig, 'rb').read())
+    if hashlib.sha1(boot).hexdigest() != BOOT_SHA1: sys.exit('gng_boot.s does not build the original')
+    apply_patches(boot, os.path.join(SRC, 'boot_patches.s'), 0, '', symbols(lst), out, 'boot')
+    assert len(boot) == 1024
+    return boot
 
 
 def build(name):
@@ -102,25 +141,11 @@ def build(name):
     mlen = os.path.getsize(mod)
     print(f'{name}: module.bin {mlen:,} bytes at ${org:X} (track {cfg["module_track"]})')
     # 3. the patches
-    addr = lambda tok: int(tok[1:], 16) if tok.startswith('$') else osyms[tok]
-    tmp_s, tmp_b, tmp_l = (os.path.join(out, 'patch.' + e) for e in ('s', 'bin', 'lst'))
-    psyms = {}
-    for a, b, body in patch_blocks():
-        write_syms(os.path.join(out, 'patch_syms.i'), psyms)
-        start, end = addr(a), addr(b)
-        with open(tmp_s, 'w') as f:
-            f.write(f'\tinclude "{cfg["equates"]}"\n\tinclude "orig_syms.i"\n\tinclude "module_syms.i"\n'
-                    f'\tinclude "patch_syms.i"\n'
-                    f'MODULE_ORG\tequ\t${org:X}\nMODULE_LEN\tequ\t{mlen}\nMODULE_TRACK\tequ\t{cfg["module_track"]}\n'
-                    f'\torg\t${start:X}\n{body}')
-        V(tmp_s, tmp_b, listing=tmp_l)
-        psyms.update({k: v for k, v in symbols(tmp_l).items() if k not in osyms and k not in msyms})
-        code = open(tmp_b, 'rb').read()
-        if len(code) > end - start:
-            sys.exit(f'{name} patch {a}: {len(code)} bytes, only {end-start} available up to {b}')
-        L = cfg['load']
-        prog[start-L:start-L+len(code)] = code
-        print(f'  patch {a:<18} ${start:05X}: {len(code):4d} of {end-start:4d} bytes')
+    known = dict(osyms); known.update(msyms)
+    apply_patches(prog, os.path.join(SRC, 'patches.s'), cfg['load'],
+                  f'\tinclude "{cfg["equates"]}"\n\tinclude "orig_syms.i"\n\tinclude "module_syms.i"\n'
+                  f'MODULE_ORG\tequ\t${org:X}\nMODULE_LEN\tequ\t{mlen}\nMODULE_TRACK\tequ\t{cfg["module_track"]}\n',
+                  known, out, name)
     main_out = os.path.join(out, 'main.bin')
     open(main_out, 'wb').write(prog)
     return main_out, mod
@@ -140,20 +165,23 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     built = {name: build(name) for name in BUILDS}
     (m512, mod512), (m1mb, mod1mb) = built['512k'], built['1mb']
-    orig_boot = os.path.join(ROOT, 'bin', 'bootblock.bin')
-    # both programs, the original bootblock (it chooses by memory)
+    bootdir = os.path.join(OUT, 'boot')
+    boot = build_boot(bootdir)
+    boot_out = os.path.join(bootdir, 'boot.bin')
+    open(boot_out, 'wb').write(boot)
+    # both programs; the bootblock chooses by memory, as the original
     adf = os.path.join(OUT, 'gng_enhanced.adf')
-    mkdisk(adf, orig_boot, {'main512': m512, 'main1mb': m1mb},
+    mkdisk(adf, boot_out, {'main512': m512, 'main1mb': m1mb},
            {BUILDS['512k']['module_track']: mod512, BUILDS['1mb']['module_track']: mod1mb})
-    verify_image(adf, open(orig_boot, 'rb').read(), {110: m512, 17: m1mb,
+    verify_image(adf, bytes(boot), {110: m512, 17: m1mb,
                  BUILDS['512k']['module_track']: mod512, BUILDS['1mb']['module_track']: mod1mb})
     # the 512K program only: load base always 0
-    boot = bytearray(open(orig_boot, 'rb').read())
+    boot = bytearray(boot)
     for off, old, new in ((0x2C, '20380004', '70004e71'),               # move.l $4.w,d0 -> moveq #0,d0
                           (0x40, '203c00080000', '70004e714e71')):       # move.l #$80000,d0 -> moveq #0,d0
         assert boot[off:off+len(old)//2].hex() == old, f'bootblock ${off:X}'
         boot[off:off+len(new)//2] = bytes.fromhex(new)
-    boot_out = os.path.join(OUT, 'boot_512k_only.bin')
+    boot_out = os.path.join(bootdir, 'boot_512k_only.bin')
     open(boot_out, 'wb').write(boot)
     adf = os.path.join(OUT, 'gng_enhanced_512k.adf')
     mkdisk(adf, boot_out, {'main512': m512}, {BUILDS['512k']['module_track']: mod512})

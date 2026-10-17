@@ -25,6 +25,8 @@ EnhLoad:        lea     EnhModuleFile(pc),a1    ; the module (its own track)
 EnhModuleFile:  dc.l    MODULE_ORG,MODULE_LEN   ; a FileTable entry: address, length, track
                 dc.w    MODULE_TRACK
 EnhRedrawBg:    jmp     EnhRedrawBackground     ; (RedrawEntry's bsr.w reaches here)
+EnhCredits:     bsr.w   DrawCreditsScreen       ; the title screen, then the machine line
+                jmp     EnhShowMachine
 
 ;@patch StartLoad StartLoadEnd
 ; Start, where it loads the copyright screen ($5D32; 1MB $5D88): load the scroller module
@@ -67,3 +69,8 @@ EnhRedrawBg:    jmp     EnhRedrawBackground     ; (RedrawEntry's bsr.w reaches h
 ; CameraJump - the camera switches to the origin 'redrawn' at g_NewTileX/Y: the same
 ; fine-scroll rules, but no buffers to rotate (SwapScreens, which it used to fall into).
                 jmp     EnhCameraJump
+
+;@patch CreditsCall CreditsCallEnd
+; AttractTitle's call of DrawCreditsScreen ($5EF0; 1MB $5F46): also show what memory the
+; bootblock found (EnhShowMachine).
+                bsr.w   EnhCredits

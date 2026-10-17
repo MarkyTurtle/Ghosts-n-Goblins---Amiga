@@ -131,9 +131,10 @@ and two disk images, made by `tools/disk/mkdisk.py` with the modules added on tr
 and 133 (1MB) (`--add`: files no table lists); the build decodes each image again and checks
 that the bootblock and every file it changed read back exactly:
 
-* `gng_enhanced.adf` - both enhanced programs and the **original bootblock**, which chooses as
-  on the original disk: the 1MB program when it finds more than 512K (1MB of chip RAM, or
-  memory above 512K), otherwise the 512K one.
+* `gng_enhanced.adf` - both enhanced programs and the bootblock, which chooses as on the
+  original disk: the 1MB program when it finds more than 512K (1MB of chip RAM, or memory above
+  512K), otherwise the 512K one. The bootblock is the original plus a memory survey (see *The
+  machine description*).
 * `gng_enhanced_512k.adf` - the 512K program only, with the bootblock's two memory tests
   changed so the load base is always 0 (to try the 512K program on a bigger machine).
 
@@ -244,6 +245,52 @@ What this does not show: anything about timing (the emulator runs each frame's w
 the real disk loader (LoadFile is replaced by a copy), sound, and how it looks on a real
 display. Those need WinUAE or a real Amiga.
 
+### Playfield text
+
+`PrintChar` on the playfield writes into the buffer being drawn, through the ring (8 lines
+copied to a scratch area laid out like the original buffer, printed there by the original code,
+copied back). Each character is also remembered for the frame; after the restore of that buffer
+(`TextReplay`, from `EnhRestoreBackground`) it is printed again - the restore may have cut through
+it, or the buffer been copied afresh - and gets a restore entry, so text the game stops printing
+goes away two frames later, like a BOB. The in-play messages ('TAKE A KEY FOR COMING IN !') are
+printed every frame, so they stay while shown. The original kept such text until its next full
+redraw: the side-by-side runs show it a frame longer, or with a piece cut out where a BOB's
+restore went through it, where the enhanced build shows it whole. Screens that are not redrawn
+(title, high scores, game over, name entry) have no restore, so their text stays as before (201
+game-over / name-entry frames compared identical in both builds).
+
+### The machine description (bootblock)
+
+The enhanced bootblock (`src/boot_patches.s`, applied to `gng_boot.s` by the build like the
+program patches) surveys the memory before taking the machine over: Kickstart calls a bootblock
+with `a6` = ExecBase, so `MemDetect` walks exec's memory list and leaves a 32-byte description at
+`$7FB00`:
+
+| Offset | |
+|---|---|
+| +0 | `'GNGM'` |
+| +4 | version (1) |
+| +5 | `VBlankFrequency` (50 PAL / 60 NTSC) |
+| +6 | `AttnFlags` (CPU / FPU bits) |
+| +8 | chip RAM: `mh_Lower`, `mh_Upper` (512K: upper `$80000`; 1MB: `$100000`) |
+| +16 | slow RAM (`$C00000`-`$DBFFFF`): lower, upper (0 if none) |
+| +24 | fast RAM (any other; the last region listed): lower, upper |
+
+It takes the 92 free bytes after the loading-screen palette (only its 16 colours are used) and
+one call in place of the bootblock's first instruction (`MemDetect` does that instruction
+itself). How the bootblock chooses the 512K or 1MB program is unchanged. `$7FB00` is above the
+loader's track buffer and below the loader copy and its stack, and above the highest game data
+(level 1's graphics end at `$7F4DE`); the module copies the block at start-up (`EnhInit`, into
+`EnhMachine`) since nothing guarantees the address later.
+
+The title screen shows it, in the free line under the credits, centred - for example
+`CHIP 512K SLOW 512K FAST 0K` (chip = its upper end; slow and fast = upper end minus the 64K
+boundary below the region's start). Without a description (the original bootblock) nothing
+is printed. `tools/test_bootinfo.py` runs the bootblock's own code on fake exec memory lists for
+six machines (A500 512K, + 512K slow, A500+ 1MB, 1MB + slow NTSC, A1200 2MB + 4MB fast, 512K +
+1.5MB slow + 2MB fast) and checks the description; `GameRun(..., machine=...)` puts it in memory
+for the whole-game runs.
+
 ### Trying it
 
 Build (or use the images in the release), then in WinUAE with Kickstart 1.3 insert
@@ -275,6 +322,7 @@ doing (walking, falling, climbing), and the level.
 * `tools/original.py`: drives the original game's display code in the harness (the reference).
 * `tools/check_harness.py`: checks the harness against the level pictures in `render/out/`.
 * `tools/test_scroll.py`: the scroller against the original, frame by frame.
+* `src/boot_patches.s`: the bootblock's memory survey; `tools/test_bootinfo.py` tests it.
 * `tools/test_bobs.py`: BOBs, restores and scenery against the original's `DrawBobs` and
   `DrawSceneryOnRedraw`.
 
@@ -333,7 +381,3 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
 3. **One-plane masks** stored per frame (or the on-demand cache) instead of the 512K build's 2
    mask-building blits (the 1MB build already has pre-masked graphics, and its scroller uses
    them).
-5. **Playfield text** goes into the buffer being drawn only, as the original; a BOB passing over
-   it restores the background from the pristine buffer, so text that is not printed again every
-   frame can lose pieces where a BOB crossed it. None was seen in the tests (the in-game messages
-   are printed every frame, or while nothing moves), but it is worth watching for.

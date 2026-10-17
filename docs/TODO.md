@@ -510,7 +510,9 @@ are 1MB-only), all of which come down to memory:
 
 **Plan**
 
-* **Bootblock: describe the machine.** Kickstart is still running when the bootblock starts, so
+* **Bootblock: describe the machine.** *Done on `enhanced/scroll`: `enhanced/src/boot_patches.s`
+  leaves a 32-byte description at `$7FB00` (layout in `enhanced/docs/SCROLLER.md`), the title
+  screen shows it; tested on six fake memory lists, not yet on real Kickstarts.* Kickstart is still running when the bootblock starts, so
   instead of guessing it can walk exec's memory list (`ExecBase->MemList`: each MemHeader gives
   the type - chip, fast; slow RAM at `$C00000` shows up as fast without DMA - its start and end).
   It writes a small block - say `'GNGM'`, version, chip size, then up to 4 (start, size, type)
