@@ -1,0 +1,620 @@
+; Ghosts'n Goblins - equates for the 1MB build
+
+CUSTOM		equ	$DFF000	; custom chip base
+; custom chip register offsets
+BLTDDAT     	equ	$000
+DMACONR     	equ	$002
+VPOSR       	equ	$004
+VHPOSR      	equ	$006
+DSKDATR     	equ	$008
+JOY0DAT     	equ	$00A
+JOY1DAT     	equ	$00C
+CLXDAT      	equ	$00E
+ADKCONR     	equ	$010
+POT0DAT     	equ	$012
+POT1DAT     	equ	$014
+POTGOR      	equ	$016
+SERDATR     	equ	$018
+DSKBYTR     	equ	$01A
+INTENAR     	equ	$01C
+INTREQR     	equ	$01E
+DSKPTH      	equ	$020
+DSKPTL      	equ	$022
+DSKLEN      	equ	$024
+DSKDAT      	equ	$026
+REFPTR      	equ	$028
+VPOSW       	equ	$02A
+VHPOSW      	equ	$02C
+COPCON      	equ	$02E
+SERDAT      	equ	$030
+SERPER      	equ	$032
+POTGO       	equ	$034
+JOYTEST     	equ	$036
+BLTCON0     	equ	$040
+BLTCON1     	equ	$042
+BLTAFWM     	equ	$044
+BLTALWM     	equ	$046
+BLTCPTH     	equ	$048
+BLTCPTL     	equ	$04A
+BLTBPTH     	equ	$04C
+BLTBPTL     	equ	$04E
+BLTAPTH     	equ	$050
+BLTAPTL     	equ	$052
+BLTDPTH     	equ	$054
+BLTDPTL     	equ	$056
+BLTSIZE     	equ	$058
+BLTCMOD     	equ	$060
+BLTBMOD     	equ	$062
+BLTAMOD     	equ	$064
+BLTDMOD     	equ	$066
+BLTCDAT     	equ	$070
+BLTBDAT     	equ	$072
+BLTADAT     	equ	$074
+DSKSYNC     	equ	$07E
+COP1LCH     	equ	$080
+COP1LCL     	equ	$082
+COP2LCH     	equ	$084
+COP2LCL     	equ	$086
+COPJMP1     	equ	$088
+COPJMP2     	equ	$08A
+COPINS      	equ	$08C
+DIWSTRT     	equ	$08E
+DIWSTOP     	equ	$090
+DDFSTRT     	equ	$092
+DDFSTOP     	equ	$094
+DMACON      	equ	$096
+CLXCON      	equ	$098
+INTENA      	equ	$09A
+INTREQ      	equ	$09C
+ADKCON      	equ	$09E
+AUD0LCH     	equ	$0A0
+AUD0LCL     	equ	$0A2
+AUD0LEN     	equ	$0A4
+AUD0PER     	equ	$0A6
+AUD0VOL     	equ	$0A8
+AUD0DAT     	equ	$0AA
+AUD1LCH     	equ	$0B0
+AUD1LCL     	equ	$0B2
+AUD1LEN     	equ	$0B4
+AUD1PER     	equ	$0B6
+AUD1VOL     	equ	$0B8
+AUD1DAT     	equ	$0BA
+AUD2LCH     	equ	$0C0
+AUD2LCL     	equ	$0C2
+AUD2LEN     	equ	$0C4
+AUD2PER     	equ	$0C6
+AUD2VOL     	equ	$0C8
+AUD2DAT     	equ	$0CA
+AUD3LCH     	equ	$0D0
+AUD3LCL     	equ	$0D2
+AUD3LEN     	equ	$0D4
+AUD3PER     	equ	$0D6
+AUD3VOL     	equ	$0D8
+AUD3DAT     	equ	$0DA
+BPL1PTH     	equ	$0E0
+BPL1PTL     	equ	$0E2
+BPL2PTH     	equ	$0E4
+BPL2PTL     	equ	$0E6
+BPL3PTH     	equ	$0E8
+BPL3PTL     	equ	$0EA
+BPL4PTH     	equ	$0EC
+BPL4PTL     	equ	$0EE
+BPL5PTH     	equ	$0F0
+BPL5PTL     	equ	$0F2
+BPL6PTH     	equ	$0F4
+BPL6PTL     	equ	$0F6
+BPLCON0     	equ	$100
+BPLCON1     	equ	$102
+BPLCON2     	equ	$104
+BPL1MOD     	equ	$108
+BPL2MOD     	equ	$10A
+BPL1DAT     	equ	$110
+BPL2DAT     	equ	$112
+BPL3DAT     	equ	$114
+BPL4DAT     	equ	$116
+BPL5DAT     	equ	$118
+BPL6DAT     	equ	$11A
+SPR0PTH     	equ	$120
+SPR0PTL     	equ	$122
+SPR1PTH     	equ	$124
+SPR1PTL     	equ	$126
+SPR2PTH     	equ	$128
+SPR2PTL     	equ	$12A
+SPR3PTH     	equ	$12C
+SPR3PTL     	equ	$12E
+SPR4PTH     	equ	$130
+SPR4PTL     	equ	$132
+SPR5PTH     	equ	$134
+SPR5PTL     	equ	$136
+SPR6PTH     	equ	$138
+SPR6PTL     	equ	$13A
+SPR7PTH     	equ	$13C
+SPR7PTL     	equ	$13E
+SPR0POS     	equ	$140
+SPR0CTL     	equ	$142
+SPR0DATA    	equ	$144
+SPR0DATB    	equ	$146
+SPR1POS     	equ	$148
+SPR1CTL     	equ	$14A
+SPR1DATA    	equ	$14C
+SPR1DATB    	equ	$14E
+SPR2POS     	equ	$150
+SPR2CTL     	equ	$152
+SPR2DATA    	equ	$154
+SPR2DATB    	equ	$156
+SPR3POS     	equ	$158
+SPR3CTL     	equ	$15A
+SPR3DATA    	equ	$15C
+SPR3DATB    	equ	$15E
+SPR4POS     	equ	$160
+SPR4CTL     	equ	$162
+SPR4DATA    	equ	$164
+SPR4DATB    	equ	$166
+SPR5POS     	equ	$168
+SPR5CTL     	equ	$16A
+SPR5DATA    	equ	$16C
+SPR5DATB    	equ	$16E
+SPR6POS     	equ	$170
+SPR6CTL     	equ	$172
+SPR6DATA    	equ	$174
+SPR6DATB    	equ	$176
+SPR7POS     	equ	$178
+SPR7CTL     	equ	$17A
+SPR7DATA    	equ	$17C
+SPR7DATB    	equ	$17E
+COLOR00     	equ	$180
+COLOR01     	equ	$182
+COLOR02     	equ	$184
+COLOR03     	equ	$186
+COLOR04     	equ	$188
+COLOR05     	equ	$18A
+COLOR06     	equ	$18C
+COLOR07     	equ	$18E
+COLOR08     	equ	$190
+COLOR09     	equ	$192
+COLOR10     	equ	$194
+COLOR11     	equ	$196
+COLOR12     	equ	$198
+COLOR13     	equ	$19A
+COLOR14     	equ	$19C
+COLOR15     	equ	$19E
+COLOR16     	equ	$1A0
+COLOR17     	equ	$1A2
+COLOR18     	equ	$1A4
+COLOR19     	equ	$1A6
+COLOR20     	equ	$1A8
+COLOR21     	equ	$1AA
+COLOR22     	equ	$1AC
+COLOR23     	equ	$1AE
+COLOR24     	equ	$1B0
+COLOR25     	equ	$1B2
+COLOR26     	equ	$1B4
+COLOR27     	equ	$1B6
+COLOR28     	equ	$1B8
+COLOR29     	equ	$1BA
+COLOR30     	equ	$1BC
+COLOR31     	equ	$1BE
+
+; CIA-A (base $BFE001, odd addresses)
+CIAA_PRA    	equ	$BFE002
+CIAA_PRB    	equ	$BFE102
+CIAA_DDRA   	equ	$BFE202
+CIAA_DDRB   	equ	$BFE302
+CIAA_TALO   	equ	$BFE402
+CIAA_TAHI   	equ	$BFE502
+CIAA_TBLO   	equ	$BFE602
+CIAA_TBHI   	equ	$BFE702
+CIAA_TODLO  	equ	$BFE802
+CIAA_TODMID 	equ	$BFE902
+CIAA_TODHI  	equ	$BFEA02
+CIAA_SDR    	equ	$BFEC02
+CIAA_ICR    	equ	$BFED02
+CIAA_CRA    	equ	$BFEE02
+CIAA_CRB    	equ	$BFEF02
+
+; CIA-B (base $BFD000, even addresses)
+CIAB_PRA    	equ	$BFD000
+CIAB_PRB    	equ	$BFD100
+CIAB_DDRA   	equ	$BFD200
+CIAB_DDRB   	equ	$BFD300
+CIAB_TALO   	equ	$BFD400
+CIAB_TAHI   	equ	$BFD500
+CIAB_TBLO   	equ	$BFD600
+CIAB_TBHI   	equ	$BFD700
+CIAB_TODLO  	equ	$BFD800
+CIAB_TODMID 	equ	$BFD900
+CIAB_TODHI  	equ	$BFDA00
+CIAB_SDR    	equ	$BFDC00
+CIAB_ICR    	equ	$BFDD00
+CIAB_CRA    	equ	$BFDE00
+CIAB_CRB    	equ	$BFDF00
+
+; ---- Memory map (1MB build). Values used with adda g_BaseAddr are offsets from the load address;
+; ---- the rest (screens, copper lists, sprites: chip RAM) are absolute. [512K value] in comments.
+RESET_STUB          	equ	$00000	; CrashReset writes RESET/JMP here
+LDR_TRACK           	equ	$00028	; loader: current logical track (Line-A vector slot)
+LDR_CYL             	equ	$0002A	; loader: cylinder the head is on
+LDR_RETRY           	equ	$0002C	; loader: retries left (Line-F vector slot)
+LDR_DIRFLAG         	equ	$0002E	; loader: last step direction
+VEC_UNINIT          	equ	$0003C	; uninitialised-interrupt vector
+VEC_SPURIOUS        	equ	$00060	; spurious-interrupt vector - holds MUSIC_PLAYER pointer
+VEC_LEVEL1          	equ	$00064
+VEC_LEVEL2          	equ	$00068
+VEC_LEVEL3          	equ	$0006C
+SCREEN_0            	equ	$00080	; also load address of the big graphics file (tracks 38-56) before unpacking [512K: $37468] (chip RAM)
+SCREEN_1            	equ	$0B480	; chip RAM
+SCREEN_2            	equ	$16880	; [512K: $4DC68] (chip RAM)
+GLOBALS             	equ	$1893A	; offset from g_BaseAddr [512K: absolute $1898C]
+GLOBALS_P2          	equ	$1894A	; player-2 view of the per-player block (GLOBALS+$10) [512K: $1899C]
+MASK_BUF            	equ	$1A0C6	; byte-plane extracted from file at tracks 61 [512K: $28234]
+ARTHUR_SPR_GFX      	equ	$1ACE6	; Arthur hardware-sprite frames, 4 planes x $2880 apart, $80 bytes/frame [512K: $1DE34]
+SPR_GFX_B0          	equ	$1C1E6	; [512K: $1F334]
+SPR_GFX_A1          	equ	$1D5E6	; [512K: $20734]
+SPR_GFX_B1          	equ	$1EAE6	; [512K: $21C34]
+SPR_GFX_A2          	equ	$1FEE6	; [512K: $23034]
+SPR_GFX_B2          	equ	$213E6	; [512K: $24534]
+SCREEN_3            	equ	$21C80	; chip RAM
+SPR_GFX_A3          	equ	$227E6	; [512K: $25934]
+SPR_GFX_B3          	equ	$23CE6	; [512K: $26E34]
+PROGRESS_MAP_CACHE  	equ	$250E6	; offset from g_BaseAddr: cached progress map file
+ENEMY_GFX_CACHE     	equ	$26E42	; offset from g_BaseAddr: cached enemy graphics with masks
+CLEAR_AREA          	equ	$2D080	; [512K: $64468]
+COPPER_INIT         	equ	$2E164	; copper list template ($180 bytes copied from CopperTemplate) [512K: $1A118]
+COPPER_A1           	equ	$2E1DC	; [512K: $1A190]
+COPPER_A2           	equ	$2E20C	; [512K: $1A1C0]
+COPPER_B1           	equ	$2E23C	; [512K: $1A1F0]
+COPPER_B2           	equ	$2E26C	; [512K: $1A220]
+COPPER_MAP          	equ	$2E29C	; copper list used by the between-level progress map [512K: $1A250]
+SPRITE0_DATA        	equ	$2E2E4	; [512K: $30BB8]
+SPRITE4_DATA        	equ	$2E368	; [512K: $30C3C]
+SPRITE1_DATA        	equ	$2E3A4	; [512K: $30C78]
+SPRITE5_DATA        	equ	$2E428	; [512K: $30CFC]
+SPRITE2_DATA        	equ	$2E464	; [512K: $30D38]
+SPRITE6_DATA        	equ	$2E4E8	; [512K: $30DBC]
+SPRITE3_DATA        	equ	$2E524	; [512K: $30DF8]
+SPRITE7_DATA        	equ	$2E5A8	; [512K: $30E7C]
+SPRITE4B_DATA       	equ	$2E5E4	; second HUD sprite block (sprite reused lower down) [512K: $30EB8]
+SPRITE5B_DATA       	equ	$2E6B0	; [512K: $30F84]
+SPRITE6B_DATA       	equ	$2E77C	; [512K: $31050]
+SPRITE7B_DATA       	equ	$2E848	; [512K: $3111C]
+ESHOT_GFX_BUF       	equ	$2E914	; chip RAM: masked enemy projectile graphics
+ITEM_GFX_BUF        	equ	$30D7C	; chip RAM: masked item graphics
+ITEM_GFX2_BUF       	equ	$34300	; chip RAM: masked item graphics 2
+MUSIC_FILE          	equ	$3604C	; chip RAM: 111KB music package (tracks 64-81)
+MUSIC_PLAYER        	equ	$3606C	; music driver entry
+BOB_GFX_A           	equ	$60EC6	; file tracks 37 / 62-63 load address [512K: $311E8]
+
+; ---- Global variables: offsets from a6 (GLOBALS = load address + $1893A; offsets >= 2 are 4 more than in the 512K build) ----
+g_SavedSR           	equ	$000	; VBL handler parks the interrupted SR here
+g_BaseAddr          	equ	$002	; 1MB build only: load address of the program (from $4.w); added to every program address
+g_FrameStamp        	equ	$006	; frame counter snapshot for timed waits
+g_VblCount          	equ	$008	; incremented every vertical blank
+g_GameFrame         	equ	$00A	; incremented every game-logic frame
+g_RawKey            	equ	$00C	; last raw keycode (Esc=$45, F1=$50, F2=$51)
+g_AsciiKey          	equ	$00D	; last key as ASCII (space=$20 pauses)
+g_RandSeed          	equ	$00E	; random generator state, seeded $AAAA
+g_TimeLeft          	equ	$010	; level timer, BCD minutes.byte/seconds.byte
+g_LevelDone         	equ	$012	; set when the level is completed
+g_PlayerDied        	equ	$013	; set when Arthur has died this frame
+g_BonusEvery        	equ	$014	; counts down from 6: every 6th spawned enemy carries a bonus
+g_BonusCycle        	equ	$015	; 0-6: which kind of bonus the next carrier gets (BonusKinds)
+g_BonusRoll         	equ	$016	; +21 per treasure bonus; on carry the treasure is the rare kind 12
+g_WeaponOdds        	equ	$017	; 5 accumulators, one per weapon (bonus weapon choice); ends at $17
+g_BossCountdown     	equ	$01C	; bosses left to beat on this level before the key / ending (LevelBossCountdown)
+g_BigEnemyCount     	equ	$01D	; Red Arremer / Satan / Unicorn / Dragon currently engaged (+1 on activation, -1 on removal; never tested)
+g_MapZone           	equ	$01E	; current map zone (MapZoneTable): selects the enemy spawners
+g_MaxMapZone        	equ	$01F	; furthest map zone reached (spawners with ZoneFlags 0 only start beyond it)
+g_RedrawPending     	equ	$020	; set to request a full redraw: the VBL diverts user mode to RedrawEntry
+g_RedrawDone        	equ	$021	; set by RedrawScreen when finished
+g_SkipLogic         	equ	$022	; non-zero: VBL does not trigger the logic interrupt
+g_TextShadow        	equ	$023	; text colour where only the first font plane is set
+g_TextInk           	equ	$024	; text colour where only the second font plane is set
+g_TextPaper         	equ	$025	; text colour where both font planes are set
+g_TwoPlayer         	equ	$02B	; non-zero = two-player game
+g_CurPlayer         	equ	$02C	; 0 = player 1, $FF = player 2
+g_GameState         	equ	$02D	; 0 = in game, 1/2 = attract screens
+g_SubState          	equ	$02E	; in-game sub state (see GameStateTable)
+g_SubState2         	equ	$02F	; step within the sub state
+g_SubState3         	equ	$030	; step within g_SubState2
+g_ArthurVisible     	equ	$031	; hardware sprites 0-3 enabled
+g_Spr47Visible      	equ	$032	; hardware sprites 4-7 enabled
+g_Paused            	equ	$033
+g_CheatOn           	equ	$034	; set by entering ')!(' on the high-score table: no life loss / no damage
+g_ScreenFront       	equ	$036
+g_ScreenBack        	equ	$03A
+g_ScreenSpare1      	equ	$046
+g_ScreenSpare2      	equ	$04A
+g_CopperFront       	equ	$04E
+g_CopperBack        	equ	$052
+g_CopperSpare1      	equ	$056
+g_CopperSpare2      	equ	$05A
+g_Joy               	equ	$05E	; joystick: b0 down b1 right b8 up b9 left b15 fire
+g_JoyPrev           	equ	$060	; previous frame joystick
+g_ArthurSprCtl      	equ	$062	; 4 longs: SPRxPOS/SPRxCTL pairs for sprites 0-3
+g_ScrollTileX       	equ	$072	; scroll position in 16-pixel tiles
+g_ScrollTileY       	equ	$074
+g_ScrollFineX       	equ	$076	; fine scroll -15..15
+g_ScrollFineY       	equ	$078
+g_CameraX           	equ	$07A	; camera world position in pixels
+g_CameraY           	equ	$07C
+g_CamDeltaX         	equ	$07E
+g_CamDeltaY         	equ	$080
+g_PendFineX         	equ	$082	; camera target X relative to g_NewTileX*16: the fine scroll to use once the pending redraw is shown
+g_PendFineY         	equ	$084	; the same for Y
+g_NewTileX          	equ	$086
+g_NewTileY          	equ	$088
+g_CamMinX           	equ	$08A	; left scroll limit (scrolling is one-way)
+g_CamMinY           	equ	$08C
+g_LevelOriginX      	equ	$08E
+g_LevelWidth        	equ	$090
+g_LevelOriginY      	equ	$092
+g_LevelHeight       	equ	$094
+g_MapPtr            	equ	$096	; current level map (block indices)
+g_SceneryHitX       	equ	$09A	; where shootable scenery was last hit: spawn point for the Magician (type 7)
+g_SceneryHitY       	equ	$09C
+g_Level             	equ	$09E	; level 0-6 (per-player block starts here, P2 copy at +$10)
+g_Weapon            	equ	$0A0	; 0 torch 1 lance 2 axe 3 cross 4 dagger (cross needed on level 6)
+g_Score             	equ	$0A2	; BCD score
+g_NextExtraLife     	equ	$0A6	; BCD score for next extra life (also AddScore accumulator end)
+g_Lives             	equ	$0AA
+g_Checkpoint        	equ	$0AB	; set once the half-way point is passed
+g_ExtraLives        	equ	$0AC	; extra lives awarded so far (20000, 70000, then every 70000)
+g_ShowIntro         	equ	$0AD	; non-zero: play the opening kidnap cutscene first
+g_OtherPlayer       	equ	$0AE	; the other player's copy of g_Level .. g_ShowIntro (16 bytes), exchanged by SwapPlayers
+g_ShownScore        	equ	$0BE	; score last drawn on the HUD / hi-score name ptr in entry mode
+g_HiScores          	equ	$0C2	; 10 BCD longs, top score first
+g_ArthurX           	equ	$0EA	; world X (also cursor column in name entry)
+g_ArthurY           	equ	$0EE	; world Y, increasing upwards (cursor row in name entry)
+g_ArthurAux         	equ	$0F2
+g_ArthurVelX        	equ	$0F4
+g_ArthurVelY        	equ	$0F8
+g_ArthurAnim        	equ	$0FC	; animation script pointer
+g_ArthurPlatform    	equ	$100	; platform slot Arthur is riding
+g_ArthurShownFrame  	equ	$104	; frame last copied into sprite RAM
+g_ArthurFrame       	equ	$105	; requested sprite frame (negative = mirrored)
+g_ArthurAnimTimer   	equ	$106
+g_ArthurDir         	equ	$107	; +1 right / -1 left
+g_LadderDir         	equ	$108	; ladder climb direction
+g_ArthurFacing      	equ	$109
+g_Crouching         	equ	$10A	; down held (also: 3 initials buffer during high-score entry)
+g_Jumping           	equ	$10B	; airborne, rising
+g_Falling           	equ	$10C	; airborne, descending / not on floor
+g_FireCooldown      	equ	$10D	; frames until the next throw
+g_OnPlatform        	equ	$10E
+g_OnLadder          	equ	$10F
+g_StateTimer        	equ	$110
+g_NoArmour          	equ	$111	; Arthur has lost his armour
+g_ArthurState       	equ	$112	; 0 normal, 1 hit, 4 time-up death, 7 fell
+g_ArthurFlash       	equ	$113	; invulnerability flashing
+g_FrogTimer         	equ	$114	; magician curse: Arthur is a frog while non-zero
+g_KeyState          	equ	$115	; end-of-level key sequence
+g_LevelFileEnd      	equ	$116
+g_LevelFileAddr     	equ	$11A
+g_SmallBobSets      	equ	$11E	; 10 pointers to the small BOB graphics sets (items, scenery), filled by LoadLevel
+g_BobSets           	equ	$146	; 21 pointers to the enemy BOB graphics sets: one per enemy type, then the bat (+76) and red crow (+80)
+g_BlitListPtr       	equ	$19A
+g_SaveBufA          	equ	$3DE	; background save area of the buffer being drawn (its address in a6 is also the top of the BOB draw list, which grows down from here to g_BlitListPtr)
+g_SaveBufB          	equ	$3E2	; background save area of the other buffer
+g_SavePtr           	equ	$3E6	; next free byte in g_SaveBufA (limit $3000 bytes a frame)
+g_SavePtrB          	equ	$3EA	; the same for the other buffer
+g_RestoreListA      	equ	$3EE	; restore list of the buffer being drawn: 12-byte entries (BLTSIZE, modulo, screen address, save address) growing down from $632; 0 ends it
+g_RestoreListB      	equ	$3F2	; restore list of the other buffer (grows down from $872)
+g_RestoreBufB       	equ	$636	; restore list storage: list A grows down from here, list B from g_SpawnQuota
+g_SpawnQuota        	equ	$876	; 16 bytes, one per enemy type: how many more the spawners may create; a handler gives one back when its enemy leaves
+g_HiNames           	equ	$886	; 10 x 3 initials
+g_SpecialObjs       	equ	$8A4	; 2 slots x $20 (key, cutscene actors)
+g_Shots             	equ	$8E4	; 4 weapon slots x $26
+g_EnemyShots        	equ	$97C	; 6 slots x $1C
+g_Spawners          	equ	$A24	; 16 enemy spawners x $C, one per enemy type
+g_Items             	equ	$AE4	; 30 slots x $1C - platforms / pickups / pots
+g_Enemies           	equ	$E2C	; 40 slots x $3C - enemy objects
+g_Enemy1            	equ	$E68	; second enemy slot (used by cut-scenes)
+
+; ---- Object slot fields (enemies $3C, shots $26, items $1C share this header) ----
+O_Active            	equ	$00	; 0 = free, 1 = active, 2 = dying (no shot test), bit 7 set = shots pass through
+O_OnScreen          	equ	$01	; set by CheckOnScreen
+O_Param             	equ	$02	; placement parameter / scratch
+O_State             	equ	$03	; enemies: 0 start (set-up, for some types also their first behaviour), 1 active, 2 killed (set by EnemyHitByShot after scoring), 3 remove - ST_START .. ST_REMOVE
+O_Step              	equ	$04	; step within the state
+O_Step2             	equ	$05	; second-level step
+O_X                 	equ	$06	; X pixel (long: 16.16 with O_XFrac)
+O_XFrac             	equ	$08
+O_Y                 	equ	$0A	; Y pixel, upwards (long with O_YFrac)
+O_YFrac             	equ	$0C
+O_MoveTable         	equ	$0E	; table of (dx,dy) words, indexed by O_Dir
+O_Dir               	equ	$12	; direction / animation index
+O_Size              	equ	$13	; size class (BoxSizeTable)
+O_Anim              	equ	$14	; animation script pointer
+O_Frame             	equ	$18	; current frame (BobFrameDescs index)
+O_AnimTimer         	equ	$19	; ticks left on this frame
+O_Type              	equ	$1A	; enemy / shot / item type
+O_HP                	equ	$1B	; hits left (enemies) / flags (items)
+
+; ---- Per-enemy fields (slot offsets $1C-$3B differ by enemy type) ----
+Uni_ChargeX         	equ	$1C	; charge target X (Arthur +-16)
+Uni_JumpType        	equ	$1E	; facing (1 right, 2 left) / jump type index into Unicorn_JumpSpeedX
+Uni_AnimSet         	equ	$20	; current animation pair (right, left)
+Uni_ShotPtr         	equ	$24	; position in Unicorn_ShotScript
+Uni_WalkPtr         	equ	$28	; position in the current Unicorn_WalkScripts entry
+Uni_VelY            	equ	$2C	; vertical speed while jumping (16.16, up = positive)
+Uni_Timer           	equ	$30	; fire wind-up / recovery timer; death timer
+Uni_Aiming          	equ	$31	; 1 = in the fire pose, shot pending
+Uni_Angry           	equ	$32	; set when Uni_AngerTimer runs out: next move is a charge or a jump at Arthur
+Uni_Approach        	equ	$33	; wanted walk direction to keep its distance from Arthur (0 = happy)
+Uni_Gravity         	equ	$34	; jump phase: selects the gravity pair in Unicorn_Gravity
+Uni_Delay           	equ	$35	; start delay, in 16-frame units
+Uni_JumpNext        	equ	$36	; 1 = jump instead of walking on the next decision
+Uni_Variant         	equ	$37	; spawn parameter: 0 normal, 1 / 3 start with a long jump, 4 = 0 after a short delay, 2 = keeps to its arena (level 5)
+Uni_ShotWait        	equ	$38	; frames until the next shot (from Unicorn_ShotScript)
+Uni_WalkTime        	equ	$39	; frames left of the current walk-script step
+Uni_AngerTimer      	equ	$3A	; frames until Uni_Angry is set (random, Unicorn_AngerDelays)
+Uni_Pause           	equ	$3B	; pause after landing
+Sat_TargetX         	equ	$1C	; Arthur X when the dive started
+Sat_ArcDepth        	equ	$1E	; current depth of the dive below Sat_ArcBaseY (word)
+Sat_FlySpeed        	equ	$20	; horizontal speed pair for the dive (left, right)
+Sat_ArcBaseY        	equ	$24	; Y at the start of the dive (word)
+Sat_ArcHeight       	equ	$26	; half the depth of the dive
+Sat_ArcPhase        	equ	$27	; 0-255 through the dive (sine table index)
+Sat_Returning       	equ	$30	; 1 = off screen, flying back in
+Sat_Hold            	equ	$31	; cleared at start and never set: would make it only count down
+Sat_WakeDelay       	equ	$32	; x 64 frames before a parameter-1 Satan wakes up
+Sat_Timer           	equ	$33	; hovering: frames left (180); diving: phase step per frame
+Sat_FirePhase       	equ	$34	; 0 shooting, 1 guarding (shots pass through), 2 back to shooting
+Sat_GuardTime       	equ	$35	; frames of guarding (30)
+Sat_FireTime        	equ	$36	; frames of shooting before it guards (SatanFireTimes)
+Sat_Swoop           	equ	$37	; 1 = level with Arthur: fly across, then climb out of the dive
+Sat_Drift           	equ	$38	; hover drift: 0 right, 1 left, 2 up, 3 down (new every 128 frames)
+Sat_ShotWait        	equ	$39	; frames to the next shot (SatanShotGaps)
+Sat_ReturnDir       	equ	$3A	; which way to fly back on screen: 0 right, 1 left, 2 up, 3 down
+Sat_ReturnTime      	equ	$3B	; frames of flying back
+Drg_PathPtr         	equ	$1C	; head: position in the current path script ((frames, direction) pairs)
+Drg_HomeY           	equ	$20	; head: start Y (word); level 5 keeps within 256 px of it
+Drg_Next            	equ	$24	; next segment towards the tail (long, 0 = this is the tail)
+Drg_Prev            	equ	$28	; previous segment towards the head (long)
+Drg_Facing          	equ	$30	; head: 0 right, 1 left
+Drg_PathTime        	equ	$31	; head: frames left on the current path step; also the death timer
+Drg_Aggro           	equ	$32	; head: attack when (random & 15) <= this (2: 3 in 16)
+Drg_Firing          	equ	$33	; head: 1 while the mouth is open after a shot
+Drg_Pending         	equ	$34	; segment: a new direction is waiting in Drg_NewDir; head: mouth-open timer
+Drg_Frozen          	equ	$35	; 1 = segment does not move (while the dragon waits to attack)
+Drg_Part            	equ	$36	; 0 head, 1 body, 2 tail
+Drg_Index           	equ	$37	; position in the chain: 8 head ... 0 tail
+Drg_NewDir          	equ	$38	; direction to take when Drg_Delay runs out
+Drg_Delay           	equ	$39	; frames until Drg_NewDir is taken
+Drg_Wait            	equ	$3A	; head: x 16 frames before the attack starts
+Drg_HeadDead        	equ	$3B	; 1 = the head was killed: boss handling on removal
+Ast_ArenaL          	equ	$1C	; left end of its walk (camera X + 96 when it woke)
+Ast_ArenaR          	equ	$1E	; right end (camera X + 224)
+Ast_WalkTime        	equ	$20	; frames to walk before turning (word, 0-1023)
+Ast_StandIn         	equ	$22	; frames until the stand-and-fire phase (word, 256-767)
+Ast_StandTime       	equ	$24	; length of the stand-and-fire phase (word, 64-191)
+Ast_Facing          	equ	$30	; 0 Arthur to the right, 1 to the left
+Ast_Turning         	equ	$31	; 1 = between walks
+Ast_Standing        	equ	$32	; 1 = stand-and-fire phase (see the bug note)
+Ast_HighShot        	equ	$33	; 1 = next shot from the upper firing point; death timer
+Ast_ShotWait        	equ	$34	; frames to the next shot (AstarothShotGaps)
+Ast_TurnWait        	equ	$37	; set to 143-190 before turning, but only tested once
+Ast_Far             	equ	$38	; 1 = Arthur more than 80 px away
+RA_CentreX          	equ	$1C	; swoop: Arthur X at the start (word); blink timer in mode 2
+RA_BaseY            	equ	$1E	; Y the flight curves are measured from (word); perch timer
+RA_WalkPtr          	equ	$20	; position in RedArremerWalkScript
+RA_ShotPtr          	equ	$24	; position in RedArremerShotTimes
+RA_SwoopPtr         	equ	$28	; position in RedArremerSwoopTimes
+RA_FlyPtr           	equ	$2C	; position in RedArremerTakeOffTimes
+RA_RadiusX          	equ	$30	; swoop: horizontal radius; death timer
+RA_Rage             	equ	$31	; aggression level: 0 at first, 1 after its rage (faster tables)
+RA_ShotTime         	equ	$32	; frames to the next shot; wind-up timer
+RA_SwoopTime        	equ	$33	; frames to the next swoop at Arthur
+RA_Phase            	equ	$34	; flight: sine index; walking: x 8 frames to the next take-off
+RA_RageTime         	equ	$35	; x 32 frames of walking before it rages (from 50)
+RA_RadiusY          	equ	$36	; height of the current flight curve
+RA_Return           	equ	$37	; step to go back to after a shot
+RA_Temp             	equ	$38	; distance to Arthur / dodge height / glide frames
+RA_ArthurLeft       	equ	$39	; 1 = Arthur is to its left
+RA_WalkDir          	equ	$3A	; walk / flight direction (negative = stand)
+RA_WalkTime         	equ	$3B	; frames left of the walk step
+BM_ShotPtr          	equ	$1C	; position in BigManShotTimes
+BM_WalkPtr          	equ	$20	; position in BigManWalkTimes
+BM_Timer            	equ	$30	; pause after shooting down; death timer
+BM_EdgeDir          	equ	$31	; direction it was walking when it found the edge; wind-up timer
+BM_AtEdge           	equ	$32	; 1 = no floor just ahead
+BM_EdgeTurn         	equ	$33	; already turned back from this edge
+BM_Crouched         	equ	$34	; starts crouching (from O_Param)
+BM_ShotTime         	equ	$35	; frames to the next shot
+BM_WalkTime         	equ	$36	; frames to the next pause
+BM_CrouchTime       	equ	$38	; x 64 frames of crouching
+BM_PauseTime        	equ	$39	; frames of the current pause
+Mag_Timer           	equ	$30	; rise / fade timer (60 frames)
+Mag_Cast            	equ	$31	; frames before and after the spell (20)
+Skl_VelY            	equ	$1C	; vertical speed (16.16, up = positive)
+Skl_BaseY           	equ	$20	; Y where the leap started (word)
+Skl_LeapDX          	equ	$24	; horizontal speed of the leap (16.16)
+Skl_Hops            	equ	$30	; hops left before the leap (2)
+Skl_Pause           	equ	$31	; frames of pause after landing (6)
+Skl_Phase           	equ	$32	; leap: sine index
+Zmb_SizePtr         	equ	$1C	; next entry in the emerge / sink size-class list
+Zmb_Timer           	equ	$30	; frames before emerging; frames to walk on after passing Arthur
+Zmb_WalkTime        	equ	$31	; walk time, counted every other frame (180 = 360 frames)
+Zmb_Steps           	equ	$32	; size-class steps left while emerging / sinking
+Crw_WaitList        	equ	$1C	; list of 8 random waits (CrowWaits)
+Crw_BaseY           	equ	$20	; centre line of the wavy flight / arc (word)
+Crw_Phase           	equ	$24	; sine phase (word, high byte = table index)
+Crw_Amp             	equ	$30	; height of the arc / wave
+Crw_Crow            	equ	$31	; 1 = crow graphics and speeds (param 3+)
+Crw_Wait            	equ	$32	; frames before it takes off
+Crw_Look            	equ	$33	; perched: frames of the current look-around; flying: half-wave count
+Crw_Speed           	equ	$34	; wave speed index (always 0)
+Pig_TurnPtr         	equ	$1C	; position in WoodyPigLoopTimes
+Pig_Bomb            	equ	$20	; enemy shot slot it is carrying (long, 0 = none)
+Pig_Drop            	equ	$30	; 1 = pick up a shot next frame
+Pig_LoopAcc         	equ	$34	; adds WoodyPigLoopOdds every 16 frames; a loop when it carries
+Pig_TurnAcc         	equ	$35	; accumulator deciding the loop direction when level with Arthur
+Pig_Loops           	equ	$36	; loops left (0-7, from the frame counter)
+Pig_Turns           	equ	$37	; turn steps left in the loop (8); emerging animation delay
+Pig_TurnDir         	equ	$38	; +1 or -1: which way it turns
+Pig_TurnTime        	equ	$39	; frames to the next 1/16 turn
+Pig_Timer           	equ	$3A	; frames of the drop animation
+PD_MoveTable        	equ	$1C	; its normal 16-way move table (restored after special moves)
+PD_TargetY          	equ	$20	; Arthur Y when this leg started (word)
+PD_TurnWait         	equ	$22	; frames to the next 1/16 turn
+PD_TurnRate         	equ	$23	; reload for PD_TurnWait (slower turns further away)
+PD_Fine             	equ	$30	; 1 = halve the turn wait again (param 1)
+PD_Shot             	equ	$31	; 1 = has fired its one shot
+PD_Legs             	equ	$32	; hunting legs left (4)
+PD_Turn             	equ	$33	; turn mode 0-3: which way it turns (DevilTurnModes)
+PD_EarlyShot        	equ	$34	; 0 = may fire as it arrives (PetiteDevilArriveShot)
+PD_ShotTime         	equ	$35	; frames before it may fire (64-95)
+PD_Time             	equ	$36	; frames left of the current leg
+PD_LegLen           	equ	$37	; length of the arrival leg
+PD_Ready            	equ	$38	; 1 = may fire now
+PD_WantDir          	equ	$39	; direction it is turning towards
+PD_StepTime         	equ	$3A	; frames per step of the recoil turn
+PD_ShotDir          	equ	$3B	; direction of its shot (selects the recoil)
+FK_BaseY            	equ	$1C	; centre line of its wave (word)
+FK_Phase            	equ	$31	; sine index, +6 a frame (43 frames per half wave)
+BK_BaseY            	equ	$1C	; start Y of a hop (word)
+BK_Phase            	equ	$1E	; hop phase (word, +$400 a frame)
+BK_Morph            	equ	$20	; frames until it turns into a Red Arremer (word, 3600)
+BK_HopHeight        	equ	$30	; hop height: 32 or 48 px
+BK_CurveWait        	equ	$32	; frames to the next 1/16 turn of the swoop
+BK_CurveRate        	equ	$33	; reload for BK_CurveWait: (Y - Arthur Y) / 8
+BK_Appear           	equ	$34	; frames before a dropping Blue Killer becomes hittable (10)
+BK_WalkTime         	equ	$35	; frames of the current walk
+BK_Delay            	equ	$36	; frames before a dropping Blue Killer starts (40)
+BK_SwoopMode        	equ	$37	; 0/1 curve right/left, 2 straight down
+BK_SwoopSet         	equ	$38	; which pair of swoop tables
+Fir_SizePtr         	equ	$1C	; position in the size-class list of the current flare
+Fir_WaitPtr         	equ	$20	; position in FireWaits
+Fir_Wait            	equ	$30	; x 32 frames to the next flare-up
+Plt_WaitPtr         	equ	$1C	; position in PlantWaits
+Plt_Wait            	equ	$30	; frames to the next spit
+Plt_Mouth           	equ	$31	; frames of the open mouth before it spits (24)
+Pil_LowPtr          	equ	$1C	; position in FirePillarTimes for the lower shot
+Pil_HighPtr         	equ	$20	; position in FirePillarTimes for the upper shot
+Pil_LowWait         	equ	$30	; frames to the next lower shot; death timer
+Pil_HighWait        	equ	$31	; frames to the next upper shot
+Pil_Fire            	equ	$33	; bit 1 lower shot due, bit 0 upper shot due
+Pil_Timer           	equ	$34	; wind-up / after-shot timer
+Pil_Flick           	equ	$35	; index into FirePillarFlicker
+Pil_Flick2          	equ	$36	; index used by the upper / double shot (never advanced)
+Pil_FlickA          	equ	$37	; written from FirePillarFlicker, never read
+Pil_FlickB          	equ	$38	; written, never read
+Pil_FlickC          	equ	$39	; written, never read
+Scn_Target          	equ	$1C	; ending: the princess's stopping X, then the message timer
+Scn_Timer           	equ	$30	; opening scene: frame countdown on the demon
+Key_Timer           	equ	$1B	; frames left spinning
+Itm_Rider           	equ	$18	; platform items: set while Arthur stands on it
+Spn_Flags           	equ	$0B	; spawner flags: bit 0 world coordinates, bit 1 runs once, bit 2 keeps running when the zone changes
+Shot_StartX         	equ	$1C	; X where the shot was thrown (range check)
+Shot_VX             	equ	$1E	; arc speed X (16.16) once a torch or axe starts to fall
+Shot_VY             	equ	$22	; arc speed Y (16.16)
+Spc_VY              	equ	$1C	; fall speed (16.16), gravity 0.07 px/frame^2
+Pig_Unused31        	equ	$31	; cleared at set-up, never read
+Pig_Unused32        	equ	$32	; cleared at set-up, never read
+Pig_Unused33        	equ	$33	; cleared at set-up, never read
+BK_Unused31         	equ	$31	; cleared, never read
+BM_FlinchTime       	equ	$37	; frames of the flinch after a hit (6)
+Ast_WalkTimeLo      	equ	$21	; low byte of the Ast_WalkTime word (set to a random number)
+Ast_StandInLo       	equ	$23	; low byte of the Ast_StandIn word (set to a random number)
+PD_PathPos          	equ	$24	; position in the current PetiteDevilPath list
+PD_PathSeg          	equ	$28	; current path segment

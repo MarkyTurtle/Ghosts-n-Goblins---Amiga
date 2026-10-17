@@ -1,0 +1,6 @@
+__pycache__/
+*.adf
+/main.bin
+/boot.bin
+/main_1mb.bin
+enhanced/build/
