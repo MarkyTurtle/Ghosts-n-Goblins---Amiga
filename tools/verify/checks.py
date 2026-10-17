@@ -139,5 +139,17 @@ check('PetiteDevil_PathNext: reads the first X as the count (offset applied afte
       G.r8(S+0x22) == 0xD8 and seg == 0xD352,
       f'list 0 holds 3 points from $D350; PD_TurnWait = {G.r8(S+0x22)} (low byte of X $10D8), segment ${seg:X}')
 
+# 13. DrawBob: clipping at the top of the buffer skips twice the graphics lines
+G = Game(BIN)
+G.w32(G.g(0x32), 0x37468); G.w32(G.g(0x3DA), 0x311E8)      # g_ScreenFront, g_SaveBufA
+G.w32(G.g(0x3E2), 0x311E8); G.w32(G.g(0x3EA), G.g(0x632))  # g_SavePtr, g_RestoreListA
+def plane4_source(clipped):                          # a 32 x 20 BOB, 'clipped' lines above the buffer
+    G.call(0xBA5C, a1=0x70000, d1=32, d2=236+clipped, d3=32, d4=20, d0=0)
+    return G.r32(0xDFF04C) - 0x70000                 # BLTBPTH of the last (plane 4) cookie-cut blit
+got = plane4_source(14)
+check('DrawBob: a BOB clipped at the top skips 2 x the lines of its graphics',
+      plane4_source(0) == 16 and got == 16 + 14*40,
+      f'14 lines clipped: plane 4 read from +{got} (right: +{16 + 14*20}, 20 bytes a line)')
+
 print(f'\n{sum(results)} of {len(results)} checks pass')
 sys.exit(0 if all(results) else 1)

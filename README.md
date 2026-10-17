@@ -320,6 +320,10 @@ differ has a `<< … >>` note naming the 512K code it replaces. The differences 
     so while Arthur falls the view alternates between on target and up to 8 px past it.
   * Skeletons, plants and fire pillars do not give their spawn quota back when removed.
   * The fire pillar writes three fields from a frame table during its shots that nothing reads.
+  * `DrawBob`: a BOB that crosses the top of the screen buffer has twice too many graphics lines
+    skipped, so the part still on screen shows the wrong lines of its image. The same code is right
+    in the 1MB build, whose masked graphics have twice the bytes a line; the 512K build kept it.
+    `DrawSceneryOnRedraw` has it too. (Found by the enhanced scroller's tests.)
   * In the unused `PetiteDevil_PathUnused`, `PetiteDevil_PathNext` adds each list offset after
     stepping past it, so it lands 2 bytes into the list: the first X is read as the point count.
 * **Corrected by the emulator checks:** the Big Man crouches when Arthur is within 16 px of it
@@ -416,7 +420,7 @@ data files: `sound/gng_sfx_512k.s` (30 effects, 512K build) and `sound/gng_music
 * **1MB-only code:** the start-up caching, the one-blit masked `DrawBob`, and every extra sound
   call (which effect and why) are commented in `gng_main_1mb.s`.
 * **Checked by emulation:** every bug note and several behaviour claims are confirmed by running
-  the original code in a 68000 emulator (`tools/verify/checks.py`, 15 checks, including the camera model).
+  the original code in a 68000 emulator (`tools/verify/checks.py`, 16 checks, including the camera model).
 * **Data:** every table the code reads is named; the map, tile, spawn, animation, movement, box,
   placement, level and score tables are written out structurally. Every object field and global the
   code uses has a name (the remaining raw offsets on a5 are slot sizes, e.g. `lea $3c(a5),a5`).

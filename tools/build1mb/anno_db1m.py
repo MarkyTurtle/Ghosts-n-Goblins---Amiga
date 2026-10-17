@@ -177,6 +177,8 @@ for _a in (0x80,0x16880):
 
 # ---- comments on the 1MB-only code (1MB addresses)
 COMMENTS1M={
+ 0xBB60:'skip lines x 2 x words x 10: right here, the masked graphics have 2 x the bytes a line (the 512K build kept it: a bug there)',
+ 0xC27E:'as in DrawBob: right for the masked graphics',
  0x5A6E:'a6 = GLOBALS + load address (from $4.w); the user stack sits below it',
  0x5A7C:'g_BaseAddr: added to every absolute program address from here on',
  0x5AC4:'the sprite banks move with the load address',

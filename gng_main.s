@@ -13223,6 +13223,11 @@ l_0BA5A:
 ;  - mask = OR of the 5 planes (colour 0 transparent), built in two blits at $371E8
 ;    (A|B|C, then mask|B|C), minterm $FE
 ;  - 5 cookie-cut blits (minterm $CA: D = A ? B : C) with the X shift in BLTCON0/1.
+;  BUG: a BOB clipped at the top of the buffer skips twice the graphics lines it should
+;  ($BAF4: the line count is multiplied by twice the words per line, then by 10), so the
+;  part still on screen is drawn from the wrong lines of the image (or the next frame's
+;  data). The same code is right in the 1MB build, whose masked graphics have twice the
+;  bytes a line; the 512K build kept it. DrawSceneryOnRedraw has it too ($C2EA).
 ;---------------------------------------------------------------------------
 DrawBob:
         move.w  g_ScrollTileX(a6),d0            ; 0BA5C  level -> buffer coordinates (16-px left margin)
@@ -13291,7 +13296,7 @@ l_0BAE0:
         neg.w   d2                              ; 0BAEE
         move.w  d6,d7                           ; 0BAF0
         add.w   d7,d7                           ; 0BAF2
-        mulu.w  d7,d2                           ; 0BAF4
+        mulu.w  d7,d2                           ; 0BAF4  BUG: d7 = 2 x words per line, so 2 x the lines are skipped
         mulu.w  #$a,d2                          ; 0BAF6
         adda.w  d2,a1                           ; 0BAFA
         clr.w   d2                              ; 0BAFC
@@ -14011,7 +14016,7 @@ l_0C2D6:
         neg.w   d2                              ; 0C2E4
         move.w  d6,d7                           ; 0C2E6
         add.w   d7,d7                           ; 0C2E8
-        mulu.w  d7,d2                           ; 0C2EA
+        mulu.w  d7,d2                           ; 0C2EA  BUG: as in DrawBob, 2 x the lines are skipped
         mulu.w  #$a,d2                          ; 0C2EC
         adda.w  d2,a1                           ; 0C2F0
         clr.w   d2                              ; 0C2F2
