@@ -15,7 +15,7 @@ ORG = 0x7A000
 FULL, SCROLL, COPPER = ORG, ORG+4, ORG+8
 BUF_SIZE = 180*256+1040
 BUFS = [0x37468, 0x37468+BUF_SIZE]
-RECS = [0x79000, 0x79010]
+RECS = [0x79000, 0x79040]                  # buffer records (buf_SIZEOF is under $40)
 LIST = 0x79100
 BIN = os.path.join(HERE, '..', 'build', 'scroll.bin')
 
@@ -30,7 +30,7 @@ class Enhanced(Original):
         super().__init__(level)
         self.u.mem_write(ORG, open(BIN, 'rb').read())
         for r, b in zip(RECS, BUFS):
-            self.u.mem_write(r, bytes(16)); self.w32(r, b)
+            self.u.mem_write(r, bytes(0x40)); self.w32(r, b)
         self.u.mem_write(BUFS[0], bytes(2*BUF_SIZE))
     def show_cam(self, k, cx, cy):
         self.blits = self.blit_words = 0
