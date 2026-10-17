@@ -12,7 +12,9 @@ Each line points to the item below with the details and measurements.
 - [ ] Optional second-stage loader to escape the bootblock's 1,024-byte limit (1)
 - [ ] Disk builder lays the files out itself and patches the tables (2)
 - [ ] zx0 compression of every file, decompressed in place (4); about 296 KB less on disk (5)
-- [ ] One main program for both 512K and 1MB instead of two copies: 100 KB less on disk (5)
+- [ ] One main program for every memory size: the bootblock finds the memory and leaves a machine
+      description at a known place; the program picks its layout and features from it. 100 KB
+      less on disk, and slow / fast RAM used properly (7)
 - [ ] Font stored without its unused bytes: 3 KB less on disk (5)
 
 **Display and drawing**
@@ -488,3 +490,56 @@ room for full-quality effects or a larger frame cache.
   ROM is available in the build environment.
 * Measure the documented timing behaviour: 25 fps drawing, redraw cost, and the short freezes
   while falling (`g_SkipLogic`).
+
+## 7. One program for every memory size
+
+Today there are two main programs on the disk (512K at track 110, 1MB at track 17), and the
+bootblock picks one with a rough test (`$4.w` - ExecBase - above 512K, or the stack above
+`$80000`). The two differ in about 130 places (the `<< >>` notes in `gng_main_1mb.s`; 259 lines
+are 1MB-only), all of which come down to memory:
+
+| | 512K program | 1MB program |
+|---|---|---|
+| Code | at `$80`, absolute addresses | anywhere: position independent through `g_BaseAddr` |
+| Enemy graphics | reloaded from disk for each level | loaded once, cached with masks (`BuildMaskedGfx`) |
+| BOB drawing | 2 mask blits + 5 plane blits | one blit (pre-masked) |
+| Progress map | reloaded each time | cached |
+| Sound | effects only (32 KB package) | music and effects (111 KB package), `PlayMusic` |
+| Drawing | every other frame (25 fps) | every frame (50 fps) |
+| Screens, HUD, copper, sprites | `$37468`-`$65548` | `$80`-`$2E914` |
+
+**Plan**
+
+* **Bootblock: describe the machine.** Kickstart is still running when the bootblock starts, so
+  instead of guessing it can walk exec's memory list (`ExecBase->MemList`: each MemHeader gives
+  the type - chip, fast; slow RAM at `$C00000` shows up as fast without DMA - its start and end).
+  It writes a small block - say `'GNGM'`, version, chip size, then up to 4 (start, size, type)
+  regions, PAL/NTSC, CPU type from `AttnFlags` - at a well-known address before taking the
+  machine over. Candidates: `$100`-`$1FF` (the user interrupt vectors, unused on the Amiga), or
+  a reserved block at the start of the loaded program file (then it moves with the program and
+  nothing else can overwrite it). Space in the bootblock is tight (code and data up to about
+  `$3A8` of 1,024 bytes); the own-loader idea in item 1 would lift that limit, and the machine
+  block fits naturally next to the shared file directory there.
+* **One program, position independent** (start from the 1MB source: it already is). At start-up
+  it reads the machine block and chooses a profile, with the addresses of every buffer computed
+  into globals instead of equates:
+  * *512K chip only*: today's 512K layout and behaviour (graphics reloaded per level, effects
+    only, 2-pass masks or the one-plane masks / on-demand cache of item 3).
+  * *512K chip + 512K slow RAM* (the most common expanded A500): code, level data, collision
+    tables, the progress map cache and the music sequences in slow RAM; everything the blitter,
+    copper, sprites or audio DMA read (screens, graphics, masks, samples) in chip RAM. The
+    original 1MB program cannot use this machine properly (its masked graphics would land in
+    slow RAM, which the blitter cannot read); a merged program can.
+  * *1MB chip (or more)*: today's 1MB behaviour.
+  * Fast RAM (A1200 / accelerators) treated like slow RAM.
+* **Feature switches from the profile**, not from the build: masked-graphics cache, music
+  quality tier (item 4), 50 / 25 fps drawing, file caching (item 4). The scroller module
+  (`enhanced/`) already builds both ways from one source (`BUILD_1MB`); the assemble-time switch
+  becomes a runtime one (two ScrDrawBob variants behind a pointer).
+* **Disk:** one main program instead of two (about 100 KB less), loaded where the bootblock
+  chose; the 1MB music package and the 512K effects package both stay, picked by profile.
+* **Order:** after the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), since this
+  rewrites the same routines. The `<< >>` notes give the complete list of places to merge.
+* **Testing:** `enhanced/tools/compare_runs.py` already runs both originals side by side with the
+  enhanced builds; the merged program can be run in each profile against the matching original
+  (512K, 1MB chip), plus a 512K chip + 512K slow configuration in the emulator and in WinUAE.
