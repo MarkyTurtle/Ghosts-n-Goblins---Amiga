@@ -248,6 +248,30 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
 
 ## Next steps
 
+0. **Fold the scroller into the game source.** Today the enhanced program is the original binary
+   with patches written over it, plus the module loaded from track 132. The aim is one source on
+   this branch (`gng_main.s`, edited here) that assembles the enhanced program directly:
+   * **First make the source relocatable** (on `main`, still byte-identical): about 36
+     instructions still give addresses as numbers (`lea $371e8.l`, `move.l #$1a250,COP2LCH`,
+     `move.l #$37468,...`, the HUD sprite blocks...) and a few pieces of code are kept as bytes
+     (`RedrawEntry`'s `bsr.w`, the bytes before `PrintChar`). Turn them into symbols and real
+     instructions. Test: assemble with padding inserted early in the program and run the whole
+     game in the emulator (`tools/compare_runs.py` against the original): it must stay in step.
+   * **Memory map as symbols**: `GLOBALS` (`$1898C`) is inside the program file's last bytes, and
+     the copper lists and sprite data follow at fixed addresses; once the code size changes they
+     must be placed after the program (equates computed from an end label), and the bootblock's
+     length (`$18A80`) and the disk layout follow (`mkdisk.py` already reads both).
+   * **Replace the routines in the source**: `RedrawScreen`, `RedrawEntry`, `CameraJump`,
+     `SwapScreens`, `SetBitplanePtrs`, `ShowBackBuffer`, `RestoreBackground`, `DrawBobs` and the
+     `PrintChar` playfield path become the module's versions; `include "scroll.s"`; drop the module
+     track, its loader stub and the dead code (old `RedrawScreen`, `DrawBob`,
+     `DrawSceneryOnRedraw`, the save areas).
+   * **Check**: the same side-by-side runs as now (all levels, teleporting), with the harness taking
+     its addresses (VblIRQ, Level1Logic, LoadFile...) from the listing instead of constants.
+   * Note: `gng_main.s` is generated on `main` (`anno/gen.py`); on this branch it would be edited
+     by hand from then on, so later annotation changes on `main` merge as text. Doing the
+     relocation step on `main` first keeps those merges small.
+
 1. **Real machine timing** in WinUAE / FS-UAE (cycle-exact A500): the image is ready.
 2. **Use the freed memory** (43 KB of screens, the 24 KB of save areas): the first step towards
    music on 512K machines and the other items in `docs/TODO.md`.
