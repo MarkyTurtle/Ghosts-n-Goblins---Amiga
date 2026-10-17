@@ -272,7 +272,20 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
      by hand from then on, so later annotation changes on `main` merge as text. Doing the
      relocation step on `main` first keeps those merges small.
 
-1. **Real machine timing** in WinUAE / FS-UAE (cycle-exact A500): the image is ready.
+1. **Real machine timing.** First WinUAE run (played to the end with the cheat): vertical
+   scrolling while falling is clearly better (no freezes); the general frame rate is not
+   noticeably different. That is expected: the game moves everything every frame (50 Hz) but
+   PlayFrame only sets the camera and draws on odd frames (`btst #0,g_GameFrame+1` at `$6E76`),
+   so the display runs at 25 fps in both builds; the original's redraws ran in the background
+   between those frames and only showed when they made the logic freeze.
+   * **Raster-time build:** set COLOR00 at the start / end of the logic, the camera, the restore,
+     the BOB drawing and the scroller (both builds), to see in WinUAE how much of each frame is
+     used and what headroom the scroller left.
+   * **Draw every frame (50 fps):** drop the odd-frame test so the camera and drawing run every
+     frame. Needs the whole frame (logic + restore + BOBs + new edges) to fit in one 20 ms frame;
+     if it does not, VblIRQ already skips the next logic run (it sees IPL 1 still running), which
+     would slow the game down rather than tear. The raster-time build shows whether it fits; an
+     option would keep 25 fps for busy scenes or slower machines.
 2. **Use the freed memory** (43 KB of screens, the 24 KB of save areas): the first step towards
    music on 512K machines and the other items in `docs/TODO.md`.
 3. **One-plane masks** stored per frame (or the on-demand cache) instead of the 2 mask-building

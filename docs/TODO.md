@@ -21,6 +21,8 @@ Each line points to the item below with the details and measurements.
       Integrated into the 512K game on branch `enhanced/scroll`, with a disk image; tested in the
       emulator side by side with the original. Still to do: real-machine timing (WinUAE)
 - [x] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
+- [ ] Raster-time debug build (COLOR00 per stage), then try drawing every frame (50 fps instead
+      of the game's 25); see `enhanced/docs/SCROLLER.md`, *Next steps* 1
 - [ ] Fold the scroller into the game source on `enhanced/scroll` (today: module on its own track
       + in-place patches over the original binary); see `enhanced/docs/SCROLLER.md`, *Next steps*
 - [ ] BOB masks: one-plane masks (+20%, stored or built on demand into a small cache) on 512K;
