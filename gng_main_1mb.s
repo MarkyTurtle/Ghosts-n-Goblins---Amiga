@@ -13380,7 +13380,7 @@ l_0BB4C:
         neg.w   d2                              ; 0BB5A
         move.w  d6,d7                           ; 0BB5C
         add.w   d7,d7                           ; 0BB5E
-        mulu.w  d7,d2                           ; 0BB60
+        mulu.w  d7,d2                           ; 0BB60  skip lines x 2 x words x 10: right here, the masked graphics have 2 x the bytes a line (the 512K build kept it: a bug there)
         mulu.w  #$a,d2                          ; 0BB62
         adda.w  d2,a1                           ; 0BB66
         clr.w   d2                              ; 0BB68
@@ -14036,7 +14036,7 @@ l_0C26A:
         neg.w   d2                              ; 0C278
         move.w  d6,d7                           ; 0C27A
         add.w   d7,d7                           ; 0C27C
-        mulu.w  d7,d2                           ; 0C27E
+        mulu.w  d7,d2                           ; 0C27E  as in DrawBob: right for the masked graphics
         mulu.w  #$a,d2                          ; 0C280
         adda.w  d2,a1                           ; 0C284
         clr.w   d2                              ; 0C286

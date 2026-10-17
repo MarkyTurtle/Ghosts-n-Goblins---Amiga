@@ -200,3 +200,13 @@ for a,t in [
  (0xD2B6,'after PD_TurnWait tries take the next entry; when PD_TurnRate runs out, give up'),
 ]: C(a,t)
 N(0xAD82, 'ApplyMoveA0', "ApplyMoveTable with the movement table already in a0")
+
+# ---------------------------------------------------------------- DrawBob top-clip bug (found with the scroller test)
+HEADERS[0xBA5C] += """
+ BUG: a BOB clipped at the top of the buffer skips twice the graphics lines it should
+ ($BAF4: the line count is multiplied by twice the words per line, then by 10), so the
+ part still on screen is drawn from the wrong lines of the image (or the next frame's
+ data). The same code is right in the 1MB build, whose masked graphics have twice the
+ bytes a line; the 512K build kept it. DrawSceneryOnRedraw has it too ($C2EA)."""
+C(0xBAF4, 'BUG: d7 = 2 x words per line, so 2 x the lines are skipped')
+C(0xC2EA, 'BUG: as in DrawBob, 2 x the lines are skipped')
