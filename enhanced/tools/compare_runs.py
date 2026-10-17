@@ -1,4 +1,4 @@
-"""Run the original and the enhanced game side by side in the emulator, with the same input,
+"""Run the original and the enhanced game side by side (512K or 1MB build) in the emulator, with the same input,
 and compare what they show, frame by frame (the whole display, HUD included).
 
 In the emulator a background redraw always finishes at once, so the original camera almost
@@ -7,11 +7,11 @@ same logic, same pictures. A difference in the picture while the game state is s
 is a drawing difference. The reference has the DrawBob top-clip bug fixed (see test_bobs.py),
 since the enhanced build draws those BOBs correctly.
 
-  python3 compare_runs.py [frames] [seed] [--png DIR] [--level N] [--teleport N]"""
+  python3 compare_runs.py [frames] [seed] [--png DIR] [--level N] [--teleport N] [--build 512k|1mb]"""
 import os, sys, time
 import numpy as np
-from game import GameRun, script_start, GLOBALS, G
-from check_game import play_script, BUILD
+from game import GameRun, script_start, enhanced
+from check_game import play_script
 
 STATE = ('g_GameState', 1), ('g_SubState', 1), ('g_Level', 2), ('g_ArthurX', 2), ('g_ArthurY', 2), \
         ('g_ScrollTileX', 2), ('g_ScrollFineX', 2), ('g_ScrollTileY', 2), ('g_ScrollFineY', 2), \
@@ -30,11 +30,12 @@ def state(m):
     return s
 
 
-def main(frames=3000, seed=1, png=None, level=None, teleport=0):
-    orig = GameRun()
-    orig.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))      # DrawBob top-clip fix
-    orig.u.mem_write(0xC2EA, bytes.fromhex('c4c6'))      # and in DrawSceneryOnRedraw
-    enh = GameRun(os.path.join(BUILD, 'main_enh.bin'), {132: os.path.join(BUILD, 'module.bin')})
+def main(frames=3000, seed=1, png=None, level=None, teleport=0, build='512k'):
+    orig = GameRun(build=build)
+    if build == '512k':
+        orig.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))  # DrawBob top-clip fix (the 1MB build is right)
+        orig.u.mem_write(0xC2EA, bytes.fromhex('c4c6'))  # and in DrawSceneryOnRedraw
+    enh = enhanced(build)
     for m in (orig, enh): m.boot()
     inputs = list(script_start()); play = play_script(seed)
     same = differ = 0; diverged = None; t = time.time()
@@ -47,16 +48,16 @@ def main(frames=3000, seed=1, png=None, level=None, teleport=0):
         if level is not None and not started and m.g('g_GameState', 1) == 0 and m.g('g_SubState', 1) == 2:
             started = True                                 # --level: once level 0 has started, load that level
             for m in (orig, enh):                          # instead; lives never run out (the game's cheat flag)
-                m.w16(G['g_Level'], level); m.w8(G['g_CheatOn'], 0xFF)
-                for k in ('g_SubState', 'g_SubState2', 'g_SubState3'): m.w8(G[k], 0)
+                m.w16(m.G['g_Level'], level); m.w8(m.G['g_CheatOn'], 0xFF)
+                for k in ('g_SubState', 'g_SubState2', 'g_SubState3'): m.w8(m.G[k], 0)
         if teleport and f % teleport == 0 and orig.g('g_GameState', 1) == 0 and orig.g('g_SubState', 1) == 2:
             # --teleport N: every N frames put Arthur somewhere else in the level (both games), so
             # the camera jumps and scrolls vertically too
             w, h = orig.g('g_LevelWidth'), orig.g('g_LevelHeight')
             x, y = trnd.randrange(32, max(33, w + 200)), trnd.randrange(40, max(41, h + 200))
-            for m in (orig, enh): m.w16(G['g_ArthurX'], x); m.w16(G['g_ArthurY'], y)
+            for m in (orig, enh): m.w16(m.G['g_ArthurX'], x); m.w16(m.G['g_ArthurY'], y)
         so, se = state(orig), state(enh)
-        if so != se or orig.rd(GLOBALS+0x88, 0x60) != enh.rd(GLOBALS+0x88, 0x60):
+        if so != se or orig.rd(orig.G['g_CamMinY'], 0x60) != enh.rd(enh.G['g_CamMinY'], 0x60):
             diverged = (f, so, se); break
         states.add((so['g_GameState'], so['g_SubState'])); levels.add(so['g_Level'])
         a, b = orig.render(), enh.render()
@@ -92,4 +93,6 @@ if __name__ == '__main__':
     if lv is not None: args.remove(str(lv))
     tp = int(sys.argv[sys.argv.index('--teleport')+1]) if '--teleport' in sys.argv else 0
     if tp: args.remove(str(tp))
-    sys.exit(main(int(args[0]) if args else 3000, int(args[1]) if len(args) > 1 else 1, png, lv, tp))
+    build = sys.argv[sys.argv.index('--build')+1] if '--build' in sys.argv else '512k'
+    if build in args: args.remove(build)
+    sys.exit(main(int(args[0]) if args else 3000, int(args[1]) if len(args) > 1 else 1, png, lv, tp, build))

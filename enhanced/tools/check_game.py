@@ -1,4 +1,4 @@
-"""Play the enhanced game in the emulator with scripted input and check every frame it shows
+"""(512K build.) Play the enhanced game in the emulator with scripted input and check every frame it shows
 against the original game's own display code.
 
 For each frame the enhanced build shows while playing, the whole memory is copied into a
@@ -11,7 +11,7 @@ by the reference, so frames after playfield text are reported separately.)
   python3 check_game.py [frames] [seed] [--png DIR]"""
 import os, random, struct, sys, time
 import numpy as np
-from game import GameRun, G, GLOBALS, script_start
+from game import GameRun, G, GLOBALS, script_start, enhanced
 from amiga import Amiga
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +22,7 @@ SS_INPLAY = 2
 
 def module_syms():
     out = {}
-    for l in open(os.path.join(BUILD, 'module_syms.i')):
+    for l in open(os.path.join(BUILD, '512k', 'module_syms.i')):
         p = l.split()
         if len(p) == 3 and p[1] == 'equ': out[p[0]] = int(p[2][1:], 16)
     return out
@@ -66,7 +66,7 @@ def play_script(seed):
 
 def main(frames=1500, seed=1, png=None):
     ms = module_syms()
-    m = GameRun(os.path.join(BUILD, 'main_enh.bin'), {132: os.path.join(BUILD, 'module.bin')})
+    m = enhanced('512k')
     prints = [0]
     from unicorn import UC_HOOK_CODE
     m.u.hook_add(UC_HOOK_CODE, lambda *a: prints.__setitem__(0, prints[0]+1),

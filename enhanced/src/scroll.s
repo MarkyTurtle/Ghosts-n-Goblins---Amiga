@@ -29,8 +29,10 @@
 ;
 ; This file is the core only: it is included by module.s (the game module, loaded by the
 ; enhanced build) and by scroll_test.s (the unit tests' build at $7A000). The includer
-; defines the custom-chip / globals equates (gng_equates.i), CellTiles, ItemBoxSizes,
-; SmallBobSizes and MASKBUF (a one-plane BOB mask, at most 64 x 80 pixels).
+; defines the custom-chip / globals equates (gng_equates.i or gng_equates_1mb.i), CellTiles,
+; ItemBoxSizes, SmallBobSizes and MASKBUF (a one-plane BOB mask, at most 64 x 80 pixels; 512K
+; only). BUILD_1MB selects the 1MB build: its program tables are offsets from g_BaseAddr, and
+; its BOB graphics carry their masks, so a BOB is one blit.
 ;
 ; Calls (a6 = game globals, as everywhere in the game):
 ;   ScrFullDraw    a0 = buffer record, d0 = camera x, d1 = camera y
@@ -91,6 +93,22 @@ INTSOFF         macro
 INTSON          macro
         move.w  #$C000,CUSTOM+INTENA
         endm
+; the address of a table in the game program: absolute in the 512K build; in the 1MB build
+; the program is position independent and its labels are offsets from g_BaseAddr
+GAMEADDR        macro
+        lea     \1,\2
+        ifd     BUILD_1MB
+        adda.l  g_BaseAddr(a6),\2
+        endif
+        endm
+
+; BOB graphics: bytes per image line for each graphics word of width. 512K: 5 plane lines;
+; 1MB: 5 plane lines each followed by its mask line (BuildMaskedGfx)
+                ifd     BUILD_1MB
+GFX_LINE_MUL    equ     20
+                else
+GFX_LINE_MUL    equ     10
+                endif
 
 ;------------------------------------------------------------------------------
 ; Window: d0 = camera x, d1 = camera y ->
@@ -256,12 +274,25 @@ ScrScrollTo:
                 bsr.w   Window                  ; bring it to this camera (normally nothing to do)
                 bra.w   .edges
 
-; d0 = camera x, d1 = camera y, d2 = first column -> clip window for BOBs
+; d0 = camera x, d1 = camera y, d2 = first column -> clip window for BOBs: the fetched
+; columns and, in a display buffer, the visible lines; in the pristine buffer every line of
+; the tile rows it holds - the scenery drawn there is copied into the display buffers as the
+; view moves within those rows, so it must not be cut off at the lines visible when it was drawn
 SetClip:        move.w  d0,buf_CamX(a0)
                 move.w  d2,d7
                 lsl.w   #4,d7
                 move.w  d7,buf_ClipX0(a0)
-                move.w  d1,d7
+                tst.l   buf_Source(a0)
+                bne.b   .visible
+                move.w  buf_RowB(a0),d7
+                lsl.w   #4,d7
+                move.w  d7,buf_ClipY0(a0)
+                move.w  buf_RowT(a0),d7
+                addq.w  #1,d7
+                lsl.w   #4,d7
+                move.w  d7,buf_ClipY1(a0)
+                rts
+.visible:       move.w  d1,d7
                 add.w   #16,d7
                 move.w  d7,buf_ClipY0(a0)
                 add.w   #224,d7
@@ -330,7 +361,7 @@ DrawTile:
                 moveq   #15,d4
                 and.w   d1,d4
                 add.w   d4,d5
-                lea     CellTiles,a4
+                GAMEADDR CellTiles,a4
                 moveq   #0,d7
                 move.b  (a4,d5.w),d7
                 beq.b   .src                    ; tile 0
@@ -525,7 +556,7 @@ ScrDrawBob:
                 sub.w   d7,d4
                 ble.w   .out
                 move.w  d6,d0
-                mulu.w  #10,d0
+                mulu.w  #GFX_LINE_MUL,d0
                 mulu.w  d7,d0
                 adda.l  d0,a1
 .nottop:        move.w  buf_ClipY0(a0),d7       ; lines below the view
@@ -598,7 +629,7 @@ ScrDrawBob:
                 move.w  d7,d4
                 bsr.b   .part                   ; top part
                 move.w  d6,d7
-                mulu.w  #10,d7
+                mulu.w  #GFX_LINE_MUL,d7
                 mulu.w  d4,d7
                 adda.l  d7,a1                   ; graphics of the bottom part
                 moveq   #0,d2
@@ -629,6 +660,41 @@ ScrDrawBob:
                 move.w  d7,(a3)+
                 move.l  a3,buf_RList(a0)
 .nolist:        INTSOFF                         ; (the mask buffer is shared: no interruption)
+                ifd     BUILD_1MB
+                ; ---- 1MB: pre-masked graphics, every plane line followed by its mask line:
+                ; one cookie-cut blit draws all 5 planes (5 x lines blitter lines), as the
+                ; 1MB DrawBob. A = mask, B = BOB (modulo skips the other line), C/D = screen
+                ; (the next 36-byte row is the next plane, then the next line).
+                move.w  d4,d2
+                mulu.w  #5,d2
+                lsl.w   #6,d2
+                or.w    d0,d2                   ; BLTSIZE: 5 x lines, d0 words
+                move.w  d6,d1
+                add.w   d1,d1                   ; d1 = bytes per plane line of the graphics
+                move.w  d1,d7
+                add.w   d7,d7
+                sub.w   d0,d7
+                sub.w   d0,d7                   ; d7 = A / B modulo (4 x words - 2 x d0)
+                moveq   #ROWBYTES,d4
+                sub.w   d0,d4
+                sub.w   d0,d4                   ; d4 = C / D modulo
+                lea     CUSTOM,a3
+                WAITBLIT
+                move.w  d3,BLTCON1(a3)
+                or.w    #$0FCA,d3
+                move.w  d3,BLTCON0(a3)
+                move.w  d4,BLTCMOD(a3)
+                move.w  d7,BLTBMOD(a3)
+                move.w  d7,BLTAMOD(a3)
+                move.w  d4,BLTDMOD(a3)
+                move.l  d5,BLTAFWM(a3)
+                lea     (a1,d1.w),a2
+                move.l  a2,BLTAPTH(a3)
+                move.l  a1,BLTBPTH(a3)
+                move.l  a4,BLTCPTH(a3)
+                move.l  a4,BLTDPTH(a3)
+                move.w  d2,BLTSIZE(a3)
+                else
                 move.w  d4,d2                   ; BLTSIZE for one plane
                 lsl.w   #6,d2
                 or.w    d0,d2
@@ -684,6 +750,7 @@ ScrDrawBob:
                 adda.w  d1,a2
                 adda.w  #ROWBYTES,a4
                 dbra    d6,.plane
+                endif
                 INTSON
                 movem.l (a7)+,d0-d7/a1-a5
                 rts
@@ -720,9 +787,9 @@ ScrDrawScenery:
                 add.w   $A(a5),d2
                 move.b  2(a5),d0                ; image = ItemBoxSizes[O_Param]
                 ext.w   d0
-                lea     ItemBoxSizes,a1
+                GAMEADDR ItemBoxSizes,a1
                 move.b  (a1,d0.w),d0
-                lea     SmallBobSizes,a1
+                GAMEADDR SmallBobSizes,a1
                 add.w   d0,d0
                 move.b  (a1,d0.w),d3
                 ext.w   d3

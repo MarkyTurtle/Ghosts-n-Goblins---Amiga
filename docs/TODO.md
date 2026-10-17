@@ -18,8 +18,8 @@ Each line points to the item below with the details and measurements.
 **Display and drawing**
 - [x] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
       redraw only the new edge instead of the whole screen; no freezes when falling (3).
-      Integrated into the 512K game on branch `enhanced/scroll`, with a disk image; tested in the
-      emulator side by side with the original. Still to do: real-machine timing (WinUAE)
+      Integrated into both programs (512K and 1MB) on branch `enhanced/scroll`, with a disk image;
+      tested in the emulator side by side with the originals. Still to do: real-machine timing (WinUAE)
 - [x] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
 - [ ] Raster-time debug build (COLOR00 per stage), then try drawing every frame (50 fps instead
       of the game's 25); see `enhanced/docs/SCROLLER.md`, *Next steps* 1

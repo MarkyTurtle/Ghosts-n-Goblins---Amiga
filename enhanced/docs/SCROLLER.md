@@ -11,7 +11,7 @@ row at a time.
 | Test harness: blitter, copper and display emulation on top of the 68000 emulator (`tools/amiga.py`) | done; reproduces the original display exactly (`tools/check_harness.py`: 16 of 16 views equal the level pictures) |
 | Background scroller: layout, tile drawing, edge columns / rows, copper list with ring wrap (`src/scroll.s`) | done; equal to the original at every camera position tested (`tools/test_scroll.py`) |
 | Pristine buffer, BOBs, restores, scenery | done; equal to the original's `DrawBobs` / `DrawSceneryOnRedraw` (`tools/test_bobs.py`) |
-| Integration into the game (`src/module.s`, `src/patches.s`), a disk image (`tools/build_enh.py`) | done: a playable image, `build/gng_enhanced.adf` |
+| Integration into the game (`src/module.s`, `src/patches.s`), a disk image (`tools/build_enh.py`) | done for both programs, 512K and 1MB: `build/gng_enhanced.adf` |
 | Whole game in the emulator against the original (`tools/compare_runs.py`) | done: see *Testing* below |
 | Real hardware / WinUAE timing | **not tested yet** - the emulator here has no timing |
 
@@ -116,20 +116,45 @@ So about 43 KB saved on the screens, and the save areas go as well.
 
 ### What is built
 
-`tools/build_enh.py` makes everything in `build/`:
+`tools/build_enh.py` builds both programs - the 512K and the 1MB one - from the same module and
+patch sources, into `build/512k/` and `build/1mb/`:
 
-* `module.bin` - `src/module.s` (which includes `src/scroll.s`), assembled at `$5C000`: the
-  scroller and the game glue, about 2.5 KB. Its storage (records, copper lists, restore lists)
-  follows it in memory but is not in the file (EnhInit clears it).
-* `main_enh.bin` - the original 512K program with the blocks of `src/patches.s` written over it
-  in place. Each block is assembled on its own at its address and checked to fit, so nothing
-  else in the program moves (the tables `scroll.s` uses, `CellTiles` and so on, stay where they
-  are). The labels come from the original's assembler listing (`orig_syms.i`, generated).
-* `boot_enh.bin` - the bootblock with two instructions changed so the load base is always 0:
-  the 512K program from track 110 on any machine (the 1MB program is not patched).
-* `gng_enhanced.adf` - an extended ADF made by `tools/disk/mkdisk.py`, with the module added
-  on track 132 (`--add`, a new option: a file no table lists). The build decodes the image again
-  and checks that the bootblock, main program and module read back exactly.
+* `module.bin` - `src/module.s` (which includes `src/scroll.s`): the scroller and the game glue,
+  about 2.5 KB, at `$5C000` (512K) or `$24400` (1MB, `BUILD_1MB`). Its storage (records, copper
+  lists, restore lists) follows it in memory but is not in the file (EnhInit clears it).
+* `main.bin` - the original program with the blocks of `src/patches.s` written over it in place.
+  Each block is assembled on its own at its address and checked to fit, so nothing else in the
+  program moves (the tables `scroll.s` uses, `CellTiles` and so on, stay where they are). The
+  labels come from the original's assembler listing (`orig_syms.i`, generated).
+
+and two disk images, made by `tools/disk/mkdisk.py` with the modules added on tracks 132 (512K)
+and 133 (1MB) (`--add`: files no table lists); the build decodes each image again and checks
+that the bootblock and every file it changed read back exactly:
+
+* `gng_enhanced.adf` - both enhanced programs and the **original bootblock**, which chooses as
+  on the original disk: the 1MB program when it finds more than 512K (1MB of chip RAM, or
+  memory above 512K), otherwise the 512K one.
+* `gng_enhanced_512k.adf` - the 512K program only, with the bootblock's two memory tests
+  changed so the load base is always 0 (to try the 512K program on a bigger machine).
+
+### The 1MB build
+
+The 1MB program is the 512K one with more kept in memory (graphics, the progress map, music).
+Two differences matter here:
+
+* **It is position independent:** it runs wherever the bootblock loads it (`$80000` with 1MB of
+  chip RAM) and adds `g_BaseAddr` to every program address. The patches only use pc-relative
+  branches into the program; the module sits at a fixed chip-RAM address (`$24400`, in the old
+  screen area: its three buffers are at `$80`-`$22AB0`, the progress map's picture can reach
+  `$242C0`, the HUD strip starts at `$2D080`) and adds `g_BaseAddr` where it reads the program's
+  tables (`CellTiles`, `ItemBoxSizes`, `SmallBobSizes`) or jumps back into `PrintChar`.
+* **Its BOB graphics carry their masks** (`BuildMaskedGfx`: every plane line followed by its mask
+  line), so a BOB is one blit - 5 x height blitter lines, A = mask, B = graphics, C/D = screen -
+  instead of 2 mask blits and 5 plane blits. `ScrDrawBob` does the same in the 1MB build, through
+  the ring and corkscrew addressing, split at the ring wrap.
+* It also **draws every frame** (50 fps): the 1MB `PlayFrame` has no odd-frame test (the 512K
+  build's `btst #0,g_GameFrame+1` at `$6E76`), so its camera moves, and its redraws are asked
+  for, twice as often.
 
 ### The patches
 
@@ -182,23 +207,33 @@ lives...).
 
 In the emulator a background redraw finishes at once, so the original never waits for one
 and the two games stay in step - same logic, same pictures - which makes a direct comparison
-possible. Results (random walking, jumping, climbing and throwing; DrawBob's top-clip bug fixed
-in the reference):
+possible. Input is random walking, jumping, climbing and throwing; `--teleport` also puts
+Arthur somewhere else in the level every 100-150 frames, so the camera jumps and scrolls
+vertically. DrawBob's top-clip bug is fixed in the 512K reference.
 
-| Run | Level | Frames in step | Identical displays | Different |
+Results with the current code (both builds):
+
+| Build | Runs | Frames in step | Identical displays | Different |
 |---|---|---:|---:|---:|
-| walking, 3 input seeds (with deaths, the progress map, restarts) | 0 | 3 x 6,000 | 17,989 | 11 |
-| walking, started on each level | 1-6 | 6 x 3,000 | 17,980 | 20 |
-| teleporting Arthur every 150 frames (camera jumps, vertical scrolling: 29-51 tile rows on levels 1, 2, 4, 5) | 0-6 | 7 x 2,500 | 17,476 | 24 |
-| **total** | | **53,500** | **53,445** | **55** |
+| 1MB | every level (0-6) with teleporting, level 2 twice; 11-63 camera tile rows on levels 1, 2, 4, 5 | 17,000 | 16,996 | 4 |
+| 512K | walking on level 0; levels 1, 2, 4, 5 with teleporting | 12,500 | 12,485 | 15 |
 
-The two games never went out of step (game state compared every frame), and none of the 55
-frames is a playfield difference:
+The two games never went out of step (game state compared every frame), and none of the frames
+that differ is a playfield difference:
 
-* 2-3 frames per run while a level's graphics load: both builds show the loading data passing
-  through screen memory, laid out differently;
-* the first frame of the progress map, 2-5 pixels at its top-left: the map's copper list starts
+* (512K only) 2-3 frames per run while a level's graphics load: both builds show the loading
+  data passing through screen memory, laid out differently. The 1MB program keeps its graphics
+  in memory and has none of these;
+* the first frame of the progress map, 1-10 pixels at its top-left: the map's copper list starts
   2 bytes before its picture, and those bytes belong to a different buffer in each build.
+
+**A bug these runs found** (fixed, both builds): the gravestones drawn into the pristine buffer
+were clipped to the lines visible at the time; when the view then moved down within the same
+tile rows (on level 2, teleporting), the lines cut off came into view as background. They are now
+clipped to the tile rows the pristine buffer holds. The first 512K image you tried has it too: on level 2 it could show as part of a gravestone missing while the screen scrolls down.
+
+Earlier, before that fix, the 512K build had run 53,500 frames in step in the same way (all
+levels, walking and teleporting), with only the loading and map frames above differing.
 
 Separately, `tools/test_scroll.py` and `tools/test_bobs.py` still pass (280 of 280 and 140 + 401
 of 401 frames) with the core as integrated. The deepest stack use in play went from about 120 to
@@ -211,9 +246,14 @@ display. Those need WinUAE or a real Amiga.
 
 ### Trying it
 
-Build (or use the image in the release), then in WinUAE: an A500 with 512K chip RAM (or more:
-the enhanced bootblock always loads the 512K program), Kickstart 1.3, and insert
-`gng_enhanced.adf` in DF0 (WinUAE reads extended ADFs). Keys as the original: F1 one player,
+Build (or use the images in the release), then in WinUAE with Kickstart 1.3 insert
+`gng_enhanced.adf` in DF0 (WinUAE reads extended ADFs): with 512K of chip RAM it runs the 512K
+program, with 1MB of chip RAM the 1MB one. `gng_enhanced_512k.adf` always runs the 512K
+program. (Use 1MB of chip RAM for the 1MB program, as for the original: it keeps the masked enemy
+graphics the blitter draws from next to itself (`ENEMY_GFX_CACHE`, an offset from its load
+address), and the blitter can only read chip RAM - so loaded into slow RAM, as the bootblock
+would do on a 512K chip + 512K slow machine, those BOBs could not be drawn. That is how the
+source reads; it has not been tried.) Keys as the original: F1 one player,
 F2 two, space to pause, Esc to abort.
 
 If something looks wrong, the most useful report is what was on screen and what Arthur was
@@ -226,7 +266,8 @@ doing (walking, falling, climbing), and the level.
 * `src/module.s`: the game module (scroller + glue); `src/patches.s`: the changes to the main
   program.
 * `tools/build_enh.py`: builds the module, the patched program, the bootblock and the disk image.
-* `tools/game.py`: runs the whole game (either build) in the emulator.
+* `tools/game.py`: runs the whole game in the emulator - 512K or 1MB program, original or
+  enhanced (`python3 game.py 1mb enh 300`).
 * `tools/compare_runs.py`: the original and the enhanced game side by side.
 * `tools/check_game.py`: each frame the enhanced game shows, against the original's display code
   drawing the same state (a second check, independent of the two games staying in step).
@@ -240,7 +281,8 @@ doing (walking, falling, climbing), and the level.
 ```
 cd enhanced/tools
 VASM=/path/to/vasmm68k_mot python3 build_enh.py         # -> ../build/gng_enhanced.adf
-python3 compare_runs.py 6000 1                           # frames, input seed [--level N] [--png DIR]
+python3 compare_runs.py 6000 1                           # frames, input seed [--level N] [--teleport N]
+python3 compare_runs.py 5000 1 --build 1mb               # the 1MB program   [--png DIR]
 python3 check_harness.py
 VASM=/path/to/vasmm68k_mot python3 test_scroll.py 80     # steps per level
 VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, then the scenery sweeps
@@ -288,9 +330,9 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
      option would keep 25 fps for busy scenes or slower machines.
 2. **Use the freed memory** (43 KB of screens, the 24 KB of save areas): the first step towards
    music on 512K machines and the other items in `docs/TODO.md`.
-3. **One-plane masks** stored per frame (or the on-demand cache) instead of the 2 mask-building
-   blits; fully pre-masked graphics for the 1MB build.
-4. **The 1MB build**: the same module on top of `gng_main_1mb.s` (its addresses differ).
+3. **One-plane masks** stored per frame (or the on-demand cache) instead of the 512K build's 2
+   mask-building blits (the 1MB build already has pre-masked graphics, and its scroller uses
+   them).
 5. **Playfield text** goes into the buffer being drawn only, as the original; a BOB passing over
    it restores the background from the pristine buffer, so text that is not printed again every
    frame can lose pieces where a BOB crossed it. None was seen in the tests (the in-game messages

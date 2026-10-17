@@ -1,21 +1,28 @@
-"""Build the enhanced game: the scroller module, the patched 512K main program, a bootblock
-that always loads the 512K program, and a disk image.
+"""Build the enhanced game: the scroller module and the patched main program for both
+builds (512K and 1MB), and the disk images.
 
   cd enhanced/tools
   VASM=/path/to/vasmm68k_mot python3 build_enh.py
 
-Writes enhanced/build/: main_enh.bin, module.bin, boot_enh.bin and gng_enhanced.adf.
+Writes enhanced/build/:
+  512k/  main.bin, module.bin (and the generated symbol files, listings)
+  1mb/   main.bin, module.bin
+  gng_enhanced.adf       both enhanced programs and the original bootblock, which picks one by
+                         the memory it finds (1MB of chip RAM, or memory above 512K: the 1MB
+                         program; otherwise the 512K one) - as the original disk
+  gng_enhanced_512k.adf  the 512K program only: the bootblock is changed (two instructions) to
+                         load it whatever the memory
 
-Steps:
- 1. assemble the original gng_main.s (checked against bin/main_512k.bin) with a listing, and
-    turn its labels into orig_syms.i;
- 2. assemble src/module.s at its load address (MODULE_ORG) -> module.bin; its Enh* entry
-    points -> module_syms.i;
+For each build:
+ 1. assemble the original source (checked against its original binary) with a listing, and
+    turn its labels into orig_syms.i (plus the few names patches.s needs: StartLoad,
+    PrintField, PrintBody);
+ 2. assemble src/module.s at its load address -> module.bin (BUILD_1MB for the 1MB build); its
+    Enh* entry points -> module_syms.i;
  3. assemble each block of src/patches.s on its own at its address, check that it fits the
-    space it replaces, and write it into a copy of the original program;
- 4. patch the bootblock (two instructions, checked) so that d0 - the load base - is always 0:
-    the 512K program from track 110, whatever the memory;
- 5. tools/disk/mkdisk.py: the image, with the module added on its own track."""
+    space it replaces, and write it into a copy of the original program.
+Then tools/disk/mkdisk.py makes the images, with the modules added on their own tracks, and
+each image is decoded again to check it."""
 import hashlib, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -23,13 +30,20 @@ ENH = os.path.join(HERE, '..')
 ROOT = os.path.join(ENH, '..')
 SRC, OUT = os.path.join(ENH, 'src'), os.path.join(ENH, 'build')
 VASM = os.environ.get('VASM', 'vasmm68k_mot')
-MODULE_TRACK = 132                  # the first free track after the game's files (0-131)
-MAIN_SHA1 = '2628a93c164a5a8791272c146053b0afb3ddcf14'
-LOAD = 0x80                         # the main program's load address
+BUILDS = {
+    '512k': dict(src='gng_main.s', equates='gng_equates.i', sha1='2628a93c164a5a8791272c146053b0afb3ddcf14',
+                 load=0x80,            # labels are addresses; the file starts at $80
+                 track=110, module_track=132, defs=(),
+                 names={'StartLoad': 0x5D32, 'StartLoadEnd': 0x5D3A, 'PrintField': 'l_0B0D6', 'PrintBody': 'l_0B0E2'}),
+    '1mb': dict(src='gng_main_1mb.s', equates='gng_equates_1mb.i', sha1='e44347679297d5d864ae7b0da689714970e261ad',
+                load=0,                # assembled at org 0: labels are file offsets
+                track=17, module_track=133, defs=(('BUILD_1MB', 1),),
+                names={'StartLoad': 0x5D88, 'StartLoadEnd': 0x5D90, 'PrintField': 'l_0B142', 'PrintBody': 'l_0B14E'}),
+}
 
 
-def vasm(src, out, listing=None, defs=(), opt=False):
-    cmd = [VASM, '-Fbin', '-m68000', '-quiet', '-I', SRC, '-I', ROOT, '-I', OUT, '-o', out]
+def vasm(src, out, listing=None, defs=(), opt=False, inc=OUT):
+    cmd = [VASM, '-Fbin', '-m68000', '-quiet', '-I', inc, '-I', SRC, '-I', ROOT, '-o', out]
     if not opt: cmd.append('-no-opt')
     if listing: cmd += ['-L', listing]
     cmd += [f'-D{k}={v}' for k, v in defs] + [src]
@@ -66,65 +80,89 @@ def patch_blocks():
     return [(a, b, ''.join(t)) for a, b, t in blocks]
 
 
-def main():
-    os.makedirs(OUT, exist_ok=True)
+def build(name):
+    cfg = BUILDS[name]
+    out = os.path.join(OUT, name)
+    os.makedirs(out, exist_ok=True)
+    V = lambda *a, **k: vasm(*a, inc=out, **k)
     # 1. the original program and its labels
-    orig = os.path.join(OUT, 'orig_main.bin')
-    vasm(os.path.join(ROOT, 'gng_main.s'), orig, listing=os.path.join(OUT, 'orig_main.lst'))
+    orig, lst = os.path.join(out, 'orig_main.bin'), os.path.join(out, 'orig_main.lst')
+    V(os.path.join(ROOT, cfg['src']), orig, listing=lst)
     prog = bytearray(open(orig, 'rb').read())
-    if hashlib.sha1(prog).hexdigest() != MAIN_SHA1: sys.exit('gng_main.s does not build the original')
-    osyms = symbols(os.path.join(OUT, 'orig_main.lst'))
-    write_syms(os.path.join(OUT, 'orig_syms.i'), osyms)
+    if hashlib.sha1(prog).hexdigest() != cfg['sha1']: sys.exit(f'{cfg["src"]} does not build the original')
+    osyms = symbols(lst)
+    for k, v in cfg['names'].items(): osyms[k] = v if isinstance(v, int) else osyms[v]
+    write_syms(os.path.join(out, 'orig_syms.i'), osyms)
     # 2. the module
-    mod = os.path.join(OUT, 'module.bin')
-    vasm(os.path.join(SRC, 'module.s'), mod, listing=os.path.join(OUT, 'module.lst'))
-    msyms = symbols(os.path.join(OUT, 'module.lst'), lambda n: n.startswith('Enh'))
-    write_syms(os.path.join(OUT, 'module_syms.i'), msyms)
-    org = min(msyms.values()) & ~0xFFF
+    mod, mlst = os.path.join(out, 'module.bin'), os.path.join(out, 'module.lst')
+    V(os.path.join(SRC, 'module.s'), mod, listing=mlst, defs=cfg['defs'])
+    msyms = symbols(mlst, lambda n: n.startswith('Enh'))
+    write_syms(os.path.join(out, 'module_syms.i'), msyms)
+    org = int(re.search(r'^MODULE_ORG\s+E:([0-9A-F]+)$', open(mlst).read(), re.M).group(1), 16)
     mlen = os.path.getsize(mod)
-    print(f'module.bin: {mlen:,} bytes at ${org:X}')
+    print(f'{name}: module.bin {mlen:,} bytes at ${org:X} (track {cfg["module_track"]})')
     # 3. the patches
     addr = lambda tok: int(tok[1:], 16) if tok.startswith('$') else osyms[tok]
-    tmp_s, tmp_b, tmp_l = (os.path.join(OUT, 'patch.' + e) for e in ('s', 'bin', 'lst'))
+    tmp_s, tmp_b, tmp_l = (os.path.join(out, 'patch.' + e) for e in ('s', 'bin', 'lst'))
     psyms = {}
     for a, b, body in patch_blocks():
-        write_syms(os.path.join(OUT, 'patch_syms.i'), psyms)
+        write_syms(os.path.join(out, 'patch_syms.i'), psyms)
         start, end = addr(a), addr(b)
         with open(tmp_s, 'w') as f:
-            f.write(f'\tinclude "gng_equates.i"\n\tinclude "orig_syms.i"\n\tinclude "module_syms.i"\n'
+            f.write(f'\tinclude "{cfg["equates"]}"\n\tinclude "orig_syms.i"\n\tinclude "module_syms.i"\n'
                     f'\tinclude "patch_syms.i"\n'
-                    f'MODULE_ORG\tequ\t${org:X}\nMODULE_LEN\tequ\t{mlen}\nMODULE_TRACK\tequ\t{MODULE_TRACK}\n'
+                    f'MODULE_ORG\tequ\t${org:X}\nMODULE_LEN\tequ\t{mlen}\nMODULE_TRACK\tequ\t{cfg["module_track"]}\n'
                     f'\torg\t${start:X}\n{body}')
-        vasm(tmp_s, tmp_b, listing=tmp_l)
+        V(tmp_s, tmp_b, listing=tmp_l)
         psyms.update({k: v for k, v in symbols(tmp_l).items() if k not in osyms and k not in msyms})
         code = open(tmp_b, 'rb').read()
         if len(code) > end - start:
-            sys.exit(f'patch {a}: {len(code)} bytes, only {end-start} available up to {b}')
-        prog[start-LOAD:start-LOAD+len(code)] = code
-        print(f'patch {a:<18} ${start:05X}: {len(code):4d} of {end-start:4d} bytes')
-    main_out = os.path.join(OUT, 'main_enh.bin')
+            sys.exit(f'{name} patch {a}: {len(code)} bytes, only {end-start} available up to {b}')
+        L = cfg['load']
+        prog[start-L:start-L+len(code)] = code
+        print(f'  patch {a:<18} ${start:05X}: {len(code):4d} of {end-start:4d} bytes')
+    main_out = os.path.join(out, 'main.bin')
     open(main_out, 'wb').write(prog)
-    # 4. the bootblock: load base always 0 (the 512K program)
-    boot = bytearray(open(os.path.join(ROOT, 'bin', 'bootblock.bin'), 'rb').read())
+    return main_out, mod
+
+
+def mkdisk(adf, boot, files, adds):
+    args = [sys.executable, os.path.join('tools', 'disk', 'mkdisk.py'), '-o', os.path.abspath(adf),
+            '--boot', os.path.abspath(boot)]
+    for k, v in files.items(): args += [f'--{k}', os.path.abspath(v)]
+    for t, p in adds.items(): args += ['--add', f'{t}={os.path.abspath(p)}']
+    r = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+    print(r.stdout + r.stderr, end='')
+    if r.returncode: sys.exit('mkdisk failed')
+
+
+def main():
+    os.makedirs(OUT, exist_ok=True)
+    built = {name: build(name) for name in BUILDS}
+    (m512, mod512), (m1mb, mod1mb) = built['512k'], built['1mb']
+    orig_boot = os.path.join(ROOT, 'bin', 'bootblock.bin')
+    # both programs, the original bootblock (it chooses by memory)
+    adf = os.path.join(OUT, 'gng_enhanced.adf')
+    mkdisk(adf, orig_boot, {'main512': m512, 'main1mb': m1mb},
+           {BUILDS['512k']['module_track']: mod512, BUILDS['1mb']['module_track']: mod1mb})
+    verify_image(adf, open(orig_boot, 'rb').read(), {110: m512, 17: m1mb,
+                 BUILDS['512k']['module_track']: mod512, BUILDS['1mb']['module_track']: mod1mb})
+    # the 512K program only: load base always 0
+    boot = bytearray(open(orig_boot, 'rb').read())
     for off, old, new in ((0x2C, '20380004', '70004e71'),               # move.l $4.w,d0 -> moveq #0,d0
                           (0x40, '203c00080000', '70004e714e71')):       # move.l #$80000,d0 -> moveq #0,d0
         assert boot[off:off+len(old)//2].hex() == old, f'bootblock ${off:X}'
         boot[off:off+len(new)//2] = bytes.fromhex(new)
-    boot_out = os.path.join(OUT, 'boot_enh.bin')
+    boot_out = os.path.join(OUT, 'boot_512k_only.bin')
     open(boot_out, 'wb').write(boot)
-    # 5. the disk image
-    adf = os.path.join(OUT, 'gng_enhanced.adf')
-    r = subprocess.run([sys.executable, os.path.join('tools', 'disk', 'mkdisk.py'), '-o', os.path.abspath(adf),
-                        '--main512', os.path.abspath(main_out), '--boot', os.path.abspath(boot_out),
-                        '--add', f'{MODULE_TRACK}={os.path.abspath(mod)}'], cwd=ROOT, capture_output=True, text=True)
-    print(r.stdout + r.stderr, end='')
-    if r.returncode: sys.exit('mkdisk failed')
-    verify_image(adf, boot, prog, open(mod, 'rb').read())
+    adf = os.path.join(OUT, 'gng_enhanced_512k.adf')
+    mkdisk(adf, boot_out, {'main512': m512}, {BUILDS['512k']['module_track']: mod512})
+    verify_image(adf, bytes(boot), {110: m512, BUILDS['512k']['module_track']: mod512})
 
 
-def verify_image(adf, boot, prog, mod):
-    """decode the image again: the bootblock (and its checksum), the main program at track 110
-    and the module at MODULE_TRACK must read back exactly"""
+def verify_image(adf, boot, files):
+    """decode the image again: the bootblock (and its checksum) and each given file (first
+    track -> path) must read back exactly"""
     sys.path.insert(0, os.path.join(ROOT, 'tools', 'disk'))
     import mkdisk
     tracks = mkdisk.read_image(open(adf, 'rb').read())
@@ -139,10 +177,10 @@ def verify_image(adf, boot, prog, mod):
             assert r and r[0] == t and r[2], f'track {t} does not decode'
             out += r[1]
         return out[:n]
-    assert read(110, len(prog)) == bytes(prog), 'main program'
-    assert read(MODULE_TRACK, len(mod)) == mod, 'module'
-    print(f'{os.path.basename(adf)}: bootblock, main program (track 110) and module (track {MODULE_TRACK}) '
-          'decode back exactly')
+    for t, path in files.items():
+        data = open(path, 'rb').read()
+        assert read(t, len(data)) == data, f'track {t}'
+    print(f'{os.path.basename(adf)}: bootblock and the files at tracks {sorted(files)} decode back exactly')
 
 
 if __name__ == '__main__':

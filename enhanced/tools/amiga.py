@@ -99,7 +99,7 @@ class Amiga(Game):
         """Run COP1 from COPPER_INIT (and COP2 after a COPJMP2) and return its register writes
         as (beam line, register, value), in order."""
         events = []
-        pc = COPPER_INIT; line = 0; high = 0
+        pc = self.custom32(0x80) or COPPER_INIT; line = 0; high = 0   # COP1LC (as InitHardware sets it)
         for _ in range(4000):
             w1, w2 = self.r16(pc), self.r16(pc+2); pc += 4
             if w1 & 1:                                   # WAIT (or SKIP)
@@ -146,7 +146,8 @@ class Amiga(Game):
         return out
 
     def palette(self):
-        return [self.r16(GAMEPALETTE+2*i) for i in range(32)]
+        pal = getattr(self, 'palette_addr', GAMEPALETTE)
+        return [self.r16(pal+2*i) for i in range(32)]
 
     def save_png(self, img, path):
         from PIL import Image

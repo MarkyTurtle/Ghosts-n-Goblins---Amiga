@@ -6,7 +6,10 @@
 ; address and checks that it fits, so everything else in the program stays where it
 ; was. Blocks may use the original's labels (orig_syms.i), the module's (module_syms.i),
 ; MODULE_ORG / MODULE_LEN / MODULE_TRACK (from the build) and the labels of the blocks
-; before them (patch_syms.i).
+; before them (patch_syms.i). The same blocks patch both programs (512K and 1MB): the few
+; places without a label of their own have names the build gives them (StartLoad,
+; PrintField, PrintBody). In the 1MB program the code is position independent, so the
+; blocks only use pc-relative branches into the program; the module is at a fixed address.
 ;
 ; The code left behind a patched block is never reached any more.
 ;==============================================================================
@@ -23,10 +26,12 @@ EnhModuleFile:  dc.l    MODULE_ORG,MODULE_LEN   ; a FileTable entry: address, le
                 dc.w    MODULE_TRACK
 EnhRedrawBg:    jmp     EnhRedrawBackground     ; (RedrawEntry's bsr.w reaches here)
 
-;@patch $5D32 $5D3A
-; Start: load the scroller module (EnhLoad, in RedrawScreen's old space) before the
-; copyright screen.
-                jsr     EnhLoad
+;@patch StartLoad StartLoadEnd
+; Start, where it loads the copyright screen ($5D32; 1MB $5D88): load the scroller module
+; first (EnhLoad, in RedrawScreen's old space; a bsr, as the 1MB program is position
+; independent).
+                bsr.w   EnhLoad
+                nop
                 nop
 
 ;@patch SwapScreens ShowBackBuffer
@@ -44,8 +49,9 @@ EnhRedrawBg:    jmp     EnhRedrawBackground     ; (RedrawEntry's bsr.w reaches h
 ;@patch DrawBobs DrawBob
                 jmp     EnhDrawBobs
 
-;@patch l_0B0D6 l_0B0E2
-; PrintChar, playfield text: through the module (the ring needs the lines copied).
+;@patch PrintField PrintBody
+; PrintChar, playfield text ($B0D6; 1MB $B142): through the module (the ring needs the
+; lines copied).
                 jmp     EnhPrintField
 
 ;@patch RedrawEntry Level1Logic

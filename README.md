@@ -15,7 +15,7 @@
 | `docs/` | `HOW_IT_WORKS.md` (a guided tour with diagrams: interrupts, the state machine, a frame, objects, spawning, drawing, level data), `GLOBALS.md` (every global, the memory map, object slot and per-type fields), `XREF.md` (which routines use each global, routine and table), `SPAWNS.md` (every level's spawn zones and scripts, decoded), `TODO.md` (planned enhancements: a shared file directory and own loader, automatic disk layout, corkscrew scrolling with a pristine buffer, zx0 / per-level files / caching / music on 512K, further space savings, emulator tests), sprite/BOB flipping spreadsheet |
 | `bin/tracks/` | All 131 decoded tracks (6,312 bytes each) used by the render scripts |
 | `bin/main_1mb.bin` | The expanded-memory build (tracks 17-32) |
-| `enhanced/` | (branch `enhanced/scroll`) The enhanced build: the incremental corkscrew scroller integrated into the 512K game, its tests (whole game in the emulator, side by side with the original) and a disk image builder - see `enhanced/docs/SCROLLER.md` |
+| `enhanced/` | (branch `enhanced/scroll`) The enhanced build: the incremental corkscrew scroller integrated into both programs (512K and 1MB), its tests (whole game in the emulator, side by side with the original) and a disk image builder - see `enhanced/docs/SCROLLER.md` |
 
 All three sources reassemble **byte-identical** to the originals:
 
