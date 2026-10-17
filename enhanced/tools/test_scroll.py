@@ -22,6 +22,7 @@ BIN = os.path.join(HERE, '..', 'build', 'scroll.bin')
 def assemble():
     src = os.path.join(HERE, '..', 'src', 'scroll.s')
     vasm = os.environ.get('VASM', 'vasmm68k_mot')
+    os.makedirs(os.path.dirname(BIN), exist_ok=True)
     subprocess.run([vasm, '-Fbin', '-m68000', '-quiet', '-o', BIN, src], check=True)
 
 class Enhanced(Original):
