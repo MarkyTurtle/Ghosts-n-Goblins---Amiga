@@ -397,7 +397,12 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
      the one before, so the CPU idles through the red and blue bands. A queue of blits fed by
      the blitter-finished interrupt (or the logic of the next objects running between blits)
      would overlap the two.
-   * **Draw every frame (50 fps) on the 512K program:** drop the odd-frame test so the camera and drawing run every
+   * **Draw every frame (50 fps) on the 512K program:** *trial build: `build_enh.py --fps50`
+     (with `--raster` for the timing colours) makes `gng_enhanced_512k_50hz.adf`, the 512K program
+     with the odd-frame test removed (`src/fps50_patches.s`). In the emulator it shows a frame
+     every logic frame (830 of 831 in play), and 1,000 of those frames checked against the
+     original's display code for the same state (`check_game.py`) were identical; whether an A500
+     keeps up is for WinUAE to tell.* Drop the odd-frame test so the camera and drawing run every
      frame. Needs the whole frame (logic + restore + BOBs + new edges) to fit in one 20 ms frame;
      if it does not, VblIRQ already skips the next logic run (it sees IPL 1 still running), which
      would slow the game down rather than tear. The raster-time build shows whether it fits; an
