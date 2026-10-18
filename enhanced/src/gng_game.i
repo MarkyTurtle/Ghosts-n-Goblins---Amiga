@@ -283,8 +283,13 @@ SCREEN_0            	equ	MAP_LOW+$1D350	; $37468: also load address of the big g
 SCREEN_1            	equ	MAP_LOW+$28750	; $42868
 SCREEN_2            	equ	MAP_LOW+$33B50	; $4DC68
 SCREEN_3            	equ	MAP_LOW+$3EF50	; $59068
-CLEAR_AREA          	equ	MAP_LOW+$4A350	; $64468
-LEVEL_FILE          	equ	MAP_LOW+$4B430	; $65548: per-level data file load address (tracks 84-109)
+CLEAR_AREA          	equ	SCREEN_0+$26700	; (the original: SCREEN_0+$2D000, $64468) the HUD's planes:
+                    			; moved down into the old fourth screen, which the scroller
+                    			; leaves free above its storage (SCROLL_STORE, scroller.s) ...
+LEVEL_FILE          	equ	CLEAR_AREA+$10E0	; ... and the per-level data file with it (tracks 84-109;
+                    			; the level's BOB sets are copied after it): the program has
+                    			; grown, and stage 2 (file $C120 + sets $DE76) must end below
+                    			; $7F4DE as in the original (build_game.py checks)
 ESHOT_GFX_BUF       	equ	MAP_LOW+$00180	; $1A298: enemy projectile graphics (file track 58)
 ITEM_GFX_BUF        	equ	MAP_LOW+$013B4	; $1B4CC: item and explosion graphics (file track 59)
 ITEM_GFX2_BUF       	equ	MAP_LOW+$02E76	; $1CF8E: item graphics 2 (file track 57)

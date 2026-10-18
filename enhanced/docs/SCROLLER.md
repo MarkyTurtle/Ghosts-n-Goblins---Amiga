@@ -394,6 +394,13 @@ text*). The originals' globals overlay the end of the program
 file and some are used before they are set (the fraction of `g_ArthurX` in the opening scene),
 so for the 1MB comparison the original starts with the same junk.
 
+**Memory (512K profile).** The program has grown (to $1A19C) and the whole map after it moves
+with it, so the HUD area (`CLEAR_AREA`) and the level file (`LEVEL_FILE`) are moved down into the
+old fourth screen, free above the scroller's storage: the worst level's data (stage 2: tile file
+$C120 + BOB sets $DE76) now ends at $7A27A, 21 KB below the original's $7F4DE. `build_game.py`
+checks it from the game's own tables. (The first disks of the one program did not do this; on a
+512K machine stage 2's data ran past $80000.)
+
 **Disk** (`build/gng_game.adf`): the bootblock (memory survey, always loads to `$80`) loads
 the program from tracks 134-150 (it is 17 tracks now); effects package at 126 (assembled for
 the program's `MUSIC_FILE`), music package at 64; the original programs' tracks are empty.
