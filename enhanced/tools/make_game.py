@@ -187,16 +187,16 @@ l_06E80:
     # --- draw queues: the item / shot graphics wherever they are ---------------------------------
     S.resub(r'lea\.l   \(ITEM_GFX_BUF\)\.l,a1  ', 'movea.l (ItemGfxPtr).l,a1   ')
     S.resub(r'lea\.l   \(ESHOT_GFX_BUF\)\.l,a1 ', 'movea.l (EShotGfxPtr).l,a1  ')
-    # --- support routines and variables, before the file table ------------------------------------
-    anchor = ";---------------------------------------------------------------------------\n; FileTable - every file the program loads"
-    S.sub(anchor, open(os.path.join(HERE, 'make_game_support.s')).read() + anchor)
+    # --- the 1MB music file, then the support routines and variables (after the file table:
+    # tools/disk/mkdisk.py finds the table by LevelFileIndex just before it) -------------------------
     S.sub("""FileLevel6:
 	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
 """, """FileLevel6:
 	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
 FileMusic1M:
 	FENTRY	MUSIC1M_FILE,$1B394,64                 ; tracks 64-81: the 1MB music package (PF_MUSIC), for upper chip RAM
-""")
+
+""" + open(os.path.join(HERE, 'make_game_support.s')).read())
     # --- FRAME runs, for CacheGraphics ---------------------------------------------------------
     L = S.s.split('\n'); runs = []; cur = None
     for k, l in enumerate(L):

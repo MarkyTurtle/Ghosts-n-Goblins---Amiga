@@ -3,7 +3,9 @@ game's own track format, and check images.          Run from the archive root:
 
   python3 tools/disk/mkdisk.py [-o gng.adf] [--main512 main.bin] [--main1mb main_1mb.bin]
                                [--boot boot.bin] [--file NAME=PATH ...] [--add TRACK=PATH ...]
-                               [--raw DIR]
+                               [--raw DIR] [--one PATH]
+  --one PATH: a disk with one main program for every machine (the enhanced branch): its
+  FileTable stands for both, and it goes where the bootblock loads the main program
   python3 tools/disk/mkdisk.py --check gng.adf       decode an image and compare it with bin/tracks
   python3 tools/disk/mkdisk.py --compare-raw DIR     compare the MFM with raw track dumps tNNN.bin
   python3 tools/disk/mkdisk.py --layout              print the layout read from the binaries
@@ -269,6 +271,7 @@ if __name__ == '__main__':
     ap.add_argument('--add', action='append', default=[], metavar='TRACK=PATH',
                     help='add a file no table lists (for example a module a patched program loads)')
     ap.add_argument('--raw', metavar='DIR', help="also write each track's raw MFM to DIR")
+    ap.add_argument('--one', metavar='PATH', help='one main program for every machine, where the bootblock loads it')
     ap.add_argument('--layout', action='store_true', help='print the layout read from the binaries')
     ap.add_argument('--check', metavar='ADF', help='decode an image and compare it with bin/tracks')
     ap.add_argument('--compare-raw', metavar='DIR', help='compare the MFM with raw track dumps')
@@ -291,8 +294,13 @@ if __name__ == '__main__':
         files[t] = path; extra.append((t, os.path.getsize(path)))
     boot = open(a.boot or DEFAULT_PROGS[0], 'rb').read()
     assert len(boot) == 1024, 'the bootblock is 1,024 bytes'
-    lay = layout(boot, open(files.get(110, DEFAULT_PROGS[1]), 'rb').read(),
-                 open(files.get(17, DEFAULT_PROGS[2]), 'rb').read(), extra)
+    if a.one:
+        one = open(a.one, 'rb').read()
+        lay = layout(boot, one, one, extra)
+        files[boot_loads(boot)[1][0]] = a.one
+    else:
+        lay = layout(boot, open(files.get(110, DEFAULT_PROGS[1]), 'rb').read(),
+                     open(files.get(17, DEFAULT_PROGS[2]), 'rb').read(), extra)
     if a.layout:
         print('track   tracks  bytes     file / loaded by')
         for t, (ln, who) in sorted(lay.items()):

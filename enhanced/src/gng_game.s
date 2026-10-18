@@ -7604,6 +7604,49 @@ LevelFileIndex:
 	dc.w	FileLevel6-*	; level 6
 
 ;---------------------------------------------------------------------------
+; FileTable - every file the program loads (FENTRY: load address, length in bytes, first
+; track; a1 points at an entry for LoadFile, which reads length / 6,312 tracks, rounded up).
+; The bootblock loads the rest: the loading screen and the main program. tools/disk/mkdisk.py
+; reads this table (from the assembled binaries of both builds) to lay out the disk.
+;---------------------------------------------------------------------------
+FileTable:
+	FENTRY	SCREEN_0,$05400,33                     ; tracks 33-36: Arthur's sprite frames
+FileSmallBobs:
+	FENTRY	BOB_GFX_A,$00D20,37                    ; track 37: small item / scenery BOBs
+FileEnemyBobs:
+	FENTRY	SCREEN_0,$1D042,38                     ; tracks 38-56: enemy BOB sets
+FileItemGfx2:
+	FENTRY	ITEM_GFX2_BUF,$00EA6,57                ; track 57: weapon / effect BOBs, tail
+FileEnemyShotGfx:
+	FENTRY	ESHOT_GFX_BUF,$01234,58                ; track 58: enemy shot BOBs
+FileItemGfx:
+	FENTRY	ITEM_GFX_BUF,$01AC2,59                 ; tracks 59-60: weapon / pickup / effect BOBs
+FileFont:
+	FENTRY	SCREEN_0,$01840,61                     ; track 61: font
+FileProgressMap:
+	FENTRY	BOB_GFX_A,$01D5C,62                    ; tracks 62-63: progress map (RLE)
+FileMusic:
+	FENTRY	MUSIC_FILE,$07D64,126                  ; tracks 126-131: sound driver and effects (512K)
+FileCopyrightScreen:
+	FENTRY	SCREEN_2,$025FE,82                     ; tracks 82-83: copyright warning screen (RLE)
+FileLevel0:
+	FENTRY	LEVEL_FILE,$07440,84                   ; tracks 84-88: level 0 tiles
+FileLevel1:
+	FENTRY	LEVEL_FILE,$0C120,89                   ; tracks 89-96: level 1 tiles
+FileLevel2:
+	FENTRY	LEVEL_FILE,$05460,97                   ; tracks 97-100: level 2 tiles
+FileLevel3:
+	FENTRY	LEVEL_FILE,$04880,101                  ; tracks 101-103: level 3 tiles
+FileLevel4:
+	FENTRY	LEVEL_FILE,$02760,104                  ; tracks 104-105: level 4 tiles
+FileLevel5:
+	FENTRY	LEVEL_FILE,$029E0,106                  ; tracks 106-107: level 5 tiles
+FileLevel6:
+	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
+FileMusic1M:
+	FENTRY	MUSIC1M_FILE,$1B394,64                 ; tracks 64-81: the 1MB music package (PF_MUSIC), for upper chip RAM
+
+;---------------------------------------------------------------------------
 ; ==================================================================
 ; One program for every machine (enhanced branch)
 ; ==================================================================
@@ -7740,48 +7783,6 @@ cg_longs:
         dbra    d0,cg_longs
         rts
 
-;---------------------------------------------------------------------------
-; FileTable - every file the program loads (FENTRY: load address, length in bytes, first
-; track; a1 points at an entry for LoadFile, which reads length / 6,312 tracks, rounded up).
-; The bootblock loads the rest: the loading screen and the main program. tools/disk/mkdisk.py
-; reads this table (from the assembled binaries of both builds) to lay out the disk.
-;---------------------------------------------------------------------------
-FileTable:
-	FENTRY	SCREEN_0,$05400,33                     ; tracks 33-36: Arthur's sprite frames
-FileSmallBobs:
-	FENTRY	BOB_GFX_A,$00D20,37                    ; track 37: small item / scenery BOBs
-FileEnemyBobs:
-	FENTRY	SCREEN_0,$1D042,38                     ; tracks 38-56: enemy BOB sets
-FileItemGfx2:
-	FENTRY	ITEM_GFX2_BUF,$00EA6,57                ; track 57: weapon / effect BOBs, tail
-FileEnemyShotGfx:
-	FENTRY	ESHOT_GFX_BUF,$01234,58                ; track 58: enemy shot BOBs
-FileItemGfx:
-	FENTRY	ITEM_GFX_BUF,$01AC2,59                 ; tracks 59-60: weapon / pickup / effect BOBs
-FileFont:
-	FENTRY	SCREEN_0,$01840,61                     ; track 61: font
-FileProgressMap:
-	FENTRY	BOB_GFX_A,$01D5C,62                    ; tracks 62-63: progress map (RLE)
-FileMusic:
-	FENTRY	MUSIC_FILE,$07D64,126                  ; tracks 126-131: sound driver and effects (512K)
-FileCopyrightScreen:
-	FENTRY	SCREEN_2,$025FE,82                     ; tracks 82-83: copyright warning screen (RLE)
-FileLevel0:
-	FENTRY	LEVEL_FILE,$07440,84                   ; tracks 84-88: level 0 tiles
-FileLevel1:
-	FENTRY	LEVEL_FILE,$0C120,89                   ; tracks 89-96: level 1 tiles
-FileLevel2:
-	FENTRY	LEVEL_FILE,$05460,97                   ; tracks 97-100: level 2 tiles
-FileLevel3:
-	FENTRY	LEVEL_FILE,$04880,101                  ; tracks 101-103: level 3 tiles
-FileLevel4:
-	FENTRY	LEVEL_FILE,$02760,104                  ; tracks 104-105: level 4 tiles
-FileLevel5:
-	FENTRY	LEVEL_FILE,$029E0,106                  ; tracks 106-107: level 5 tiles
-FileLevel6:
-	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
-FileMusic1M:
-	FENTRY	MUSIC1M_FILE,$1B394,64                 ; tracks 64-81: the 1MB music package (PF_MUSIC), for upper chip RAM
 
 ;---------------------------------------------------------------------------
 ; Switch to the screen RedrawScreen has just drawn at g_NewTileX/Y: the pending

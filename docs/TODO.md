@@ -545,7 +545,10 @@ on `main` now assembles both programs: 21,580 lines of code shared, about 640 51
 * **Disk:** one main program instead of two (about 100 KB less), loaded where the bootblock
   chose; the 1MB music package and the 512K effects package both stay, picked by profile.
 * **Order:** *One source for both builds: done (on `main`, `tools/merge_src.py`; both programs
-  byte-identical).* Next the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), into
+  byte-identical). One program for every machine: done on `enhanced/scroll` without the
+  scroller (`enhanced/src/gng_game.s`, profiles from the machine description; tested against
+  both originals; see `enhanced/docs/SCROLLER.md`, One program for every machine). Not yet:
+  slow/fast RAM used (a 512K chip + slow machine runs the 512K profile).* Next the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), into
   both builds of the one source; then this item turns the `ifd BUILD_1MB` blocks into run-time
   choices. The blocks give the complete list of places to merge.
 * **Testing:** `enhanced/tools/compare_runs.py` already runs both originals side by side with the

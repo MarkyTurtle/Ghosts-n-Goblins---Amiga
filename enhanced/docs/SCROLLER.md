@@ -342,6 +342,53 @@ F2 two, space to pause, Esc to abort.
 If something looks wrong, the most useful report is what was on screen and what Arthur was
 doing (walking, falling, climbing), and the level.
 
+## One program for every machine
+
+The original disk has two main programs; `enhanced/src/gng_game.s` is one program for every
+machine, made from the merged source by `tools/make_game.py` and built with `tools/build_game.py`
+(`build/game/`, disk `build/gng_game.adf`). *The scroller is not in it yet* (next step: fold it
+into this source); it draws as the originals do.
+
+**How it chooses.** It is the 512K program - its memory map, loaded to `$80` on every machine -
+plus the 1MB program's features. `ReadProfile` (first thing in `Start`) reads the bootblock's
+machine description (`MACHINE_INFO`) and sets `Profile`:
+
+| Bit | When | What it turns on |
+|---|---|---|
+| `PF_CACHE` | 1MB or more of chip RAM | graphics cached with masks in upper chip RAM (`CacheGraphics`, `BuildMaskedGfx`); one-blit BOBs (`DrawBobMasked`, `DrawSceneryMasked`); no graphics loads per level, the frame tables point into the cache; frame offsets doubled in place; progress map kept |
+| `PF_MUSIC` | (with `PF_CACHE`) | the 1MB music package (assembled for `$80000`), its tunes and the extra effects |
+| `PF_EVERY` | (with `PF_CACHE`) | draw every frame |
+
+Without them (512K of chip RAM, with or without slow/fast RAM, or no machine description) it
+is the 512K program. Upper chip RAM: music `$80000`, progress map `$9B400`, enemy sets
+`$9D200`, small sets `$D7300`, shots `$D8D80`, items `$DB200`-`$E04D0` (checked at assembly).
+
+**Where the originals differ** both versions are in the source, chosen at run time. In the
+sound code the choice keeps the condition codes (`move sr,-(a7)` ... `move (a7)+,ccr`; game
+logic runs in supervisor mode), so each profile sees exactly the flags and `d0` its original
+did. Jump-table entries stay single `bra.w`s. Two text differences (`SOUND`/`MUSIC` in the
+credits, the blank-name initials) are patched at start-up.
+
+**A bug fixed on the way (`MapTileAt`).** For an object far below a level (Y negative) the
+original reads its own code as map cells (the cell index runs $1FE0 bytes past the map), so
+what it finds depends on the program's layout: the 512K and 1MB programs already differ there,
+and any changed program differs again. Now a cell read at or past the BOB frame tables (where
+the programs' contents start to differ; the map and the tables after it read as before) is the
+empty cell `$67`. `compare_game.py` gives the originals the same fix (a hook) when comparing.
+
+**Testing** (`tools/compare_game.py --machine 512k|1mb`, against the matching original, game
+state and picture every frame): on a 512K A500 identical to the 512K program in every frame
+(level 0 4,000 frames; levels 2, 4, 5 2,500 frames with teleporting); on a 1MB A500+ in step
+with the 1MB program throughout, pictures identical except two single frames where the
+original shows leftover screen junk. The originals' globals overlay the end of the program
+file and some are used before they are set (the fraction of `g_ArthurX` in the opening scene),
+so for the 1MB comparison the original starts with the same junk.
+
+**Disk** (`build/gng_game.adf`): the bootblock (memory survey, always loads to `$80`) loads
+the program from tracks 134-150 (it is 17 tracks now); effects package at 126 (assembled for
+the program's `MUSIC_FILE`), music package at 64; the original programs' tracks are empty.
+`tools/disk/mkdisk.py --one` builds it.
+
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
