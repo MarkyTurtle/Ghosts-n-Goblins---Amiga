@@ -1,4 +1,4 @@
-; Ghosts'n Goblins - hardware, globals and memory-map equates
+; Ghosts'n Goblins - hardware, globals and memory-map equates (both builds; BUILD_1MB selects the 1MB memory map)
 
 CUSTOM		equ	$DFF000	; custom chip base
 ; custom chip register offsets
@@ -230,6 +230,8 @@ CIAB_CRA    	equ	$BFDE00
 CIAB_CRB    	equ	$BFDF00
 
 ; ---- Memory map (fixed buffers outside the program image) ----
+; [1MB] ---- Memory map (1MB build). Values used with adda g_BaseAddr are offsets from the load address;
+; [1MB] ---- the rest (screens, copper lists, sprites: chip RAM) are absolute. [512K value] in comments.
 RESET_STUB          	equ	$00000	; CrashReset writes RESET/JMP here
 LDR_TRACK           	equ	$00028	; loader: current logical track (Line-A vector slot)
 LDR_CYL             	equ	$0002A	; loader: cylinder the head is on
@@ -240,6 +242,50 @@ VEC_SPURIOUS        	equ	$00060	; spurious-interrupt vector - holds MUSIC_PLAYER
 VEC_LEVEL1          	equ	$00064
 VEC_LEVEL2          	equ	$00068
 VEC_LEVEL3          	equ	$0006C
+	ifd	BUILD_1MB
+SCREEN_0            	equ	$00080	; also load address of the big graphics file (tracks 38-56) before unpacking [512K: $37468] (chip RAM)
+SCREEN_1            	equ	$0B480	; chip RAM
+SCREEN_2            	equ	$16880	; [512K: $4DC68] (chip RAM)
+GLOBALS             	equ	$1893A	; offset from g_BaseAddr [512K: absolute $1898C]
+GLOBALS_P2          	equ	$1894A	; player-2 view of the per-player block (GLOBALS+$10) [512K: $1899C]
+MASK_BUF            	equ	$1A0C6	; byte-plane extracted from file at tracks 61 [512K: $28234]
+ARTHUR_SPR_GFX      	equ	$1ACE6	; Arthur hardware-sprite frames, 4 planes x $2880 apart, $80 bytes/frame [512K: $1DE34]
+SPR_GFX_B0          	equ	$1C1E6	; [512K: $1F334]
+SPR_GFX_A1          	equ	$1D5E6	; [512K: $20734]
+SPR_GFX_B1          	equ	$1EAE6	; [512K: $21C34]
+SPR_GFX_A2          	equ	$1FEE6	; [512K: $23034]
+SPR_GFX_B2          	equ	$213E6	; [512K: $24534]
+SCREEN_3            	equ	$21C80	; chip RAM
+SPR_GFX_A3          	equ	$227E6	; [512K: $25934]
+SPR_GFX_B3          	equ	$23CE6	; [512K: $26E34]
+PROGRESS_MAP_CACHE  	equ	$250E6	; offset from g_BaseAddr: cached progress map file
+ENEMY_GFX_CACHE     	equ	$26E42	; offset from g_BaseAddr: cached enemy graphics with masks
+CLEAR_AREA          	equ	$2D080	; [512K: $64468]
+COPPER_INIT         	equ	$2E164	; copper list template ($180 bytes copied from CopperTemplate) [512K: $1A118]
+COPPER_A1           	equ	$2E1DC	; [512K: $1A190]
+COPPER_A2           	equ	$2E20C	; [512K: $1A1C0]
+COPPER_B1           	equ	$2E23C	; [512K: $1A1F0]
+COPPER_B2           	equ	$2E26C	; [512K: $1A220]
+COPPER_MAP          	equ	$2E29C	; copper list used by the between-level progress map [512K: $1A250]
+SPRITE0_DATA        	equ	$2E2E4	; [512K: $30BB8]
+SPRITE4_DATA        	equ	$2E368	; [512K: $30C3C]
+SPRITE1_DATA        	equ	$2E3A4	; [512K: $30C78]
+SPRITE5_DATA        	equ	$2E428	; [512K: $30CFC]
+SPRITE2_DATA        	equ	$2E464	; [512K: $30D38]
+SPRITE6_DATA        	equ	$2E4E8	; [512K: $30DBC]
+SPRITE3_DATA        	equ	$2E524	; [512K: $30DF8]
+SPRITE7_DATA        	equ	$2E5A8	; [512K: $30E7C]
+SPRITE4B_DATA       	equ	$2E5E4	; second HUD sprite block (sprite reused lower down) [512K: $30EB8]
+SPRITE5B_DATA       	equ	$2E6B0	; [512K: $30F84]
+SPRITE6B_DATA       	equ	$2E77C	; [512K: $31050]
+SPRITE7B_DATA       	equ	$2E848	; [512K: $3111C]
+ESHOT_GFX_BUF       	equ	$2E914	; chip RAM: masked enemy projectile graphics
+ITEM_GFX_BUF        	equ	$30D7C	; chip RAM: masked item graphics
+ITEM_GFX2_BUF       	equ	$34300	; chip RAM: masked item graphics 2
+MUSIC_FILE          	equ	$3604C	; chip RAM: 111KB music package (tracks 64-81)
+MUSIC_PLAYER        	equ	$3606C	; music driver entry
+BOB_GFX_A           	equ	$60EC6	; file tracks 37 / 62-63 load address [512K: $311E8]
+	else
 GLOBALS             	equ	$1898C	; a6 points here for the whole game (variables block)
 GLOBALS_P2          	equ	$1899C	; player-2 view of the per-player block (GLOBALS+$10)
 COPPER_INIT         	equ	$1A118	; copper list template ($180 bytes copied from CopperTemplate)
@@ -280,131 +326,139 @@ SCREEN_2            	equ	$4DC68
 SCREEN_3            	equ	$59068
 CLEAR_AREA          	equ	$64468
 LEVEL_FILE          	equ	$65548	; per-level data file load address (tracks 84-109)
+	endc
 
 ; ---- Global variables: offsets from a6 (GLOBALS = $1898C) ----
+; [1MB] ---- Global variables: offsets from a6 (GLOBALS = load address + $1893A; offsets >= 2 are 4 more than in the 512K build) ----
 g_SavedSR           	equ	$000	; VBL handler parks the interrupted SR here
-g_FrameStamp        	equ	$002	; frame counter snapshot for timed waits
-g_VblCount          	equ	$004	; incremented every vertical blank
-g_GameFrame         	equ	$006	; incremented every game-logic frame
-g_RawKey            	equ	$008	; last raw keycode (Esc=$45, F1=$50, F2=$51)
-g_AsciiKey          	equ	$009	; last key as ASCII (space=$20 pauses)
-g_RandSeed          	equ	$00A	; random generator state, seeded $AAAA
-g_TimeLeft          	equ	$00C	; level timer, BCD minutes.byte/seconds.byte
-g_LevelDone         	equ	$00E	; set when the level is completed
-g_PlayerDied        	equ	$00F	; set when Arthur has died this frame
-g_BonusEvery        	equ	$010	; counts down from 6: every 6th spawned enemy carries a bonus
-g_BonusCycle        	equ	$011	; 0-6: which kind of bonus the next carrier gets (BonusKinds)
-g_BonusRoll         	equ	$012	; +21 per treasure bonus; on carry the treasure is the rare kind 12
-g_WeaponOdds        	equ	$013	; 5 accumulators, one per weapon (bonus weapon choice); ends at $17
-g_BossCountdown     	equ	$018	; bosses left to beat on this level before the key / ending (LevelBossCountdown)
-g_BigEnemyCount     	equ	$019	; Red Arremer / Satan / Unicorn / Dragon currently engaged (+1 on activation, -1 on removal; never tested)
-g_MapZone           	equ	$01A	; current map zone (MapZoneTable): selects the enemy spawners
-g_MaxMapZone        	equ	$01B	; furthest map zone reached (spawners with ZoneFlags 0 only start beyond it)
-g_RedrawPending     	equ	$01C	; set to request a full redraw: the VBL diverts user mode to RedrawEntry
-g_RedrawDone        	equ	$01D	; set by RedrawScreen when finished
-g_SkipLogic         	equ	$01E	; non-zero: VBL does not trigger the logic interrupt
-g_TextShadow        	equ	$01F	; text colour where only the first font plane is set
-g_TextInk           	equ	$020	; text colour where only the second font plane is set
-g_TextPaper         	equ	$021	; text colour where both font planes are set
-g_TwoPlayer         	equ	$027	; non-zero = two-player game
-g_CurPlayer         	equ	$028	; 0 = player 1, $FF = player 2
-g_GameState         	equ	$029	; 0 = in game, 1/2 = attract screens
-g_SubState          	equ	$02A	; in-game sub state (see GameStateTable)
-g_SubState2         	equ	$02B	; step within the sub state
-g_SubState3         	equ	$02C	; step within g_SubState2
-g_ArthurVisible     	equ	$02D	; hardware sprites 0-3 enabled
-g_Spr47Visible      	equ	$02E	; hardware sprites 4-7 enabled
-g_Paused            	equ	$02F
-g_CheatOn           	equ	$030	; set by entering ')!(' on the high-score table: no life loss / no damage
-g_ScreenFront       	equ	$032
-g_ScreenBack        	equ	$036
-g_ScreenSpare1      	equ	$042
-g_ScreenSpare2      	equ	$046
-g_CopperFront       	equ	$04A
-g_CopperBack        	equ	$04E
-g_CopperSpare1      	equ	$052
-g_CopperSpare2      	equ	$056
-g_Joy               	equ	$05A	; joystick: b0 down b1 right b8 up b9 left b15 fire
-g_JoyPrev           	equ	$05C	; previous frame joystick
-g_ArthurSprCtl      	equ	$05E	; 4 longs: SPRxPOS/SPRxCTL pairs for sprites 0-3
-g_ScrollTileX       	equ	$06E	; scroll position in 16-pixel tiles
-g_ScrollTileY       	equ	$070
-g_ScrollFineX       	equ	$072	; fine scroll -15..15
-g_ScrollFineY       	equ	$074
-g_CameraX           	equ	$076	; camera world position in pixels
-g_CameraY           	equ	$078
-g_CamDeltaX         	equ	$07A
-g_CamDeltaY         	equ	$07C
-g_PendFineX         	equ	$07E	; camera target X relative to g_NewTileX*16: the fine scroll to use once the pending redraw is shown
-g_PendFineY         	equ	$080	; the same for Y
-g_NewTileX          	equ	$082
-g_NewTileY          	equ	$084
-g_CamMinX           	equ	$086	; left scroll limit (scrolling is one-way)
-g_CamMinY           	equ	$088
-g_LevelOriginX      	equ	$08A
-g_LevelWidth        	equ	$08C
-g_LevelOriginY      	equ	$08E
-g_LevelHeight       	equ	$090
-g_MapPtr            	equ	$092	; current level map (block indices)
-g_SceneryHitX       	equ	$096	; where shootable scenery was last hit: spawn point for the Magician (type 7)
-g_SceneryHitY       	equ	$098
-g_Level             	equ	$09A	; level 0-6 (per-player block starts here, P2 copy at +$10)
-g_Weapon            	equ	$09C	; 0 torch 1 lance 2 axe 3 cross 4 dagger (cross needed on level 6)
-g_Score             	equ	$09E	; BCD score
-g_NextExtraLife     	equ	$0A2	; BCD score for next extra life (also AddScore accumulator end)
-g_Lives             	equ	$0A6
-g_Checkpoint        	equ	$0A7	; set once the half-way point is passed
-g_ExtraLives        	equ	$0A8	; extra lives awarded so far (20000, 70000, then every 70000)
-g_ShowIntro         	equ	$0A9	; non-zero: play the opening kidnap cutscene first
-g_OtherPlayer       	equ	$0AA	; the other player's copy of g_Level .. g_ShowIntro (16 bytes), exchanged by SwapPlayers
-g_ShownScore        	equ	$0BA	; score last drawn on the HUD / hi-score name ptr in entry mode
-g_HiScores          	equ	$0BE	; 10 BCD longs, top score first
-g_ArthurX           	equ	$0E6	; world X (also cursor column in name entry)
-g_ArthurY           	equ	$0EA	; world Y, increasing upwards (cursor row in name entry)
-g_ArthurAux         	equ	$0EE
-g_ArthurVelX        	equ	$0F0
-g_ArthurVelY        	equ	$0F4
-g_ArthurAnim        	equ	$0F8	; animation script pointer
-g_ArthurPlatform    	equ	$0FC	; platform slot Arthur is riding
-g_ArthurShownFrame  	equ	$100	; frame last copied into sprite RAM
-g_ArthurFrame       	equ	$101	; requested sprite frame (negative = mirrored)
-g_ArthurAnimTimer   	equ	$102
-g_ArthurDir         	equ	$103	; +1 right / -1 left
-g_LadderDir         	equ	$104	; ladder climb direction
-g_ArthurFacing      	equ	$105
-g_Crouching         	equ	$106	; down held (also: 3 initials buffer during high-score entry)
-g_Jumping           	equ	$107	; airborne, rising
-g_Falling           	equ	$108	; airborne, descending / not on floor
-g_FireCooldown      	equ	$109	; frames until the next throw
-g_OnPlatform        	equ	$10A
-g_OnLadder          	equ	$10B
-g_StateTimer        	equ	$10C
-g_NoArmour          	equ	$10D	; Arthur has lost his armour
-g_ArthurState       	equ	$10E	; 0 normal, 1 hit, 4 time-up death, 7 fell
-g_ArthurFlash       	equ	$10F	; invulnerability flashing
-g_FrogTimer         	equ	$110	; magician curse: Arthur is a frog while non-zero
-g_KeyState          	equ	$111	; end-of-level key sequence
-g_LevelFileEnd      	equ	$112
-g_LevelFileAddr     	equ	$116
-g_SmallBobSets      	equ	$11A	; 10 pointers to the small BOB graphics sets (items, scenery), filled by LoadLevel
-g_BobSets           	equ	$142	; 21 pointers to the enemy BOB graphics sets: one per enemy type, then the bat (+76) and red crow (+80)
-g_BlitListPtr       	equ	$196
-g_SaveBufA          	equ	$3DA	; background save area of the buffer being drawn (its address in a6 is also the top of the BOB draw list, which grows down from here to g_BlitListPtr)
-g_SaveBufB          	equ	$3DE	; background save area of the other buffer
-g_SavePtr           	equ	$3E2	; next free byte in g_SaveBufA (limit $3000 bytes a frame)
-g_SavePtrB          	equ	$3E6	; the same for the other buffer
-g_RestoreListA      	equ	$3EA	; restore list of the buffer being drawn: 12-byte entries (BLTSIZE, modulo, screen address, save address) growing down from $632; 0 ends it
-g_RestoreListB      	equ	$3EE	; restore list of the other buffer (grows down from $872)
-g_RestoreBufB       	equ	$632	; restore list storage: list A grows down from here, list B from g_SpawnQuota
-g_SpawnQuota        	equ	$872	; 16 bytes, one per enemy type: how many more the spawners may create; a handler gives one back when its enemy leaves
-g_HiNames           	equ	$882	; 10 x 3 initials
-g_SpecialObjs       	equ	$8A0	; 2 slots x $20 (key, cutscene actors)
-g_Shots             	equ	$8E0	; 4 weapon slots x $26
-g_EnemyShots        	equ	$978	; 6 slots x $1C
-g_Spawners          	equ	$A20	; 16 enemy spawners x $C, one per enemy type
-g_Items             	equ	$AE0	; 30 slots x $1C - platforms / pickups / pots
-g_Enemies           	equ	$E28	; 40 slots x $3C - enemy objects
-g_Enemy1            	equ	$E64	; second enemy slot (used by cut-scenes)
+	ifd	BUILD_1MB
+g_BaseAddr          	equ	$002	; 1MB build only: load address of the program (from $4.w); added to every program address
+G_SHIFT             	equ	4	; added to the offsets of the globals after g_BaseAddr
+	else
+G_SHIFT             	equ	0	; added to the offsets of the globals (4 in the 1MB build: g_BaseAddr comes first)
+	endc
+g_FrameStamp        	equ	G_SHIFT+$002	; frame counter snapshot for timed waits
+g_VblCount          	equ	G_SHIFT+$004	; incremented every vertical blank
+g_GameFrame         	equ	G_SHIFT+$006	; incremented every game-logic frame
+g_RawKey            	equ	G_SHIFT+$008	; last raw keycode (Esc=$45, F1=$50, F2=$51)
+g_AsciiKey          	equ	G_SHIFT+$009	; last key as ASCII (space=$20 pauses)
+g_RandSeed          	equ	G_SHIFT+$00A	; random generator state, seeded $AAAA
+g_TimeLeft          	equ	G_SHIFT+$00C	; level timer, BCD minutes.byte/seconds.byte
+g_LevelDone         	equ	G_SHIFT+$00E	; set when the level is completed
+g_PlayerDied        	equ	G_SHIFT+$00F	; set when Arthur has died this frame
+g_BonusEvery        	equ	G_SHIFT+$010	; counts down from 6: every 6th spawned enemy carries a bonus
+g_BonusCycle        	equ	G_SHIFT+$011	; 0-6: which kind of bonus the next carrier gets (BonusKinds)
+g_BonusRoll         	equ	G_SHIFT+$012	; +21 per treasure bonus; on carry the treasure is the rare kind 12
+g_WeaponOdds        	equ	G_SHIFT+$013	; 5 accumulators, one per weapon (bonus weapon choice); ends at $17
+g_BossCountdown     	equ	G_SHIFT+$018	; bosses left to beat on this level before the key / ending (LevelBossCountdown)
+g_BigEnemyCount     	equ	G_SHIFT+$019	; Red Arremer / Satan / Unicorn / Dragon currently engaged (+1 on activation, -1 on removal; never tested)
+g_MapZone           	equ	G_SHIFT+$01A	; current map zone (MapZoneTable): selects the enemy spawners
+g_MaxMapZone        	equ	G_SHIFT+$01B	; furthest map zone reached (spawners with ZoneFlags 0 only start beyond it)
+g_RedrawPending     	equ	G_SHIFT+$01C	; set to request a full redraw: the VBL diverts user mode to RedrawEntry
+g_RedrawDone        	equ	G_SHIFT+$01D	; set by RedrawScreen when finished
+g_SkipLogic         	equ	G_SHIFT+$01E	; non-zero: VBL does not trigger the logic interrupt
+g_TextShadow        	equ	G_SHIFT+$01F	; text colour where only the first font plane is set
+g_TextInk           	equ	G_SHIFT+$020	; text colour where only the second font plane is set
+g_TextPaper         	equ	G_SHIFT+$021	; text colour where both font planes are set
+g_TwoPlayer         	equ	G_SHIFT+$027	; non-zero = two-player game
+g_CurPlayer         	equ	G_SHIFT+$028	; 0 = player 1, $FF = player 2
+g_GameState         	equ	G_SHIFT+$029	; 0 = in game, 1/2 = attract screens
+g_SubState          	equ	G_SHIFT+$02A	; in-game sub state (see GameStateTable)
+g_SubState2         	equ	G_SHIFT+$02B	; step within the sub state
+g_SubState3         	equ	G_SHIFT+$02C	; step within g_SubState2
+g_ArthurVisible     	equ	G_SHIFT+$02D	; hardware sprites 0-3 enabled
+g_Spr47Visible      	equ	G_SHIFT+$02E	; hardware sprites 4-7 enabled
+g_Paused            	equ	G_SHIFT+$02F
+g_CheatOn           	equ	G_SHIFT+$030	; set by entering ')!(' on the high-score table: no life loss / no damage
+g_ScreenFront       	equ	G_SHIFT+$032
+g_ScreenBack        	equ	G_SHIFT+$036
+g_ScreenSpare1      	equ	G_SHIFT+$042
+g_ScreenSpare2      	equ	G_SHIFT+$046
+g_CopperFront       	equ	G_SHIFT+$04A
+g_CopperBack        	equ	G_SHIFT+$04E
+g_CopperSpare1      	equ	G_SHIFT+$052
+g_CopperSpare2      	equ	G_SHIFT+$056
+g_Joy               	equ	G_SHIFT+$05A	; joystick: b0 down b1 right b8 up b9 left b15 fire
+g_JoyPrev           	equ	G_SHIFT+$05C	; previous frame joystick
+g_ArthurSprCtl      	equ	G_SHIFT+$05E	; 4 longs: SPRxPOS/SPRxCTL pairs for sprites 0-3
+g_ScrollTileX       	equ	G_SHIFT+$06E	; scroll position in 16-pixel tiles
+g_ScrollTileY       	equ	G_SHIFT+$070
+g_ScrollFineX       	equ	G_SHIFT+$072	; fine scroll -15..15
+g_ScrollFineY       	equ	G_SHIFT+$074
+g_CameraX           	equ	G_SHIFT+$076	; camera world position in pixels
+g_CameraY           	equ	G_SHIFT+$078
+g_CamDeltaX         	equ	G_SHIFT+$07A
+g_CamDeltaY         	equ	G_SHIFT+$07C
+g_PendFineX         	equ	G_SHIFT+$07E	; camera target X relative to g_NewTileX*16: the fine scroll to use once the pending redraw is shown
+g_PendFineY         	equ	G_SHIFT+$080	; the same for Y
+g_NewTileX          	equ	G_SHIFT+$082
+g_NewTileY          	equ	G_SHIFT+$084
+g_CamMinX           	equ	G_SHIFT+$086	; left scroll limit (scrolling is one-way)
+g_CamMinY           	equ	G_SHIFT+$088
+g_LevelOriginX      	equ	G_SHIFT+$08A
+g_LevelWidth        	equ	G_SHIFT+$08C
+g_LevelOriginY      	equ	G_SHIFT+$08E
+g_LevelHeight       	equ	G_SHIFT+$090
+g_MapPtr            	equ	G_SHIFT+$092	; current level map (block indices)
+g_SceneryHitX       	equ	G_SHIFT+$096	; where shootable scenery was last hit: spawn point for the Magician (type 7)
+g_SceneryHitY       	equ	G_SHIFT+$098
+g_Level             	equ	G_SHIFT+$09A	; level 0-6 (per-player block starts here, P2 copy at +$10)
+g_Weapon            	equ	G_SHIFT+$09C	; 0 torch 1 lance 2 axe 3 cross 4 dagger (cross needed on level 6)
+g_Score             	equ	G_SHIFT+$09E	; BCD score
+g_NextExtraLife     	equ	G_SHIFT+$0A2	; BCD score for next extra life (also AddScore accumulator end)
+g_Lives             	equ	G_SHIFT+$0A6
+g_Checkpoint        	equ	G_SHIFT+$0A7	; set once the half-way point is passed
+g_ExtraLives        	equ	G_SHIFT+$0A8	; extra lives awarded so far (20000, 70000, then every 70000)
+g_ShowIntro         	equ	G_SHIFT+$0A9	; non-zero: play the opening kidnap cutscene first
+g_OtherPlayer       	equ	G_SHIFT+$0AA	; the other player's copy of g_Level .. g_ShowIntro (16 bytes), exchanged by SwapPlayers
+g_ShownScore        	equ	G_SHIFT+$0BA	; score last drawn on the HUD / hi-score name ptr in entry mode
+g_HiScores          	equ	G_SHIFT+$0BE	; 10 BCD longs, top score first
+g_ArthurX           	equ	G_SHIFT+$0E6	; world X (also cursor column in name entry)
+g_ArthurY           	equ	G_SHIFT+$0EA	; world Y, increasing upwards (cursor row in name entry)
+g_ArthurAux         	equ	G_SHIFT+$0EE
+g_ArthurVelX        	equ	G_SHIFT+$0F0
+g_ArthurVelY        	equ	G_SHIFT+$0F4
+g_ArthurAnim        	equ	G_SHIFT+$0F8	; animation script pointer
+g_ArthurPlatform    	equ	G_SHIFT+$0FC	; platform slot Arthur is riding
+g_ArthurShownFrame  	equ	G_SHIFT+$100	; frame last copied into sprite RAM
+g_ArthurFrame       	equ	G_SHIFT+$101	; requested sprite frame (negative = mirrored)
+g_ArthurAnimTimer   	equ	G_SHIFT+$102
+g_ArthurDir         	equ	G_SHIFT+$103	; +1 right / -1 left
+g_LadderDir         	equ	G_SHIFT+$104	; ladder climb direction
+g_ArthurFacing      	equ	G_SHIFT+$105
+g_Crouching         	equ	G_SHIFT+$106	; down held (also: 3 initials buffer during high-score entry)
+g_Jumping           	equ	G_SHIFT+$107	; airborne, rising
+g_Falling           	equ	G_SHIFT+$108	; airborne, descending / not on floor
+g_FireCooldown      	equ	G_SHIFT+$109	; frames until the next throw
+g_OnPlatform        	equ	G_SHIFT+$10A
+g_OnLadder          	equ	G_SHIFT+$10B
+g_StateTimer        	equ	G_SHIFT+$10C
+g_NoArmour          	equ	G_SHIFT+$10D	; Arthur has lost his armour
+g_ArthurState       	equ	G_SHIFT+$10E	; 0 normal, 1 hit, 4 time-up death, 7 fell
+g_ArthurFlash       	equ	G_SHIFT+$10F	; invulnerability flashing
+g_FrogTimer         	equ	G_SHIFT+$110	; magician curse: Arthur is a frog while non-zero
+g_KeyState          	equ	G_SHIFT+$111	; end-of-level key sequence
+g_LevelFileEnd      	equ	G_SHIFT+$112
+g_LevelFileAddr     	equ	G_SHIFT+$116
+g_SmallBobSets      	equ	G_SHIFT+$11A	; 10 pointers to the small BOB graphics sets (items, scenery), filled by LoadLevel
+g_BobSets           	equ	G_SHIFT+$142	; 21 pointers to the enemy BOB graphics sets: one per enemy type, then the bat (+76) and red crow (+80)
+g_BlitListPtr       	equ	G_SHIFT+$196
+g_SaveBufA          	equ	G_SHIFT+$3DA	; background save area of the buffer being drawn (its address in a6 is also the top of the BOB draw list, which grows down from here to g_BlitListPtr)
+g_SaveBufB          	equ	G_SHIFT+$3DE	; background save area of the other buffer
+g_SavePtr           	equ	G_SHIFT+$3E2	; next free byte in g_SaveBufA (limit $3000 bytes a frame)
+g_SavePtrB          	equ	G_SHIFT+$3E6	; the same for the other buffer
+g_RestoreListA      	equ	G_SHIFT+$3EA	; restore list of the buffer being drawn: 12-byte entries (BLTSIZE, modulo, screen address, save address) growing down from $632; 0 ends it
+g_RestoreListB      	equ	G_SHIFT+$3EE	; restore list of the other buffer (grows down from $872)
+g_RestoreBufB       	equ	G_SHIFT+$632	; restore list storage: list A grows down from here, list B from g_SpawnQuota
+g_SpawnQuota        	equ	G_SHIFT+$872	; 16 bytes, one per enemy type: how many more the spawners may create; a handler gives one back when its enemy leaves
+g_HiNames           	equ	G_SHIFT+$882	; 10 x 3 initials
+g_SpecialObjs       	equ	G_SHIFT+$8A0	; 2 slots x $20 (key, cutscene actors)
+g_Shots             	equ	G_SHIFT+$8E0	; 4 weapon slots x $26
+g_EnemyShots        	equ	G_SHIFT+$978	; 6 slots x $1C
+g_Spawners          	equ	G_SHIFT+$A20	; 16 enemy spawners x $C, one per enemy type
+g_Items             	equ	G_SHIFT+$AE0	; 30 slots x $1C - platforms / pickups / pots
+g_Enemies           	equ	G_SHIFT+$E28	; 40 slots x $3C - enemy objects
+g_Enemy1            	equ	G_SHIFT+$E64	; second enemy slot (used by cut-scenes)
 
 ; ---- Object slot fields (enemies $3C, shots $26, items $1C share this header) ----
 O_Active            	equ	$00	; 0 = free, 1 = active, 2 = dying (no shot test), bit 7 set = shots pass through

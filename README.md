@@ -2,13 +2,12 @@
 
 | File | What it is |
 |---|---|
-| `gng_main.s` | Main program, 512K build (tracks 110-125, runs at `$80`). ~25,500 lines |
-| `gng_equates.i` | Custom-chip / CIA registers, memory map, all named `a6` globals, object slot fields |
-| `gng_main_1mb.s` / `gng_equates_1mb.i` | Main program, **expanded-memory (1MB) build** (tracks 17-32), assembled at org 0. Carries all the 512K annotations; every difference is marked |
+| `gng_main.s` | Main program, **both builds** from one source: the 512K build (tracks 110-125, runs at `$80`) and, with `-DBUILD_1MB=1`, the expanded-memory (1MB) build (tracks 17-32, position independent, assembled at org 0). ~26,000 lines; the ~190 places where the builds differ are `ifd BUILD_1MB` / `else` blocks |
+| `gng_equates.i` | Custom-chip / CIA registers, memory map, all named `a6` globals, object slot fields (both builds: the memory map differs, the globals are `G_SHIFT` further on in the 1MB build) |
 | `gng_boot.s` | Bootblock + trackloader (track 0) |
-| `build.sh` | Assembles all three sources with vasm and checks SHA-1 against the originals |
+| `build.sh` | Assembles the three programs (two from `gng_main.s`) with vasm and checks SHA-1 against the originals |
 | `bin/` | The original binaries the sources reproduce |
-| `tools/` | The tracer / generator used to produce `gng_main.s` (see below), `compare_builds.py`; `tools/budget/` (memory and size measurements for `docs/TODO.md`: `level_sizes.py`, `enemy_windows.py`, `gfx_redundancy.py`, `program_breakdown.py`; `sound/tools/sample_rates.py` and `tune_samples.py` for the samples); `tools/build1mb/` produces the 1MB source; `tools/verify/checks.py` runs the real code in a 68000 emulator to check the bug notes; `tools/refdocs.py` writes `docs/GLOBALS.md` and `docs/XREF.md` |
+| `tools/` | The tracer / generator used to produce `gng_main.s` (see below), `compare_builds.py`; `tools/budget/` (memory and size measurements for `docs/TODO.md`: `level_sizes.py`, `enemy_windows.py`, `gfx_redundancy.py`, `program_breakdown.py`; `sound/tools/sample_rates.py` and `tune_samples.py` for the samples); `tools/build1mb/` produces the 1MB build's source and `tools/merge_src.py` merges the two into `gng_main.s`; `tools/verify/checks.py` runs the real code in a 68000 emulator to check the bug notes; `tools/refdocs.py` writes `docs/GLOBALS.md` and `docs/XREF.md` |
 | `sound/` | Sound driver and music/sfx data: annotated sources, samples, renders (`sound/SOUND.md`) |
 | `render/` | Scripts that render levels, enemy BOBs and Arthur's sprites from the disk data; output in `render/out/`, including `worldmap_cells.png` (the whole world map with every cell number) |
 | `disk/` | **Every file loaded from the disk** (`disk/files/`), the file table (`disk/FILES.md`) and a track-by-track disk map (`disk/DISKMAP.md`). `tools/disk/mkdisk.py` builds a playable disk image from them (see *Making a disk image*) |
@@ -16,12 +15,12 @@
 | `bin/tracks/` | All 131 decoded tracks (6,312 bytes each) used by the render scripts |
 | `bin/main_1mb.bin` | The expanded-memory build (tracks 17-32) |
 
-All three sources reassemble **byte-identical** to the originals:
+All three programs reassemble **byte-identical** to the originals:
 
 ```
-vasmm68k_mot -Fbin -m68000 -no-opt -o main.bin gng_main.s         ; sha1 2628a93c164a5a8791272c146053b0afb3ddcf14
-vasmm68k_mot -Fbin -m68000 -no-opt -o main_1mb.bin gng_main_1mb.s ; sha1 e44347679297d5d864ae7b0da689714970e261ad
-vasmm68k_mot -Fbin -m68000 -no-opt -o boot.bin gng_boot.s         ; sha1 0bf93a4078bf317fa2774b4b973e1c79c0060227
+vasmm68k_mot -Fbin -m68000 -no-opt -o main.bin gng_main.s                     ; sha1 2628a93c164a5a8791272c146053b0afb3ddcf14
+vasmm68k_mot -Fbin -m68000 -no-opt -DBUILD_1MB=1 -o main_1mb.bin gng_main.s   ; sha1 e44347679297d5d864ae7b0da689714970e261ad
+vasmm68k_mot -Fbin -m68000 -no-opt -o boot.bin gng_boot.s                     ; sha1 0bf93a4078bf317fa2774b4b973e1c79c0060227
 ```
 
 `-no-opt` matters: the source keeps the original instruction sizes explicitly.
@@ -219,9 +218,10 @@ charges, and the timings and speeds from its tables.
 ## 512K vs 1MB builds
 
 Compared instruction by instruction (`tools/compare_builds.py`): **the same program**. There is no
-extra title or ancillary code in the 1MB build. `gng_main_1mb.s` is the full 1MB source: about 260
-instructions have no 512K counterpart (marked `[1MB]`), and each of the 121 places where the builds
-differ has a `<< … >>` note naming the 512K code it replaces. The differences are:
+extra title or ancillary code in the 1MB build. `gng_main.s` holds both: where the builds differ
+(about 680 lines of 1MB code against 640 of 512K code, in about 190 places) the 1MB code is in an
+`ifd BUILD_1MB` block with the 512K code in its `else`. The address column gives both addresses
+(`05B2C/05AB6`: 512K / 1MB file offset). The differences are:
 
 * **Addressing**: the 1MB build runs at `$80000` or `$C00000`, so it adds a base register adjustment
   (`adda.l base(a6)`) wherever the 512K build uses an absolute address.
@@ -234,7 +234,7 @@ differ has a `<< … >>` note naming the 512K code it replaces. The differences 
 * **Memory layout**: the program sits in fast/slow RAM at the load address; screens (`$80`, `$B480`,
   `$16880`, `$21C80`), copper lists, sprites and the music package (`$3604C`) are in chip RAM at
   absolute addresses. `g_BaseAddr` is inserted at `$2(a6)`, so every global from `+2` on is 4 bytes
-  further into the block than in the 512K build (`gng_equates_1mb.i` has the 1MB offsets).
+  further into the block than in the 512K build (`G_SHIFT` in `gng_equates.i`).
 * **Music**: the 1MB build loads a 111KB music package (tracks 64-81) instead of the 512K build's 32KB
   one (tracks 126-131), and has 13 extra calls to a **PlayMusic** entry (player command 1) for level
   tunes, game over, time-up, beating Astaroth (tune 9) and so on, plus extra sound effects (e.g. effect 9 when enemies are hit). In the 512K build those calls were removed but their set-up
@@ -418,7 +418,7 @@ data files: `sound/gng_sfx_512k.s` (30 effects, 512K build) and `sound/gng_music
 * **Line comments** on the mechanical routines too (explosions, map zones, spawners, the collision
   routines, VBL, hardware set-up, bitplane pointers, ladders, Unicorn and Petite Devil details).
 * **1MB-only code:** the start-up caching, the one-blit masked `DrawBob`, and every extra sound
-  call (which effect and why) are commented in `gng_main_1mb.s`.
+  call (which effect and why) are commented in the `ifd BUILD_1MB` blocks of `gng_main.s`.
 * **Checked by emulation:** every bug note and several behaviour claims are confirmed by running
   the original code in a 68000 emulator (`tools/verify/checks.py`, 16 checks, including the camera model).
 * **Data:** every table the code reads is named; the map, tile, spawn, animation, movement, box,
@@ -447,7 +447,7 @@ then regenerate and verify:
 
 ```
 cd tools
-python3 mkeq.py && python3 gen.py      # writes gng_main.s / gng_equates.i
+python3 mkeq.py && python3 gen.py      # writes tools/gng_main.s / tools/gng_equates.i (512K build)
 vasmm68k_mot -Fbin -m68000 -no-opt -o out.bin gng_main.s && cmp out.bin main.bin
 ```
 
@@ -457,6 +457,24 @@ For the 1MB source, run `trace1m.py`, `mkmap.py`, `make_gen1m.py`, `mkeq1m.py` a
 `mkmap.py` aligns the two builds instruction by instruction (checking that branch targets and
 immediates agree), and `anno_db1m.py` carries every name, header and comment across; 1MB-only
 annotations are at the end of `anno_db1m.py`.
+
+The two generated sources (`tools/gng_main.s`, `tools/build1mb/gng_main_1mb.s` and their equates)
+are not kept: `merge_src.py` merges them into the `gng_main.s` and `gng_equates.i` in the root,
+the one source for both builds, and `--check` assembles both programs from it and compares them
+with the originals:
+
+```
+cd tools
+python3 mkeq.py && python3 gen.py
+(cd build1mb && python3 make_gen1m.py && python3 mkeq1m.py && python3 gen1m.py)
+python3 merge_src.py --check           # writes ../gng_main.s, ../gng_equates.i
+```
+
+It aligns the two sources line by line on the code (comments left out; the 1MB build's
+`l_XXXXX` labels renamed to their 512K counterparts through `build1mb/map.json`), writes what
+they share once and puts the rest in `ifd BUILD_1MB` / `else` blocks. Labels only the 1MB build
+has are `l1m_XXXXX` (its file offset); 1MB-only wording of a block comment is kept as `; [1MB]`
+lines.
 
 `trace.py` re-runs the control-flow trace (`seeds.json` holds the extra entry points: interrupt
 handlers, `JSR (a0)` targets and unreferenced routines).

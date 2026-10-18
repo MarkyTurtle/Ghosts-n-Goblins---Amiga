@@ -4,3 +4,9 @@ __pycache__/
 /boot.bin
 /main_1mb.bin
 enhanced/build/
+# generated per build, merged into the root gng_main.s / gng_equates.i by tools/merge_src.py
+/tools/gng_main.s
+/tools/gng_equates.i
+/tools/build1mb/gng_main_1mb.s
+/tools/build1mb/gng_equates_1mb.i
+/tools/build1mb/gen1m.py
