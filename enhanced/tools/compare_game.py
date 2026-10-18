@@ -1,5 +1,6 @@
 """Run the one program for every machine (build_game.py) side by side with the original it
-stands in for, in the emulator, with the same input:
+stands in for, in the emulator, with the same input (the 512K original drawing every frame and
+with its DrawBob top-clip bug fixed, both originals with the one program's MapTileAt fix):
 
   --machine 512k   an A500 with 512K of chip RAM   against the original 512K program
   --machine 1mb    an A500+ with 1MB of chip RAM   against the original 1MB program
@@ -27,6 +28,10 @@ def main(frames, seed, machine, level=None, teleport=0, png=None):
         n = 0x1780
         junk = bytes(test.u.mem_read(test.globals, n))
         ref.u.mem_write(ref.globals, junk[:2]); ref.u.mem_write(ref.globals + 6, junk[2:])
+    if build == '512k':     # as the enhanced builds were always compared (compare_runs.py): the
+        ref.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))    # DrawBob top-clip fix, the one program
+        ref.u.mem_write(0xC2EA, bytes.fromhex('c4c6'))    # draws BOBs correctly (scroller)
+        ref.u.mem_write(0x6E76, bytes.fromhex('4e71' * 5))  # every frame drawn, as the one program
     fix_map_reads(ref, test)
     return compare_runs.main(frames, seed, png, level, teleport, build, pair=(ref, test), raw=False)
 

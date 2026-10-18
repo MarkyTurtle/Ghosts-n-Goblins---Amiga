@@ -234,7 +234,42 @@ mt_inside:
         move.b  (a1),d0                         ; 05A8E/05A0E
 """)
     S.sub("\nMapTileAt:\n", "\nMapCellEmpty:\n\tdc.b\t$67\t\t\t; a cell type with nothing in it (MapTileAt)\n\teven\nMapTileAt:\n")
+    fold_scroller(S)
     assert ';@@' not in S.s
+
+
+def fold_scroller(S):
+    """the scroller (src/scroller.s, src/scroll.s) in place of the original display code: the
+    game's routines call it as the earlier enhanced builds' patches did (src/patches.s)"""
+    jmp = lambda label, target, why: S.sub(f'\n{label}:\n', f'\n{label}:\n' + I(f'jmp     {target}', why) + '\n')
+    jmp('RedrawScreen', 'EnhRedrawScreen', 'the scroller: draw the pristine buffer')
+    jmp('SwapScreens', 'EnhSwapScreens', 'the scroller')
+    jmp('ShowBackBuffer', 'EnhShowBackBuffer', 'the scroller')
+    jmp('SetBitplanePtrs', 'EnhSetBitplanePtrs', 'the scroller')
+    jmp('RestoreBackground', 'EnhRestoreBackground', 'the scroller')
+    jmp('DrawBobs', 'EnhDrawBobs', 'the scroller')
+    jmp('CameraJump', 'EnhCameraJump', 'the scroller: the same fine-scroll rules, no buffers to rotate')
+    jmp('l_0B0D6', 'EnhPrintField', 'playfield text: through the scroller (the ring needs the lines copied)')
+    S.sub("        bsr.w   RedrawScreen                    ; 05EAC/05F02  the redraw VblIRQ asked for (user mode)\n",
+          I('jsr     EnhRedrawBackground', 'nothing to redraw: the scroller keeps the buffers current') + '\n')
+    S.sub("        lea.l   FileCopyrightScreen(pc),a1      ; 05D32/05D88\n",
+          I('jsr     EnhInit', 'the scroller\'s records (and the machine description)') + '\n'
+          "        lea.l   FileCopyrightScreen(pc),a1      ; 05D32/05D88\n")
+    S.sub("        bsr.w   DrawCreditsScreen               ; 05EF0/05F46\n",
+          "        bsr.w   DrawCreditsScreen               ; 05EF0/05F46\n" + I('jsr     EnhShowMachine', 'and the memory the bootblock found') + '\n')
+    # the timing build: the logic's start and end colour the background
+    S.sub("Level1Logic:\n        move.w  #INTF_SOFTINT,CUSTOM+INTREQ     ; 05EB6/05F0C\n",
+          "Level1Logic:\n\tifd\tRASTER_BUILD\n" + I('jsr     EnhLogicStart', 'timing build: (does the INTREQ write) grey') + '\n\telse\n'
+          "        move.w  #INTF_SOFTINT,CUSTOM+INTREQ     ; 05EB6/05F0C\n\tendc\n")
+    for old in ("LogicExit:\n        movem.l (a7)+,d0-d7/a0-a5               ; 06BF2/06C50\n        rte                                     ; 06BF6/06C54\n",):
+        S.sub(old, "LogicExit:\n\tifd\tRASTER_BUILD\n" + I('jmp     EnhLogicEnd', 'timing build: black, then this') + '\n\tendc\n' + old[len('LogicExit:\n'):])
+    S.sub("        movem.l (a7)+,d0-d7/a0-a5               ; 071E6/0724E\n        rte                                     ; 071EA/07252\n",
+          "\tifd\tRASTER_BUILD\n" + I('jmp     EnhLogicEnd') + '\n\tendc\n'
+          "        movem.l (a7)+,d0-d7/a0-a5               ; 071E6/0724E\n        rte                                     ; 071EA/07252\n")
+    # the scroller's code after the support routines (CacheGraphics' cg_longs ends them):
+    # inside the program file, before its end, which the globals overlay at run time
+    i = S.s.index('cg_longs:\n'); j = S.s.index('        rts\n', i) + len('        rts\n')
+    S.s = S.s[:j] + '\n\tinclude\t"scroller.s"\n' + S.s[j:]
 
 
 def widen_branches(path):
@@ -245,11 +280,17 @@ def widen_branches(path):
     while True:
         r = subprocess.run([vasm, '-Fbin', '-m68000', '-no-opt', '-quiet', '-maxerrors=10000',
                             '-I', os.path.dirname(path), '-o', os.devnull, path], capture_output=True, text=True)
-        bad = [int(m.group(1)) for m in re.finditer(r'error 2029 in line (\d+) of', r.stdout + r.stderr)]
-        if not bad: return n
+        out = r.stdout + r.stderr
+        bad = [(int(m.group(2)), m.group(1)) for m in re.finditer(r'error (2029|2030) in line (\d+) of "[^"]*gng_game\.s"', out)]
+        if not bad:
+            assert 'error' not in out, out[:2000]
+            return n
         L = open(path).read().split('\n')
-        for k in bad:
-            new = re.sub(r'^(\s+b(?:ra|sr|eq|ne|cc|cs|pl|mi|hi|ls|ge|gt|le|lt|vc|vs))\.b(\s)', r'\1.w\2', L[k - 1])
+        for k, e in bad:
+            if e == '2029':                   # short branch -> word branch
+                new = re.sub(r'^(\s+b(?:ra|sr|eq|ne|cc|cs|pl|mi|hi|ls|ge|gt|le|lt|vc|vs))\.b(\s)', r'\1.w\2', L[k - 1])
+            else:                             # lea x(pc) out of reach -> lea (x).l (no flags either way)
+                new = re.sub(r'^(\s+lea\.l\s+)(\w+)\(pc\),(a\d)', r'\1(\2).l,\3', L[k - 1])
             assert new != L[k - 1], L[k - 1]
             L[k - 1] = new; n += 1
         open(path, 'w').write('\n'.join(L))
@@ -262,7 +303,7 @@ def main():
     hand_edits(S, V1)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)
-    print(f'{os.path.relpath(OUT, ROOT)}: {S.s.count(chr(10))} lines; {n} short branches made word branches')
+    print(f'{os.path.relpath(OUT, ROOT)}: {S.s.count(chr(10))} lines; {n} references out of reach made longer')
 
 
 if __name__ == '__main__':

@@ -32,7 +32,9 @@
 ; defines the custom-chip / globals equates (gng_equates.i, with BUILD_1MB for the 1MB build), CellTiles,
 ; ItemBoxSizes, SmallBobSizes and MASKBUF (a one-plane BOB mask, at most 64 x 80 pixels; 512K
 ; only). BUILD_1MB selects the 1MB build: its program tables are offsets from g_BaseAddr, and
-; its BOB graphics carry their masks, so a BOB is one blit.
+; its BOB graphics carry their masks, so a BOB is one blit. BUILD_ONE (the one program for every
+; machine, gng_game.s): absolute addresses, and the BOB drawing is chosen at run time - masked
+; graphics (one blit) with PF_CACHE in Profile, the 512K way otherwise.
 ;
 ; Calls (a6 = game globals, as everywhere in the game):
 ;   ScrFullDraw    a0 = buffer record, d0 = camera x, d1 = camera y
@@ -103,12 +105,30 @@ GAMEADDR        macro
         endm
 
 ; BOB graphics: bytes per image line for each graphics word of width. 512K: 5 plane lines;
-; 1MB: 5 plane lines each followed by its mask line (BuildMaskedGfx)
+; 1MB: 5 plane lines each followed by its mask line (BuildMaskedGfx). GFXMUL reg: reg (a word
+; count) times that, as a long
                 ifd     BUILD_1MB
 GFX_LINE_MUL    equ     20
                 else
 GFX_LINE_MUL    equ     10
                 endif
+                ifd     BUILD_1MB               ; masked BOB drawing assembled (1MB, or chosen at run time)
+SCR_MASKED      equ     1
+                endif
+                ifd     BUILD_ONE
+SCR_MASKED      equ     1
+                endif
+GFXMUL          macro
+                ifd     BUILD_ONE
+                mulu.w  #10,\1
+                btst    #PF_CACHE,(Profile).l
+                beq.b   .gm\@
+                add.l   \1,\1                 ; masked graphics: twice the lines
+.gm\@:
+                else
+                mulu.w  #GFX_LINE_MUL,\1
+                endif
+                endm
 
 ;------------------------------------------------------------------------------
 ; Window: d0 = camera x, d1 = camera y ->
@@ -556,7 +576,7 @@ ScrDrawBob:
                 sub.w   d7,d4
                 ble.w   .out
                 move.w  d6,d0
-                mulu.w  #GFX_LINE_MUL,d0
+                GFXMUL  d0
                 mulu.w  d7,d0
                 adda.l  d0,a1
 .nottop:        move.w  buf_ClipY0(a0),d7       ; lines below the view
@@ -629,7 +649,7 @@ ScrDrawBob:
                 move.w  d7,d4
                 bsr.b   .part                   ; top part
                 move.w  d6,d7
-                mulu.w  #GFX_LINE_MUL,d7
+                GFXMUL  d7
                 mulu.w  d4,d7
                 adda.l  d7,a1                   ; graphics of the bottom part
                 moveq   #0,d2
@@ -660,7 +680,11 @@ ScrDrawBob:
                 move.w  d7,(a3)+
                 move.l  a3,buf_RList(a0)
 .nolist:        INTSOFF                         ; (the mask buffer is shared: no interruption)
-                ifd     BUILD_1MB
+                ifd     BUILD_ONE
+                btst    #PF_CACHE,(Profile).l
+                beq.w   .p512
+                endif
+                ifd     SCR_MASKED
                 ; ---- 1MB: pre-masked graphics, every plane line followed by its mask line:
                 ; one cookie-cut blit draws all 5 planes (5 x lines blitter lines), as the
                 ; 1MB DrawBob. A = mask, B = BOB (modulo skips the other line), C/D = screen
@@ -694,7 +718,12 @@ ScrDrawBob:
                 move.l  a4,BLTCPTH(a3)
                 move.l  a4,BLTDPTH(a3)
                 move.w  d2,BLTSIZE(a3)
-                else
+                endif
+                ifd     BUILD_ONE
+                bra.w   .pdone
+.p512:
+                endif
+                ifnd    BUILD_1MB
                 move.w  d4,d2                   ; BLTSIZE for one plane
                 lsl.w   #6,d2
                 or.w    d0,d2
@@ -751,7 +780,7 @@ ScrDrawBob:
                 adda.w  #ROWBYTES,a4
                 dbra    d6,.plane
                 endif
-                INTSON
+.pdone:         INTSON
                 movem.l (a7)+,d0-d7/a1-a5
                 rts
 

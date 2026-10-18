@@ -346,8 +346,13 @@ doing (walking, falling, climbing), and the level.
 
 The original disk has two main programs; `enhanced/src/gng_game.s` is one program for every
 machine, made from the merged source by `tools/make_game.py` and built with `tools/build_game.py`
-(`build/game/`, disk `build/gng_game.adf`). *The scroller is not in it yet* (next step: fold it
-into this source); it draws as the originals do.
+(`build/game/`, disk `build/gng_game.adf`; `--raster`: the timing build, `gng_game_raster.adf`).
+The scroller is part of it: `src/scroller.s` (the module's glue, storage at `SCROLL_STORE`) and
+`src/scroll.s` (`BUILD_ONE`: the one-blit masked BOB drawing or the 512K mask-and-5-blits drawing
+chosen at run time); `make_game.py` puts the calls into the game's routines where the earlier
+builds patched them (`RedrawScreen`, `SwapScreens`, `ShowBackBuffer`, `SetBitplanePtrs`,
+`RestoreBackground`, `DrawBobs`, `CameraJump`, PrintChar's playfield path, `RedrawEntry`, the
+machine line after `DrawCreditsScreen`). Every machine draws every frame (`PF_EVERY`).
 
 **How it chooses.** It is the 512K program - its memory map, loaded to `$80` on every machine -
 plus the 1MB program's features. `ReadProfile` (first thing in `Start`) reads the bootblock's
@@ -377,10 +382,15 @@ the programs' contents start to differ; the map and the tables after it read as 
 empty cell `$67`. `compare_game.py` gives the originals the same fix (a hook) when comparing.
 
 **Testing** (`tools/compare_game.py --machine 512k|1mb`, against the matching original, game
-state and picture every frame): on a 512K A500 identical to the 512K program in every frame
-(level 0 4,000 frames; levels 2, 4, 5 2,500 frames with teleporting); on a 1MB A500+ in step
-with the 1MB program throughout, pictures identical except two single frames where the
-original shows leftover screen junk. The originals' globals overlay the end of the program
+state and picture every frame; the 512K original drawing every frame and with its DrawBob
+top-clip bug fixed, as the enhanced builds were always compared). Before the scroller was folded
+in: on a 512K A500 identical to the 512K program in every frame (level 0 4,000 frames; levels 2,
+4, 5 2,500 frames with teleporting); on a 1MB A500+ in step with the 1MB program throughout,
+pictures identical except two single frames of leftover screen junk in the original. With the
+scroller: the same runs stay in step on both machines; the pictures differ only on the title
+screen (the machine line), the loading frames, one progress-map frame, and where the original
+leaves playfield text on screen that the game no longer prints (the key message; see *Playfield
+text*). The originals' globals overlay the end of the program
 file and some are used before they are set (the fraction of `g_ArthurX` in the opening scene),
 so for the 1MB comparison the original starts with the same junk.
 

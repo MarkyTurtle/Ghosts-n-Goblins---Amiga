@@ -3,8 +3,8 @@
 ; One program for every machine (enhanced branch)
 ; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
-; (MACHINE_INFO). With 1MB or more of chip RAM: PF_CACHE, PF_MUSIC, PF_EVERY - the 1MB
-; program's features. Without a description (the original bootblock) or with less chip RAM:
+; (MACHINE_INFO). With 1MB or more of chip RAM: PF_CACHE, PF_MUSIC - the 1MB program's
+; features (PF_EVERY, drawing every frame, is set for every machine). Without a description (the original bootblock) or with less chip RAM:
 ; none, the 512K program. Also the two texts the 1MB program has its own way: the credit line
 ; ('MUSIC' for 'SOUND') and the initials stored for a blank name ('501' for '504').
 ;---------------------------------------------------------------------------
@@ -27,7 +27,8 @@ rp_done:
 TxtMusic:
         dc.b    'MUSIC'
 Profile:
-        dc.b    0                               ; PF_ bits
+        dc.b    1<<PF_EVERY                     ; PF_ bits: every machine draws every frame now (the
+                                                ; scroller has no redraw to wait for)
         even
 MusicPlayerPtr:
         dc.l    MUSIC_PLAYER                    ; the sound driver's entry (LoadSound)

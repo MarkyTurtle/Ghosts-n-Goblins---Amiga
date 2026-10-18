@@ -79,7 +79,9 @@ def main(frames=3000, seed=1, png=None, level=None, teleport=0, build='512k', pa
         if (a == b).all(): same += 1
         else:
             differ += 1
-            if len(first_diffs) < 10:
+            if os.environ.get('DIFF_LOG') and so['g_GameState'] != 1:
+                print(f'  play diff frame {f}: {int((a != b).sum())} px, state {so["g_GameState"]}/{so["g_SubState"]}', flush=True)
+            if len(first_diffs) < 10 or (png and so['g_GameState'] == 0 and so['g_SubState'] == 2):
                 first_diffs.append((f, int((a != b).sum()), so))
                 if png:
                     os.makedirs(png, exist_ok=True)

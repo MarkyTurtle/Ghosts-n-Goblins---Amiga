@@ -629,6 +629,7 @@ PD_PathPos          	equ	$24	; position in the current PetiteDevilPath list
 PD_PathSeg          	equ	$28	; current path segment
 
 ; ---- One program for every machine (enhanced branch) ----------------------------------
+BUILD_ONE           	equ	1	; (scroll.s: absolute addresses, BOB drawing chosen at run time)
 MACHINE_INFO        	equ	$7FB00	; the bootblock's machine description (32 bytes, 'GNGM'):
 MI_MAGIC            	equ	0	;   'GNGM'
 MI_CHIP_UPPER       	equ	12	;   end of chip RAM (+8 start, +12 end)

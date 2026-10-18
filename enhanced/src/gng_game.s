@@ -4414,6 +4414,7 @@ l_05D24:
         move.b  (a0)+,(a1)+                     ; 05D24/05D4C
         dbra    d0,l_05D24                      ; 05D26/05D4E
         bsr.w   LoadSound                       ; the 512K effects package, or the 1MB music package
+        jsr     EnhInit                         ; the scroller's records (and the machine description)
         lea.l   FileCopyrightScreen(pc),a1      ; 05D32/05D88
         bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68
         btst    #PF_CACHE,(Profile).l           ; the 1MB program loads level 0 here, so the title
@@ -4530,7 +4531,7 @@ IdleLoop:
 ; (kept as bytes: the code is only reached through the patched return address)
 ;---------------------------------------------------------------------------
 RedrawEntry:
-        bsr.w   RedrawScreen                    ; 05EAC/05F02  the redraw VblIRQ asked for (user mode)
+        jsr     EnhRedrawBackground             ; nothing to redraw: the scroller keeps the buffers current
         clr.b   g_SkipLogic(a6)                 ; 05EB0/05F06  let the logic run again
         bra.b   *                               ; 05EB4/05F0A  idle until the next interrupt
 
@@ -4545,7 +4546,11 @@ RedrawEntry:
 ; ==================================================================
 ;---------------------------------------------------------------------------
 Level1Logic:
+	ifd	RASTER_BUILD
+        jsr     EnhLogicStart                   ; timing build: (does the INTREQ write) grey
+	else
         move.w  #INTF_SOFTINT,CUSTOM+INTREQ     ; 05EB6/05F0C
+	endc
         movem.l d0-d7/a0-a5,-(a7)               ; 05EBE/05F14
         move.b  g_GameState(a6),d0              ; 05EC2/05F18
         ext.w   d0                              ; 05EC6/05F1C
@@ -4568,6 +4573,7 @@ AttractTitle:
         clr.w   g_RawKey(a6)                    ; 05EE8/05F3E
         bsr.w   SwapScreens                     ; 05EEC/05F42
         bsr.w   DrawCreditsScreen               ; 05EF0/05F46
+        jsr     EnhShowMachine                  ; and the memory the bootblock found
         clr.b   g_ArthurVisible(a6)             ; 05EF4/05F4A
         clr.b   g_Spr47Visible(a6)              ; 05EF8/05F4E
         bsr.w   ArthurSpritePos                 ; 05EFC/05F52
@@ -5749,6 +5755,9 @@ l_06B4A:
 ; Common exit: restore registers and RTE
 ;---------------------------------------------------------------------------
 LogicExit:
+	ifd	RASTER_BUILD
+        jmp     EnhLogicEnd                     ; timing build: black, then this
+	endc
         movem.l (a7)+,d0-d7/a0-a5               ; 06BF2/06C50
         rte                                     ; 06BF6/06C54
 
@@ -6464,6 +6473,9 @@ l_071BA:
 l_071DC:
         move.w  g_VblCount(a6),g_FrameStamp(a6) ; 071DC/07244  frame done
         addq.w  #$1,g_GameFrame(a6)             ; 071E2/0724A
+	ifd	RASTER_BUILD
+        jmp     EnhLogicEnd                     
+	endc
         movem.l (a7)+,d0-d7/a0-a5               ; 071E6/0724E
         rte                                     ; 071EA/07252
 
@@ -7038,6 +7050,7 @@ ProgressMap_Wait:
 ; Write bitplane pointers + BPLCON1 fine scroll into the back copper list
 ;---------------------------------------------------------------------------
 SetBitplanePtrs:
+        jmp     EnhSetBitplanePtrs              ; the scroller
         move.l  g_ScreenFront(a6),d2            ; 0789A/078FA  front screen
         move.w  g_ScrollFineX(a6),d0            ; 0789E/078FE  + the scroll in words
         subq.w  #$1,d0                          ; 078A2/07902
@@ -7651,8 +7664,8 @@ FileMusic1M:
 ; One program for every machine (enhanced branch)
 ; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
-; (MACHINE_INFO). With 1MB or more of chip RAM: PF_CACHE, PF_MUSIC, PF_EVERY - the 1MB
-; program's features. Without a description (the original bootblock) or with less chip RAM:
+; (MACHINE_INFO). With 1MB or more of chip RAM: PF_CACHE, PF_MUSIC - the 1MB program's
+; features (PF_EVERY, drawing every frame, is set for every machine). Without a description (the original bootblock) or with less chip RAM:
 ; none, the 512K program. Also the two texts the 1MB program has its own way: the credit line
 ; ('MUSIC' for 'SOUND') and the initials stored for a blank name ('501' for '504').
 ;---------------------------------------------------------------------------
@@ -7675,7 +7688,8 @@ rp_done:
 TxtMusic:
         dc.b    'MUSIC'
 Profile:
-        dc.b    0                               ; PF_ bits
+        dc.b    1<<PF_EVERY                     ; PF_ bits: every machine draws every frame now (the
+                                                ; scroller has no redraw to wait for)
         even
 MusicPlayerPtr:
         dc.l    MUSIC_PLAYER                    ; the sound driver's entry (LoadSound)
@@ -7783,6 +7797,8 @@ cg_longs:
         dbra    d0,cg_longs
         rts
 
+	include	"scroller.s"
+
 
 ;---------------------------------------------------------------------------
 ; Switch to the screen RedrawScreen has just drawn at g_NewTileX/Y: the pending
@@ -7790,6 +7806,7 @@ cg_longs:
 ; are rotated (falls into SwapScreens)
 ;---------------------------------------------------------------------------
 CameraJump:
+        jmp     EnhCameraJump                   ; the scroller: the same fine-scroll rules, no buffers to rotate
         move.w  g_PendFineX(a6),d0              ; 08046/0809C
         move.w  d0,g_CamDeltaX(a6)              ; 0804A/080A0
         cmp.w   #$f,d0                          ; 0804E/080A4
@@ -7821,6 +7838,7 @@ l_0807E:
 ; the spares for the next redraw. Both restore lists are emptied.
 ;---------------------------------------------------------------------------
 SwapScreens:
+        jmp     EnhSwapScreens                  ; the scroller
         move.w  g_NewTileX(a6),g_ScrollTileX(a6); 08082/080D8
         move.w  g_NewTileY(a6),g_ScrollTileY(a6); 08088/080DE
         movea.l g_ScreenBack(a6),a1             ; 0808E/080E4
@@ -7849,6 +7867,7 @@ SwapScreens:
 ; save areas, restore lists and save pointers for the next frame
 ;---------------------------------------------------------------------------
 ShowBackBuffer:
+        jmp     EnhShowBackBuffer               ; the scroller
         lea.l   CUSTOM,a0                       ; 080DC/08132
         movea.l g_CopperBack(a6),a1             ; 080E2/08138
         move.l  g_CopperFront(a6),g_CopperBack(a6); 080E6/0813C
@@ -12794,6 +12813,7 @@ PrintChar:
         lea.l   (CLEAR_AREA).l,a1               ; 0B0CE/0B13A
         bra.b   l_0B0E2                         ; 0B0D4/0B140
 l_0B0D6:
+        jmp     EnhPrintField                   ; playfield text: through the scroller (the ring needs the lines copied)
         movea.l g_ScreenFront(a6),a1            ; 0B0D6/0B142
         moveq   #-16,d0                         ; 0B0DA/0B146
         add.w   g_ScrollFineY(a6),d0            ; 0B0DC/0B148
@@ -13640,6 +13660,7 @@ TxtInitial:
 ; back (A->D blits) from the restore list, then reset the list
 ;---------------------------------------------------------------------------
 RestoreBackground:
+        jmp     EnhRestoreBackground            ; the scroller
         movea.l g_RestoreListA(a6),a5           ; 0B9EC/0BA58
         tst.w   (a5)                            ; 0B9F0/0BA5C
         beq.b   l_0BA3C                         ; 0B9F2/0BA5E
@@ -13678,6 +13699,7 @@ l_0BA3C:
 ; and the first queued ends up on top. g_SavePtr restarts at g_SaveBufA.
 ;---------------------------------------------------------------------------
 DrawBobs:
+        jmp     EnhDrawBobs                     ; the scroller
         move.l  g_SaveBufA(a6),g_SavePtr(a6)    ; 0BA3E/0BAAA  rewind the save area
         movea.l g_BlitListPtr(a6),a3            ; 0BA44/0BAB0  walk the draw list up to its top
         lea.l   g_SaveBufA(a6),a5               ; 0BA48/0BAB4
@@ -14355,6 +14377,7 @@ l_0BFD8:
 ; during set-up.
 ;---------------------------------------------------------------------------
 RedrawScreen:
+        jmp     EnhRedrawScreen                 ; the scroller: draw the pristine buffer
         movea.l g_ScreenSpare1(a6),a1           ; 0BFDE/0BF72
         adda.l  #$a8c0,a1                       ; 0BFE2/0BF76  start at the bottom row: 240 lines down
         lea.l   CUSTOM+INTENA,a2                ; 0BFE8/0BF7C
@@ -14529,7 +14552,7 @@ ObjectMapCollide:
 l_0C1A4:
         move.w  O_X(a5),d6                      ; 0C1A4/0C138
         move.w  O_Y(a5),d7                      ; 0C1A8/0C13C
-        lea.l   BoxSizeTable(pc),a1             ; 0C1AC/0C140
+        lea.l   (BoxSizeTable).l,a1             ; 0C1AC/0C140
         clr.w   d0                              ; 0C1B0/0C144
         move.b  O_Size(a5),d0                   ; 0C1B2/0C146
         add.w   d0,d0                           ; 0C1B6/0C14A
@@ -14582,7 +14605,7 @@ l_0C202:
         beq.w   l_0C442                         ; 0C206/0C19A
         cmpi.b  #$1,O_Type(a5)                  ; 0C20A/0C19E
         bne.w   l_0C442                         ; 0C210/0C1A4
-        lea.l   ItemBoxSizes(pc),a1             ; 0C214/0C1A8  image and size from ItemBoxSizes / SmallBobSizes
+        lea.l   (ItemBoxSizes).l,a1             ; 0C214/0C1A8  image and size from ItemBoxSizes / SmallBobSizes
         moveq   #-16,d1                         ; 0C218/0C1AC
         add.w   O_X(a5),d1                      ; 0C21A/0C1AE
         moveq   #$10,d2                         ; 0C21E/0C1B2
@@ -14798,7 +14821,7 @@ l_0C202_m:
         beq.w   l_0C442_m                         ; 0C206/0C19A
         cmpi.b  #$1,O_Type(a5)                  ; 0C20A/0C19E
         bne.w   l_0C442_m                         ; 0C210/0C1A4
-        lea.l   ItemBoxSizes(pc),a1             ; 0C214/0C1A8  image and size from ItemBoxSizes / SmallBobSizes
+        lea.l   (ItemBoxSizes).l,a1             ; 0C214/0C1A8  image and size from ItemBoxSizes / SmallBobSizes
         moveq   #-16,d1                         ; 0C218/0C1AC
         add.w   O_X(a5),d1                      ; 0C21A/0C1AE
         moveq   #$10,d2                         ; 0C21E/0C1B2

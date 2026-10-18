@@ -1,7 +1,11 @@
 """Build the one program for every machine (src/gng_game.s) and the sound packages it loads.
 
   cd enhanced/tools
-  VASM=/path/to/vasmm68k_mot python3 build_game.py
+  VASM=/path/to/vasmm68k_mot python3 build_game.py [--raster]
+
+--raster: the timing build (RASTER_BUILD): the background colour shows which part of each frame
+is running (grey logic, red new edges / restore, orange text, blue BOBs, yellow copper list,
+green waiting for line $44, black idle); build/game_raster/, build/gng_game_raster.adf
 
 Writes enhanced/build/game/:
   game.bin, game.lst   the main program (loaded to $80 on every machine)
@@ -19,7 +23,8 @@ import os, re, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENH = os.path.join(HERE, '..')
 ROOT = os.path.join(ENH, '..')
-OUT = os.path.join(ENH, 'build', 'game')
+RASTER = '--raster' in sys.argv
+OUT = os.path.join(ENH, 'build', 'game_raster' if RASTER else 'game')
 VASM = os.environ.get('VASM', 'vasmm68k_mot')
 TRACK_SFX, TRACK_MUSIC = 126, 64
 MAIN_TRACK = 134                         # tracks no file of the original disk uses
@@ -48,6 +53,14 @@ def build(extra_defs=()):
     vasm(os.path.join(ROOT, 'sound', 'gng_sfx_512k.s'), sfx, defs=(('SND_ORG', syms['MUSIC_FILE']),))
     vasm(os.path.join(ROOT, 'sound', 'gng_music_1mb.s'), music, defs=(('SND_ORG', syms['MUSIC1M_FILE']),))
     end = 0x80 + os.path.getsize(prog)
+    # layout checks the assembler cannot make where the symbols are defined (the map moves with
+    # the program, so it is only known at the end)
+    checks = [('the program file runs past the globals block?', end <= syms['GlobalsBlock'] + 0x1780),
+              ('the scroller code is inside the program file', syms['ScrDrawBob'] < syms['GlobalsBlock']),
+              ("the scroller's buffers end before its storage", syms['SCREEN_0'] + 3 * 47120 <= syms['SCROLL_STORE']),
+              ("the scroller's storage ends before the HUD area", syms['ScrollStoreEnd'] <= syms['CLEAR_AREA'])]
+    for what, ok in checks:
+        if not ok: sys.exit('layout: ' + what + ' - no')
     print(f'game.bin {os.path.getsize(prog):,} bytes ($80-${end:X}); globals ${syms["GlobalsBlock"]:X}, '
           f'memory map from ${syms["MAP_LOW"]:X} (screens ${syms["SCREEN_0"]:X}, level file ${syms["LEVEL_FILE"]:X}); '
           f'effects package for ${syms["MUSIC_FILE"]:X}, music package for ${syms["MUSIC1M_FILE"]:X}')
@@ -74,7 +87,7 @@ def bootblock(length):
 def make_disk(prog, sound):
     import build_enh
     boot, bootbytes = bootblock(os.path.getsize(prog))
-    adf = os.path.abspath(os.path.join(OUT, '..', 'gng_game.adf'))
+    adf = os.path.abspath(os.path.join(OUT, '..', 'gng_game_raster.adf' if RASTER else 'gng_game.adf'))
     args = [sys.executable, os.path.join('tools', 'disk', 'mkdisk.py'), '-o', adf, '--boot', os.path.abspath(boot),
             '--one', os.path.abspath(prog), '--file', f'{TRACK_SFX}={os.path.abspath(sound[TRACK_SFX])}',
             '--add', f'{TRACK_MUSIC}={os.path.abspath(sound[TRACK_MUSIC])}']
@@ -86,5 +99,5 @@ def make_disk(prog, sound):
 
 
 if __name__ == '__main__':
-    prog, lst, sound, syms = build()
+    prog, lst, sound, syms = build((('RASTER_BUILD', 1),) if RASTER else ())
     make_disk(prog, sound)

@@ -70,7 +70,9 @@ class GameRun(Amiga):
         self.L = L = labels(build, listing)
         self.entry, self.idle = L['ProgramEntry'], L['IdleLoop']
         self.copyright_wait = L[copyright_wait(build)]
-        self.redraw_entry, self.redraw_idle = L['RedrawEntry'], L['RedrawEntry'] + 8
+        self.redraw_entry = L['RedrawEntry']           # ... and its idle loop (bra.b *): the first $60FE
+        o = self.redraw_entry - cfg['load']
+        self.redraw_idle = self.redraw_entry + next(i for i in range(0, 32, 2) if prog[o+i:o+i+2] == b'\x60\xfe')
         self.vbl, self.level1 = L['VblIRQ'], L['Level1Logic']
         self.palette_addr = L['GamePalette']
         eq = equates(os.path.join(ROOT, cfg['equates']), build != '512k')
