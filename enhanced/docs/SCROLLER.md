@@ -387,10 +387,17 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
    PlayFrame only sets the camera and draws on odd frames (`btst #0,g_GameFrame+1` at `$6E76`),
    so the display runs at 25 fps in both builds; the original's redraws ran in the background
    between those frames and only showed when they made the logic freeze.
-   * **Raster-time build:** set COLOR00 at the start / end of the logic, the camera, the restore,
-     the BOB drawing and the scroller (both builds), to see in WinUAE how much of each frame is
-     used and what headroom the scroller left.
-   * **Draw every frame (50 fps):** drop the odd-frame test so the camera and drawing run every
+   * **Raster-time build:** done (`--raster`, see *Timing build*). First WinUAE results: the
+     pauses seen with the 1MB program were WinUAE in full-screen mode (none in a window). On an
+     A1200 configuration a frame's work takes about half a frame; on an A500 it does not always
+     fit in one frame at the 1MB program's 50 fps. In the A500 screenshot the BOBs (blue) are the
+     biggest drawing stage, then the restore and new edges (red); the CPU waits for the blitter
+     through both.
+   * **Let the CPU work while the blitter does:** today every blit is set up after waiting for
+     the one before, so the CPU idles through the red and blue bands. A queue of blits fed by
+     the blitter-finished interrupt (or the logic of the next objects running between blits)
+     would overlap the two.
+   * **Draw every frame (50 fps) on the 512K program:** drop the odd-frame test so the camera and drawing run every
      frame. Needs the whole frame (logic + restore + BOBs + new edges) to fit in one 20 ms frame;
      if it does not, VblIRQ already skips the next logic run (it sees IPL 1 still running), which
      would slow the game down rather than tear. The raster-time build shows whether it fits; an
