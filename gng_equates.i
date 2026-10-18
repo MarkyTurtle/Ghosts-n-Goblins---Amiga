@@ -246,8 +246,8 @@ VEC_LEVEL3          	equ	$0006C
 SCREEN_0            	equ	$00080	; also load address of the big graphics file (tracks 38-56) before unpacking [512K: $37468] (chip RAM)
 SCREEN_1            	equ	$0B480	; chip RAM
 SCREEN_2            	equ	$16880	; [512K: $4DC68] (chip RAM)
-GLOBALS             	equ	$1893A	; offset from g_BaseAddr [512K: absolute $1898C]
-GLOBALS_P2          	equ	$1894A	; player-2 view of the per-player block (GLOBALS+$10) [512K: $1899C]
+GLOBALS             	equ	GlobalsBlock	; offset from g_BaseAddr ($1893A) [512K: absolute $1898C]
+GLOBALS_P2          	equ	GLOBALS+$10	; player-2 view of the per-player block [512K: $1899C]
 MASK_BUF            	equ	$1A0C6	; byte-plane extracted from file at tracks 61 [512K: $28234]
 ARTHUR_SPR_GFX      	equ	$1ACE6	; Arthur hardware-sprite frames, 4 planes x $2880 apart, $80 bytes/frame [512K: $1DE34]
 SPR_GFX_B0          	equ	$1C1E6	; [512K: $1F334]
@@ -284,48 +284,61 @@ ITEM_GFX_BUF        	equ	$30D7C	; chip RAM: masked item graphics
 ITEM_GFX2_BUF       	equ	$34300	; chip RAM: masked item graphics 2
 MUSIC_FILE          	equ	$3604C	; chip RAM: 111KB music package (tracks 64-81)
 MUSIC_PLAYER        	equ	$3606C	; music driver entry
+SAVE_BUF_A          	equ	$513E0	; background save area A ($3000 bytes; g_SaveBufA)
+SAVE_BUF_B          	equ	$543E0	; background save area B
+LEVEL_FILE          	equ	$573E0	; per-level data file load address (tracks 84-109)
+MFM_BUFFER          	equ	$7C000	; raw track buffer for LoadFile ($1900 words)
 BOB_GFX_A           	equ	$60EC6	; file tracks 37 / 62-63 load address [512K: $311E8]
 	else
-GLOBALS             	equ	$1898C	; a6 points here for the whole game (variables block)
-GLOBALS_P2          	equ	$1899C	; player-2 view of the per-player block (GLOBALS+$10)
-COPPER_INIT         	equ	$1A118	; copper list template ($180 bytes copied from CopperTemplate)
-COPPER_A1           	equ	$1A190
-COPPER_A2           	equ	$1A1C0
-COPPER_B1           	equ	$1A1F0
-COPPER_B2           	equ	$1A220
-COPPER_MAP          	equ	$1A250	; copper list used by the between-level progress map
-ARTHUR_SPR_GFX      	equ	$1DE34	; Arthur hardware-sprite frames, 4 planes x $2880 apart, $80 bytes/frame
-SPR_GFX_B0          	equ	$1F334
-SPR_GFX_A1          	equ	$20734
-SPR_GFX_B1          	equ	$21C34
-SPR_GFX_A2          	equ	$23034
-SPR_GFX_B2          	equ	$24534
-SPR_GFX_A3          	equ	$25934
-SPR_GFX_B3          	equ	$26E34
-MASK_BUF            	equ	$28234	; byte-plane extracted from file at tracks 61
-MUSIC_FILE          	equ	$28E54	; sound driver + 30 effects (tracks 126-131) - source: sound/gng_sfx_512k.s
-MUSIC_PLAYER        	equ	$28E74	; driver entry: d0.l = arg<<16 | cmd (0 tick, 1 tune, 2 sfx, 3 user value)
-SPRITE0_DATA        	equ	$30BB8
-SPRITE4_DATA        	equ	$30C3C
-SPRITE1_DATA        	equ	$30C78
-SPRITE5_DATA        	equ	$30CFC
-SPRITE2_DATA        	equ	$30D38
-SPRITE6_DATA        	equ	$30DBC
-SPRITE3_DATA        	equ	$30DF8
-SPRITE7_DATA        	equ	$30E7C
-SPRITE4B_DATA       	equ	$30EB8	; second HUD sprite block (sprite reused lower down)
-SPRITE5B_DATA       	equ	$30F84
-SPRITE6B_DATA       	equ	$31050
-SPRITE7B_DATA       	equ	$3111C
-BOB_GFX_A           	equ	$311E8	; file tracks 37 / 62-63 load address
-MFM_BUFFER          	equ	$33FE8	; raw track buffer for LoadFile ($1900 words)
-BOB_GFX_B           	equ	$341E8
-SCREEN_0            	equ	$37468	; also load address of the big graphics file (tracks 38-56) before unpacking
-SCREEN_1            	equ	$42868
-SCREEN_2            	equ	$4DC68
-SCREEN_3            	equ	$59068
-CLEAR_AREA          	equ	$64468
-LEVEL_FILE          	equ	$65548	; per-level data file load address (tracks 84-109)
+GLOBALS             	equ	GlobalsBlock	; a6 points here for the whole game (variables block; $1898C)
+GLOBALS_P2          	equ	GLOBALS+$10	; player-2 view of the per-player block ($1899C)
+GLOBALS_SIZE        	equ	$178C	; the globals block and the object slots
+MAP_LOW             	equ	GLOBALS+GLOBALS_SIZE	; ($1A118) the memory map below starts here, right after
+                    			; the globals, so it moves with the program
+COPPER_INIT         	equ	MAP_LOW+$00000	; $1A118: copper list template ($180 bytes copied from CopperTemplate)
+COPPER_A1           	equ	MAP_LOW+$00078	; $1A190
+COPPER_A2           	equ	MAP_LOW+$000A8	; $1A1C0
+COPPER_B1           	equ	MAP_LOW+$000D8	; $1A1F0
+COPPER_B2           	equ	MAP_LOW+$00108	; $1A220
+COPPER_MAP          	equ	MAP_LOW+$00138	; $1A250: copper list used by the between-level progress map
+ARTHUR_SPR_GFX      	equ	MAP_LOW+$03D1C	; $1DE34: Arthur hardware-sprite frames, 4 planes x $2880 apart, $80 bytes/frame
+SPR_GFX_B0          	equ	MAP_LOW+$0521C	; $1F334
+SPR_GFX_A1          	equ	MAP_LOW+$0661C	; $20734
+SPR_GFX_B1          	equ	MAP_LOW+$07B1C	; $21C34
+SPR_GFX_A2          	equ	MAP_LOW+$08F1C	; $23034
+SPR_GFX_B2          	equ	MAP_LOW+$0A41C	; $24534
+SPR_GFX_A3          	equ	MAP_LOW+$0B81C	; $25934
+SPR_GFX_B3          	equ	MAP_LOW+$0CD1C	; $26E34
+MASK_BUF            	equ	MAP_LOW+$0E11C	; $28234: byte-plane extracted from file at tracks 61
+MUSIC_FILE          	equ	MAP_LOW+$0ED3C	; $28E54: sound driver + 30 effects (tracks 126-131) - source: sound/gng_sfx_512k.s
+MUSIC_PLAYER        	equ	MAP_LOW+$0ED5C	; $28E74: driver entry: d0.l = arg<<16 | cmd (0 tick, 1 tune, 2 sfx, 3 user value)
+SPRITE0_DATA        	equ	MAP_LOW+$16AA0	; $30BB8
+SPRITE4_DATA        	equ	MAP_LOW+$16B24	; $30C3C
+SPRITE1_DATA        	equ	MAP_LOW+$16B60	; $30C78
+SPRITE5_DATA        	equ	MAP_LOW+$16BE4	; $30CFC
+SPRITE2_DATA        	equ	MAP_LOW+$16C20	; $30D38
+SPRITE6_DATA        	equ	MAP_LOW+$16CA4	; $30DBC
+SPRITE3_DATA        	equ	MAP_LOW+$16CE0	; $30DF8
+SPRITE7_DATA        	equ	MAP_LOW+$16D64	; $30E7C
+SPRITE4B_DATA       	equ	MAP_LOW+$16DA0	; $30EB8: second HUD sprite block (sprite reused lower down)
+SPRITE5B_DATA       	equ	MAP_LOW+$16E6C	; $30F84
+SPRITE6B_DATA       	equ	MAP_LOW+$16F38	; $31050
+SPRITE7B_DATA       	equ	MAP_LOW+$17004	; $3111C
+BOB_GFX_A           	equ	MAP_LOW+$170D0	; $311E8: file tracks 37 / 62-63 load address
+MFM_BUFFER          	equ	MAP_LOW+$19ED0	; $33FE8: raw track buffer for LoadFile ($1900 words)
+BOB_GFX_B           	equ	MAP_LOW+$1A0D0	; $341E8
+SCREEN_0            	equ	MAP_LOW+$1D350	; $37468: also load address of the big graphics file (tracks 38-56) before unpacking
+SCREEN_1            	equ	MAP_LOW+$28750	; $42868
+SCREEN_2            	equ	MAP_LOW+$33B50	; $4DC68
+SCREEN_3            	equ	MAP_LOW+$3EF50	; $59068
+CLEAR_AREA          	equ	MAP_LOW+$4A350	; $64468
+LEVEL_FILE          	equ	MAP_LOW+$4B430	; $65548: per-level data file load address (tracks 84-109)
+ESHOT_GFX_BUF       	equ	MAP_LOW+$00180	; $1A298: enemy projectile graphics (file track 58)
+ITEM_GFX_BUF        	equ	MAP_LOW+$013B4	; $1B4CC: item and explosion graphics (file track 59)
+ITEM_GFX2_BUF       	equ	MAP_LOW+$02E76	; $1CF8E: item graphics 2 (file track 57)
+SAVE_BUF_A          	equ	MAP_LOW+$170D0	; $311E8: background save area A ($3000 bytes; g_SaveBufA) - also BOB_GFX_A
+SAVE_BUF_B          	equ	MAP_LOW+$1A0D0	; $341E8: background save area B - also BOB_GFX_B
+MASK_LINE_BUF       	equ	MAP_LOW+$1D0D0	; $371E8: DrawBob: the mask built for one BOB (512K build; 640 bytes)
 	endc
 
 ; ---- Global variables: offsets from a6 (GLOBALS = $1898C) ----

@@ -197,7 +197,11 @@ PORTA_OFF macro
 	dc.b	$6B
 	endm
 
+	ifd	SND_ORG	; (assembled for another address: -DSND_ORG=...)
+	org	SND_ORG
+	else
 	org	$28E54
+	endc
 
 HunkHeader:
         dc.l    $000003F3                   ; 00000  HUNK_HEADER

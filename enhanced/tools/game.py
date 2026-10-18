@@ -32,10 +32,11 @@ EQ = equates()
 G = {k: GLOBALS+v for k, v in EQ.items() if k.startswith('g_')}      # (512K; GameRun.G per build)
 
 
-def labels(build):
-    """label -> address in memory, from the listing build_enh.py made of the original source"""
+def labels(build, listing=None):
+    """label -> address in memory, from the listing build_enh.py made of the original source
+    (or the given listing)"""
     cfg = BUILDS[build]
-    text = open(os.path.join(BUILD, build, 'orig_main.lst')).read()
+    text = open(listing or os.path.join(BUILD, build, 'orig_main.lst')).read()
     part = text[text.index('Symbols by name:'):text.index('Symbols by value:')]
     return {m.group(1): cfg['base'] + int(m.group(2), 16)
             for m in re.finditer(r'^(\S+)\s+A:([0-9A-F]+)$', part, re.M)}
@@ -52,7 +53,7 @@ def copyright_wait(build):
 class GameRun(Amiga):
     """build: '512k' or '1mb'; binfile: the main program (default: the original); extra_files:
     {track: path} for files LoadFile reads that are not in disk/files (the modules)"""
-    def __init__(self, binfile=None, extra_files=None, build='512k', machine=None):
+    def __init__(self, binfile=None, extra_files=None, build='512k', machine=None, listing=None):
         cfg = self.cfg = BUILDS[build]
         super().__init__(os.path.join(ROOT, BUILDS['512k']['orig']))
         if build != '512k':
@@ -65,17 +66,18 @@ class GameRun(Amiga):
         if machine:                            # the enhanced bootblock's machine description:
             import test_bootinfo                # its own code, run on a fake exec memory list
             self.u.mem_write(test_bootinfo.MACHINE_INFO, test_bootinfo.run(*machine))
-        self.L = L = labels(build)
+        self.L = L = labels(build, listing)
         self.entry, self.idle = L['ProgramEntry'], L['IdleLoop']
         self.copyright_wait = L[copyright_wait(build)]
         self.redraw_entry, self.redraw_idle = L['RedrawEntry'], L['RedrawEntry'] + 8
         self.vbl, self.level1 = L['VblIRQ'], L['Level1Logic']
         self.palette_addr = L['GamePalette']
         eq = equates(os.path.join(ROOT, cfg['equates']), build != '512k')
-        self.globals = cfg['globals']
-        self.G = {k: cfg['globals'] + v for k, v in eq.items() if k.startswith('g_')}
-        orig = open(os.path.join(ROOT, cfg['orig']), 'rb').read()   # RTEs: same places in both programs
-        rtes = [cfg['load'] + i for i in range(0, len(orig) - 1, 2) if orig[i:i+2] == b'\x4e\x73']
+        # the globals: where the listing puts them (a program that has moved), else the build's
+        self.globals = L['GlobalsBlock'] if listing and 'GlobalsBlock' in L else cfg['globals']
+        self.G = {k: self.globals + v for k, v in eq.items() if k.startswith('g_')}
+        # every RTE in the program loaded (a hook on a data word that looks like one is harmless)
+        rtes = [cfg['load'] + i for i in range(0, len(prog) - 1, 2) if prog[i:i+2] == b'\x4e\x73']
         self.extra = extra_files or {}
         self.u.mem_map(0xFFFF0000, 0x10000)    # the game sometimes reads a little below 0 (MapTileAt
                                                # with a map byte >= $80); on the Amiga's 24-bit bus that

@@ -30,14 +30,19 @@ def state(m):
     return s
 
 
-def main(frames=3000, seed=1, png=None, level=None, teleport=0, build='512k'):
-    orig = GameRun(build=build)
-    if build == '512k':
+def main(frames=3000, seed=1, png=None, level=None, teleport=0, build='512k', pair=None, raw=True):
+    """pair: (reference, tested) machines to compare as they are, instead of the original and
+    the enhanced build; raw: also compare the camera tables byte for byte (not when the two
+    programs are at different addresses: the tables hold pointers)"""
+    if pair:
+        orig, enh = pair
+    else:
+        orig, enh = GameRun(build=build), enhanced(build)
+    if build == '512k' and not pair:
         orig.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))  # DrawBob top-clip fix (the 1MB build is right)
         orig.u.mem_write(0xC2EA, bytes.fromhex('c4c6'))  # and in DrawSceneryOnRedraw
         orig.u.mem_write(0x6E76, bytes.fromhex('4e71'*5))  # draw every frame, as the enhanced 512K build
                                                            # (src/fps50_patches.s) and the 1MB program
-    enh = enhanced(build)
     for m in (orig, enh): m.boot()
     inputs = list(script_start()); play = play_script(seed)
     same = differ = 0; diverged = None; t = time.time()
@@ -59,7 +64,7 @@ def main(frames=3000, seed=1, png=None, level=None, teleport=0, build='512k'):
             x, y = trnd.randrange(32, max(33, w + 200)), trnd.randrange(40, max(41, h + 200))
             for m in (orig, enh): m.w16(m.G['g_ArthurX'], x); m.w16(m.G['g_ArthurY'], y)
         so, se = state(orig), state(enh)
-        if so != se or orig.rd(orig.G['g_CamMinY'], 0x60) != enh.rd(enh.G['g_CamMinY'], 0x60):
+        if so != se or (raw and orig.rd(orig.G['g_CamMinY'], 0x60) != enh.rd(enh.G['g_CamMinY'], 0x60)):
             diverged = (f, so, se); break
         states.add((so['g_GameState'], so['g_SubState'])); levels.add(so['g_Level'])
         a, b = orig.render(), enh.render()
