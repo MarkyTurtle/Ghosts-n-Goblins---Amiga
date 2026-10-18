@@ -56,7 +56,8 @@ class GameRun(Amiga):
     def __init__(self, binfile=None, extra_files=None, build='512k', machine=None, listing=None):
         cfg = self.cfg = BUILDS[build]
         super().__init__(os.path.join(ROOT, BUILDS['512k']['orig']))
-        if build != '512k':
+        big = machine and any(end > 0x80000 and attr & 2 for attr, start, end in machine[0])
+        if build != '512k' or big:
             self.u.mem_map(0x80000, 0x80000)                  # 1MB of chip RAM
             self.u.mem_write(0, bytes(0x80000))
         self.u.mem_write(0, bytes(0x60))
@@ -157,6 +158,15 @@ class GameRun(Amiga):
 
 
 MODULE_TRACK = {'512k': 132, '1mb': 133}
+
+
+def game(machine=None):
+    """the one program for every machine (build_game.py), on a machine as in
+    test_bootinfo.MACHINES (regions, vblank, attnflags); None: no machine description"""
+    import build_game
+    d = build_game.OUT
+    files = {build_game.TRACK_SFX: os.path.join(d, 'sfx.bin'), build_game.TRACK_MUSIC: os.path.join(d, 'music.bin')}
+    return GameRun(os.path.join(d, 'game.bin'), files, '512k', machine, listing=os.path.join(d, 'game.lst'))
 
 
 def enhanced(build='512k', machine=None):

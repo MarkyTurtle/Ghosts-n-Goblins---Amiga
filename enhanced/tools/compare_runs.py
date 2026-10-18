@@ -47,7 +47,7 @@ def main(frames=3000, seed=1, png=None, level=None, teleport=0, build='512k', pa
     inputs = list(script_start()); play = play_script(seed)
     same = differ = 0; diverged = None; t = time.time()
     states = set(); levels = set(); first_diffs = []; ys = set()
-    started = False
+    started = playing = False
     import random; trnd = random.Random(seed)
     for f in range(frames):
         joy, fire = inputs[f] if f < len(inputs) else next(play)
@@ -64,7 +64,15 @@ def main(frames=3000, seed=1, png=None, level=None, teleport=0, build='512k', pa
             x, y = trnd.randrange(32, max(33, w + 200)), trnd.randrange(40, max(41, h + 200))
             for m in (orig, enh): m.w16(m.G['g_ArthurX'], x); m.w16(m.G['g_ArthurY'], y)
         so, se = state(orig), state(enh)
-        if so != se or (raw and orig.rd(orig.G['g_CamMinY'], 0x60) != enh.rd(enh.G['g_CamMinY'], 0x60)):
+        co, ce = so, se
+        if not raw and so['g_SubState'] == se['g_SubState'] == 2: playing = True
+        if not raw and not playing:      # Arthur is set up with the level (SetupLevel)
+            co, ce = ({k: v for k, v in x.items() if k not in ('g_ArthurX', 'g_ArthurY')} for x in (so, se))
+        if not raw and so['g_GameState'] == se['g_GameState'] == 1:
+            co = ce = None      # attract mode: programs with different file tails start with
+            # different junk in the globals the game has not set yet (Arthur, lives); until a
+            # game starts only the picture counts
+        if co != ce or (raw and orig.rd(orig.G['g_CamMinY'], 0x60) != enh.rd(enh.G['g_CamMinY'], 0x60)):
             diverged = (f, so, se); break
         states.add((so['g_GameState'], so['g_SubState'])); levels.add(so['g_Level'])
         a, b = orig.render(), enh.render()
