@@ -4382,14 +4382,14 @@ l_05CBC:
         move.l  (a1)+,(a5)+                     ; 05CC2/05C60
         dbra    d7,l_05CBC                      ; 05CC4/05C62
         lea.l   FileItemGfx2(pc),a1             ; 05CC8/05CAA
-        bsr.w   LoadFile                        ; 05CCC/05CAE  load file tracks 57    -> $1CF8E
+        jsr     (LoadFile).l                        ; 05CCC/05CAE  load file tracks 57    -> $1CF8E
         lea.l   FileEnemyShotGfx(pc),a1         ; 05CD0/05CC8
-        bsr.w   LoadFile                        ; 05CD4/05CCC  load file tracks 58    -> $1A298
+        jsr     (LoadFile).l                        ; 05CD4/05CCC  load file tracks 58    -> $1A298
         lea.l   FileItemGfx(pc),a1              ; 05CD8/05CE6
-        bsr.w   LoadFile                        ; 05CDC/05CEA  load file tracks 59-60 -> $1B4CC
+        jsr     (LoadFile).l                        ; 05CDC/05CEA  load file tracks 59-60 -> $1B4CC
         bsr.w   CacheGraphics                   ; 1MB+ chip: cache the graphics with masks, the progress map
         lea.l   FileFont(pc),a1                 ; 05CE0/05D04
-        bsr.w   LoadFile                        ; 05CE4/05D08  load file tracks 61    -> $37468 (font/mask source)
+        jsr     (LoadFile).l                        ; 05CE4/05D08  load file tracks 61    -> $37468 (font/mask source)
         lea.l   FileFont(pc),a1                 ; 05CE8/05D0C  the font: every other byte of the file (one plane pair) into MASK_BUF
         movea.l (a1),a1                         ; 05CEC/05D10
         lea.l   (MASK_BUF).l,a2                 ; 05CEE/05D12
@@ -4416,11 +4416,11 @@ l_05D24:
         bsr.w   LoadSound                       ; the 512K effects package, or the 1MB music package
         jsr     EnhInit                         ; the scroller's records (and the machine description)
         lea.l   FileCopyrightScreen(pc),a1      ; 05D32/05D88
-        bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68
+        jsr     (LoadFile).l                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68
         btst    #PF_CACHE,(Profile).l           ; the 1MB program loads level 0 here, so the title
         beq.b   st_lv0late                      ; shows the level behind it; the 512K one after InitHardware
         lea.l   FileLevel0(pc),a1               
-        bsr.w   LoadFile                        
+        jsr     (LoadFile).l                        
 st_lv0late:
         lea.l   CopperTemplate(pc),a0           ; 05D3A/05D98
         lea.l   (COPPER_INIT).l,a1              ; 05D3E/05D9C
@@ -4493,7 +4493,7 @@ l_05E08:
         btst    #PF_CACHE,(Profile).l           
         bne.b   l_05E36                         ; (loaded before)
         lea.l   FileLevel0(pc),a1               ; 05E2E/     
-        bsr.w   LoadFile                        ; 05E32/       load level-0 enemy graphics while the copyright screen shows
+        jsr     (LoadFile).l                        ; 05E32/       load level-0 enemy graphics while the copyright screen shows
 l_05E36:
         cmpi.w  #$1f4,g_VblCount(a6)            ; 05E36/05E8C  show the copyright warning for 500 VBLs (10 s)
         bcs.b   l_05E36                         ; 05E3C/05E92
@@ -14235,7 +14235,7 @@ VblIRQ:
         clr.l   (SPRITE7B_DATA).l               ; 0BE06/0BD96
         bra.b   l_0BE42                         ; 0BE0C/0BD9C
 l_0BE0E:
-        lea.l   HudSpriteCtl(pc),a1             ; 0BE0E/0BD9E
+        lea.l   (HudSpriteCtl).l,a1             ; 0BE0E/0BD9E
         move.l  (a1),(SPRITE4_DATA).l           ; 0BE12/0BDA2
         move.l  (a1)+,(SPRITE5_DATA).l          ; 0BE18/0BDA8
         move.l  (a1),(SPRITE6_DATA).l           ; 0BE1E/0BDAE

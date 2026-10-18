@@ -33,8 +33,9 @@
 ; ItemBoxSizes, SmallBobSizes and MASKBUF (a one-plane BOB mask, at most 64 x 80 pixels; 512K
 ; only). BUILD_1MB selects the 1MB build: its program tables are offsets from g_BaseAddr, and
 ; its BOB graphics carry their masks, so a BOB is one blit. BUILD_ONE (the one program for every
-; machine, gng_game.s): absolute addresses, and the BOB drawing is chosen at run time - masked
-; graphics (one blit) with PF_CACHE in Profile, the 512K way otherwise.
+; machine, gng_game.s): absolute addresses, and the BOB drawing is chosen per BOB at run time
+; (BobMaskFind, BobMasked): pre-masked graphics in one blit (PF_CACHE, or on 512K the images
+; BuildLevelMasks converted at level load), otherwise 5 blits with a one-plane mask.
 ;
 ; Calls (a6 = game globals, as everywhere in the game):
 ;   ScrFullDraw    a0 = buffer record, d0 = camera x, d1 = camera y
@@ -121,7 +122,7 @@ SCR_MASKED      equ     1
 GFXMUL          macro
                 ifd     BUILD_ONE
                 mulu.w  #10,\1
-                btst    #PF_CACHE,(Profile).l
+                tst.b   (BobMasked).l           ; this image pre-masked (BobMaskFind)?
                 beq.b   .gm\@
                 add.l   \1,\1                 ; masked graphics: twice the lines
 .gm\@:
@@ -569,7 +570,7 @@ ScrDrawBob:
                 add.w   d3,d6
                 lsr.w   #4,d6                   ; d6 = graphics words per plane line
                 ifd     BUILD_ONE
-                bsr.w   BobMaskFind             ; 512K: this image's one-plane mask, if made (scroller.s)
+                bsr.w   BobMaskFind             ; pre-masked (a1 to the masked copy) or its one-plane mask (scroller.s)
                 endif
                 ; ---- vertical clip
                 move.w  d2,d7
@@ -684,7 +685,7 @@ ScrDrawBob:
                 move.l  a3,buf_RList(a0)
 .nolist:        INTSOFF                         ; (the mask buffer is shared: no interruption)
                 ifd     BUILD_ONE
-                btst    #PF_CACHE,(Profile).l
+                tst.b   (BobMasked).l           ; pre-masked (the cache, or a converted set)?
                 beq.w   .p512
                 endif
                 ifd     SCR_MASKED

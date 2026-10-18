@@ -394,23 +394,46 @@ PrCopy:         movea.l DrawRec(pc),a3
                 rts
 
 ;------------------------------------------------------------------------------
-; One-plane BOB masks (512K profile). The 512K drawing used to build each BOB's mask with
-; two blits (the OR of its 5 planes) before its 5 cookie-cut blits; now the masks are made
-; once, at level load, for every image the level can draw: the level's BOB sets (copied
-; after the level file, region 2) and the item / weapon / shot graphics (ESHOT_GFX_BUF ..
-; the end of ITEM_GFX2_BUF, region 1). A mask line is the OR of an image line's 5 plane
-; lines, so a region's masks are a fifth of its size and an image's mask is at
-;     mask base + (graphics - region base) / 5.
-; With the cache (PF_CACHE) the graphics carry their own masks and none of this runs.
+; BOB graphics on 512K, made at level load (BuildLevelMasks) in the level data area:
+;  * pre-masked images, as the 1MB cache (BuildMaskedGfx: every plane line followed by its
+;    mask line), drawn in one blit: as many of the level's images as the memory up to
+;    LEVEL_GFX_LIMIT holds, chosen in the order of GfxPriority;
+;  * one-plane masks for the rest, drawn in 5 blits (the 2 blits that made the mask of
+;    every BOB, every frame, are gone). A mask line is the OR of an image line's 5 plane
+;    lines, so a region's masks are a fifth of its size and an image's mask is at
+;        mask base + (graphics - region base) / 5.
+; The game keeps its own image addresses (the frame tables are not changed): a converted
+; image's pointer (g_BobSets, g_SmallBobSets, EShotGfxPtr, ItemGfxPtr) is a key in
+; [KeyBase, KeyBase + KeyLen), and its masked copy is at KeyBase + 2 x (key - KeyBase), as
+; the 1MB program doubles its offsets. Layout from g_LevelFileEnd (= KeyBase):
+;    masked copies (2 x KeyLen) | the other sets' copies (region 2) | their masks |
+;    the masks of the items, weapons and shots (region 1, always made)
+; With the cache (PF_CACHE) every image is pre-masked and none of this runs.
 ;------------------------------------------------------------------------------
-ITEMS_GFX_LEN   equ     $1234+$1AC2+$EA6        ; shots, items, items 2: contiguous in memory
+ESHOT_LEN       equ     $1234                   ; enemy shots
+ITEM_LEN        equ     $1AC2+$EA6              ; items, weapons, effects (ITEM_GFX_BUF, ITEM_GFX2_BUF)
+ITEMS_GFX_LEN   equ     ESHOT_LEN+ITEM_LEN      ; region 1: contiguous in memory from ESHOT_GFX_BUF
+LEVEL_GFX_LIMIT equ     $7F4DE                  ; the level data's end in the original 512K program
 
-; BobMaskFind - ScrDrawBob, at the start: a1 = the image -> BobGfx = a1, BobMask = its mask
-; (0: none; the BOB is then drawn the old way). All registers kept.
+; BobMaskFind - ScrDrawBob, at the start: a1 = the image. Pre-masked (the cache, or a key of
+; a converted image): BobMasked set and a1 = the masked copy. Otherwise BobMasked clear,
+; BobGfx = a1 and BobMask = its one-plane mask (0: none; the BOB is then drawn the old way).
+; Other registers kept.
 BobMaskFind:    move.l  d0,-(a7)
+                btst    #PF_CACHE,(Profile).l
+                bne.b   .masked
+                move.l  a1,d0
+                sub.l   (KeyBase).l,d0          ; a converted image? (unsigned compare)
+                cmp.l   (KeyLen).l,d0
+                bcc.b   .plain
+                adda.l  d0,a1                   ; KeyBase + 2 x (key - KeyBase)
+.masked:        st.b    (BobMasked).l
+                move.l  (a7)+,d0
+                rts
+.plain:         sf.b    (BobMasked).l
                 move.l  a1,(BobGfx).l
                 move.l  a1,d0
-                sub.l   (MaskG2).l,d0           ; region 2: the level's sets
+                sub.l   (MaskG2).l,d0           ; region 2: the level's other sets
                 cmp.l   (MaskL2).l,d0           ; (unsigned: below the region is huge)
                 bcs.b   .r2
                 move.l  a1,d0
@@ -438,28 +461,189 @@ BobMaskFind:    move.l  d0,-(a7)
                 move.l  (a7)+,d0
                 rts
 
-; BuildLevelMasks - LoadLevel, after BuildFrameTable has copied the level's sets: a2 = the
-; end of the copies (they start at g_LevelFileEnd). The masks go after them: region 2's,
-; then region 1's.
+; GfxPriority - the order in which images are pre-masked while memory lasts: the enemy shots
+; (small, so the 4 blits saved are a large part of their cost), the small BOB sets, the
+; dragon (9 BOBs at once), the items / weapons / effects, then the other enemy sets,
+; smallest first. 0-20: enemy set, $20+n: small set n, $40: shots, $41: items; -1 ends.
+GfxPriority:    dc.b    $40,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,12,$41
+                dc.b    3,9,15,19,14,1,20,17,7,18,4,0,2,11,10,6,8,5,13,-1
+                even
+
+; BuildLevelMasks - LoadLevel, after BuildFrameTable (whose copies of the level's sets are
+; replaced: every set of the level is marked 1 until it is placed): the sets are taken again from the files still in memory (enemy sets at
+; SCREEN_0, small sets at BOB_GFX_A) and laid out as above.
 BuildLevelMasks:
                 btst    #PF_CACHE,(Profile).l
                 bne.w   .out
                 movem.l d0-d7/a0-a5,-(a7)
-                clr.l   (MaskL1).l              ; (no lookups match while they are being made)
-                move.l  g_LevelFileEnd(a6),d0
-                move.l  d0,(MaskG2).l
-                move.l  a2,d1
-                sub.l   d0,d1
+                clr.l   (MaskL1).l              ; (no lookups match while it is all being made)
+                clr.l   (MaskL2).l
+                clr.l   (KeyLen).l
+                move.l  g_LevelFileEnd(a6),(KeyBase).l
+                move.l  #ESHOT_GFX_BUF,(EShotGfxPtr).l
+                move.l  #ITEM_GFX_BUF,(ItemGfxPtr).l
+                ; ---- the room left with no image pre-masked: d5
+                moveq   #0,d4                   ; the level's sets, total size
+                lea     g_BobSets(a6),a4
+                lea     (BobSetSizes).l,a0
+                moveq   #21-1,d7
+.sz1:           moveq   #0,d0
+                move.w  (a0)+,d0
+                tst.l   (a4)
+                beq.b   .sz1n
+                move.l  #1,(a4)                 ; in this level, not copied yet
+                add.l   d0,d4
+.sz1n:          addq.l  #4,a4
+                dbra    d7,.sz1
+                lea     g_SmallBobSets(a6),a4
+                lea     (SmallBobSetSizes).l,a0
+                moveq   #10-1,d7
+.sz2:           moveq   #0,d0
+                move.w  (a0)+,d0
+                tst.l   (a4)
+                beq.b   .sz2n
+                move.l  #1,(a4)                 ; in this level, not copied yet
+                add.l   d0,d4
+.sz2n:          addq.l  #4,a4
+                dbra    d7,.sz2
+                move.l  d4,d0
+                divu.w  #5,d0                   ; their masks
+                andi.l  #$FFFF,d0
+                add.l   d4,d0
+                add.l   #ITEMS_GFX_LEN/5+4,d0   ; region 1's masks (+ a little)
+                add.l   g_LevelFileEnd(a6),d0
+                move.l  #LEVEL_GFX_LIMIT,d5
+                sub.l   d0,d5                   ; (never negative: build_game.py checks)
+                ; ---- pre-mask in GfxPriority's order what fits: a5 = next masked copy
+                movea.l g_LevelFileEnd(a6),a5
+                lea     GfxPriority(pc),a0
+.pri:           moveq   #0,d0
+                move.b  (a0)+,d0
+                bmi.w   .copies
+                movem.l d5/a0,-(a7)
+                cmp.b   #$40,d0
+                bcc.w   .region1
+                cmp.b   #$20,d0
+                bcc.b   .small
+                lea     g_BobSets(a6),a4        ; enemy set d0
+                lea     (BobSetSizes).l,a0
+                lea     (BobSetOffsets).l,a1
+                lea     (CacheSizesEnemyGfx).l,a3
+                lea     (SCREEN_0).l,a2
+                bra.b   .set
+.small:         sub.b   #$20,d0                 ; small set d0
+                lea     g_SmallBobSets(a6),a4
+                lea     (SmallBobSetSizes).l,a0
+                lea     (SmallBobSetOffsets).l,a1
+                lea     (CacheSizesSmallBobs).l,a3
+                lea     (BOB_GFX_A).l,a2
+.set:           add.w   d0,d0
+                moveq   #0,d2
+                move.w  (a0,d0.w),d2            ; d2 = size
+                beq.w   .skip
+                add.w   d0,d0
+                adda.w  d0,a4
+                tst.l   (a4)                    ; not in this level
+                beq.w   .skip
+                move.l  (a1,d0.w),d1            ; d1 = offset in the file
+                move.l  d2,d3
+                divu.w  #5,d3
+                andi.l  #$FFFF,d3
+                neg.l   d3
+                add.l   d2,d3                   ; cost: the copy's size again less its mask
+                cmp.l   (a7),d3
+                bgt.w   .skip
+                sub.l   d3,(a7)
+                bsr.w   .r1key                  ; the key: KeyBase + KeyLen
+                move.l  d0,(a4)
+                adda.l  d1,a2                   ; the set in the file
+                moveq   #0,d0                   ; its strips: skip those before it
+                movea.l a3,a4
+.find:          cmp.l   d1,d0
+                bcc.b   .found
+                bsr.w   .stripsize
+                add.l   d4,d0
+                addq.l  #4,a4
+                bra.b   .find
+.found:         movea.l a4,a3                   ; the set's first strip
+                add.l   d2,d1                   ; its end in the file
+                moveq   #-1,d7                  ; strips - 1
+.count:         cmp.l   d1,d0
+                bcc.b   .counted
+                bsr.w   .stripsize
+                add.l   d4,d0
+                addq.l  #4,a4
+                addq.w  #1,d7
+                bra.b   .count
+.counted:       add.l   d2,(KeyLen).l
+                movea.l a2,a1
+                movea.l a5,a2
+                adda.l  d2,a5
+                adda.l  d2,a5
+                jsr     BuildMaskedGfx
+                bra.w   .skip
+.region1:       bne.w   .items                  ; $40: the enemy shots, $41: the items
+                move.l  #2*ESHOT_LEN,d3
+                cmp.l   (a7),d3
+                bgt.w   .skip
+                sub.l   d3,(a7)
+                bsr.w   .r1key
+                move.l  d0,(EShotGfxPtr).l
+                add.l   #ESHOT_LEN,(KeyLen).l
+                lea     (ESHOT_GFX_BUF).l,a1
+                movea.l a5,a2
+                lea     2*ESHOT_LEN(a5),a5
+                lea     (CacheSizesEnemyShots).l,a3
+                moveq   #3-1,d7
+                jsr     BuildMaskedGfx
+                bra.w   .skip
+.items:         move.l  #2*ITEM_LEN,d3
+                cmp.l   (a7),d3
+                bgt.w   .skip
+                sub.l   d3,(a7)
+                bsr.w   .r1key
+                move.l  d0,(ItemGfxPtr).l
+                add.l   #ITEM_LEN,(KeyLen).l
+                lea     (ITEM_GFX_BUF).l,a1
+                movea.l a5,a2
+                lea     (CacheSizesItems).l,a3
+                moveq   #4-1,d7
+                jsr     BuildMaskedGfx
+                lea     (ITEM_GFX2_BUF).l,a1    ; then the second file, after it
+                lea     2*$1AC2(a5),a2
+                lea     (CacheSizesItemGfx2).l,a3
+                moveq   #3-1,d7
+                jsr     BuildMaskedGfx
+                lea     2*ITEM_LEN(a5),a5
+.skip:          movem.l (a7)+,d5/a0
+                bra.w   .pri
+                ; ---- the other sets: copied after the masked copies (region 2)
+.copies:        move.l  a5,(MaskG2).l
+                lea     g_BobSets(a6),a4
+                lea     (BobSetSizes).l,a0
+                lea     (BobSetOffsets).l,a1
+                lea     (SCREEN_0).l,a2
+                moveq   #21-1,d7
+                bsr.w   .copy
+                lea     g_SmallBobSets(a6),a4
+                lea     (SmallBobSetSizes).l,a0
+                lea     (SmallBobSetOffsets).l,a1
+                lea     (BOB_GFX_A).l,a2
+                moveq   #10-1,d7
+                bsr.w   .copy
+                move.l  a5,d1
+                sub.l   (MaskG2).l,d1
                 move.l  d1,(MaskL2).l
-                move.l  a2,(MaskM2).l
-                lea     g_BobSets(a6),a4        ; enemy sets: copies, file offsets, sizes, strips
+                move.l  a5,(MaskM2).l
+                movea.l a5,a2
+                lea     g_BobSets(a6),a4        ; their masks: enemy sets ...
                 lea     (BobSetOffsets).l,a5
                 lea     (BobSetSizes).l,a0
                 lea     (CacheSizesEnemyGfx).l,a3
                 moveq   #21-1,d6
                 moveq   #39-1,d5
                 bsr.w   MasksForSets
-                lea     g_SmallBobSets(a6),a4   ; small BOB sets
+                lea     g_SmallBobSets(a6),a4   ; ... small sets
                 lea     (SmallBobSetOffsets).l,a5
                 lea     (SmallBobSetSizes).l,a0
                 lea     (CacheSizesSmallBobs).l,a3
@@ -468,7 +652,6 @@ BuildLevelMasks:
                 bsr.w   MasksForSets
                 move.l  (MaskL2).l,d0           ; region 1 after region 2's masks
                 divu.w  #5,d0
-                ext.l   d0
                 andi.l  #$FFFF,d0
                 add.l   (MaskM2).l,d0
                 addq.l  #1,d0
@@ -491,10 +674,39 @@ BuildLevelMasks:
                 move.l  #ITEMS_GFX_LEN,(MaskL1).l
                 movem.l (a7)+,d0-d7/a0-a5
 .out:           rts
+; d0 = the key of a region 1 image now pre-masked at a5 (KeyBase + KeyLen)
+.r1key:         move.l  (KeyLen).l,d0
+                add.l   g_LevelFileEnd(a6),d0
+                rts
+; a4 = a strip (width px, lines) -> d4 = its size: words x 2 x 5 x lines
+.stripsize:     moveq   #15,d4
+                add.w   (a4),d4
+                lsr.w   #4,d4
+                mulu.w  2(a4),d4
+                mulu.w  #10,d4
+                rts
+; a4 = the sets' pointers, a0 = sizes, a1 = file offsets, a2 = the file, d7 = sets - 1:
+; every set of the level not pre-masked (its pointer not a key) copied to a5
+.copy:          moveq   #0,d0
+                move.w  (a0)+,d0
+                move.l  (a1)+,d1
+                cmpi.l  #1,(a4)                 ; in this level and not pre-masked?
+                bne.b   .cnext
+                move.l  a5,(a4)
+                lea     (a2,d1.l),a3
+                lsr.w   #1,d0
+                subq.w  #1,d0
+                bmi.b   .cnext
+.cw:            move.w  (a3)+,(a5)+
+                dbra    d0,.cw
+.cnext:         addq.l  #4,a4
+                dbra    d7,.copy
+                rts
 
-; MasksForSets - a4 = the sets' copies (longs, 0: not in this level), a5 = their offsets in
-; the graphics file (longs), a0 = their sizes (words), a3 = the file's strips (width px,
-; lines), d6 = sets - 1, d5 = strips - 1. Each strip of a copied set gets its masks.
+; MasksForSets - a4 = the sets' copies (longs, 0: not in this level; below MaskG2: a key,
+; pre-masked), a5 = their offsets in the graphics file (longs), a0 = their sizes (words),
+; a3 = the file's strips (width px, lines), d6 = sets - 1, d5 = strips - 1. Each strip of a
+; copied set gets its masks.
 MasksForSets:
 .set:           move.l  (a4)+,d0                ; the copy
                 move.l  (a5)+,d1                ; its offset in the file
@@ -502,6 +714,8 @@ MasksForSets:
                 move.w  (a0)+,d2                ; its size
                 tst.l   d0
                 beq.b   .next
+                cmp.l   (MaskG2).l,d0
+                bcs.b   .next
                 add.l   d1,d2                   ; its end in the file
                 movem.l d5-d6/a0/a3-a5,-(a7)
                 moveq   #0,d3                   ; strip offset in the file
@@ -649,12 +863,16 @@ PrRing:         dc.w    0
                 cnop    0,4
 BobGfx:         dc.l    0               ; the image ScrDrawBob is drawing (BobMaskFind) ...
 BobMask:        dc.l    0               ; ... and its one-plane mask (0: none)
+KeyBase:        dc.l    0               ; pre-masked images' keys: [KeyBase, KeyBase + KeyLen) ...
+KeyLen:         dc.l    0               ; ... their copies at KeyBase + 2 x (key - KeyBase)
 MaskG2:         dc.l    0               ; region 2 (the level's sets): start, length, masks
 MaskL2:         dc.l    0
 MaskM2:         dc.l    0
 MaskL1:         dc.l    0               ; region 1 (items, weapons, shots): length, masks
 MaskM1:         dc.l    0
 MaskEnd:        dc.l    0               ; end of the masks
+BobMasked:      dc.b    0               ; this BOB is pre-masked: one blit (BobMaskFind)
+                even
                 cnop    0,4
                 rsset   SCROLL_STORE            ; (cleared by EnhInit)
 RecP            rs.b    buf_SIZEOF

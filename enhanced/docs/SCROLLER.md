@@ -409,6 +409,39 @@ quarter. Measured in the emulator over 600 frames of level 0 (restore and new ed
 runs found its mask; the pictures are the same as before on all seven levels. Memory: at most
 13 KB per level plus 3 KB (the worst level's data now ends at $7DD56).
 
+**Pre-masked images on 512K, as far as memory goes.** A pre-masked image (the 1MB format:
+every plane line followed by its mask line, `BuildMaskedGfx`) is drawn in one blit instead of 5.
+The blitter moves the same words either way; what goes is the 4 set-ups between blits (the CPU
+waiting for the blitter, then loading it, with the blitter idle) and the mask lookup with its
+divisions: about 1.5 raster lines per BOB, a large part of a small BOB's cost. `BuildLevelMasks`
+now fills the room up to `LEVEL_GFX_LIMIT` ($7F4DE, the original's end of level data) in the
+order of `GfxPriority`: the enemy shots, the small BOB sets, the dragon's set, the items /
+weapons / effects, then the other enemy sets, smallest first; whatever does not fit gets
+one-plane masks as above. A set costs 0.8 x its size more than with a one-plane mask; the shots
+and the items cost twice their size (their files stay where they are loaded, for the next
+level). The game's own image addresses are not changed: a converted image's pointer
+(`g_BobSets`, `g_SmallBobSets`, `EShotGfxPtr`, `ItemGfxPtr`) becomes a key in
+`[KeyBase, KeyBase + KeyLen)` and its masked copy is at `KeyBase + 2 x (key - KeyBase)` - the
+doubling the 1MB program applies to its offsets - so `BobMaskFind` needs one compare to send a
+BOB down the one-blit path (`BobMasked`, which `GFXMUL` and the drawing test instead of the
+profile). The sets are taken again from the graphics files still in memory at that point (enemy
+sets at `SCREEN_0`, small sets at `BOB_GFX_A`). `build_game.py` prints what each stage gets:
+
+| Stage | Data ends | Still 5 blits |
+|---|---|---|
+| 1 | $7F382 | items / weapons, 8 enemy sets |
+| 2 | $7F12A | enemy shots, items / weapons, 6 enemy sets |
+| 3 (dragon) | $7EB96 | 3 enemy sets |
+| 4 (dragon) | $7B3AE | nothing |
+| 5 | $7DFA2 | 2 enemy sets |
+| 6 (dragon) | $7F2F6 | 5 enemy sets |
+| 7 | $7553A | nothing |
+
+Measured in the emulator (2,500 frames with the same input, teleporting): blits per play frame
+on stage 1 21.6 -> 18.1, stage 3 36.5 -> 19.4, stage 6 (the dragon present) 35.2 -> 18.9; the
+blitter words are unchanged, and so are the pictures on all seven stages (512K and 1MB runs in
+step with the originals). The time saved has to be measured in WinUAE (timing build).
+
 **Memory (512K profile).** The program has grown (to $1A19C) and the whole map after it moves
 with it, so the HUD area (`CLEAR_AREA`) and the level file (`LEVEL_FILE`) are moved down into the
 old fourth screen, free above the scroller's storage: the worst level's data (stage 2: tile file

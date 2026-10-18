@@ -64,7 +64,9 @@ def build(extra_defs=()):
                    top <= 0x7F4DE))
     for what, ok in checks:
         if not ok: sys.exit('layout: ' + what + ' - no')
-    print(f'level data up to ${top:X}')
+    print(f'level data up to ${top:X} with no image pre-masked')
+    for lv, (top_lv, left) in enumerate(level_plan(prog, syms)):
+        print(f'  stage {lv + 1}: data to ${top_lv:X}; 5 blits for: {", ".join(left) or "nothing"}')
     print(f'game.bin {os.path.getsize(prog):,} bytes ($80-${end:X}); globals ${syms["GlobalsBlock"]:X}, '
           f'memory map from ${syms["MAP_LOW"]:X} (screens ${syms["SCREEN_0"]:X}, level file ${syms["LEVEL_FILE"]:X}); '
           f'effects package for ${syms["MUSIC_FILE"]:X}, music package for ${syms["MUSIC1M_FILE"]:X}')
@@ -85,6 +87,41 @@ def level_data_top(prog, syms):
         # then the one-plane masks (BuildLevelMasks): a fifth of the sets and of the item graphics
         return syms['LEVEL_FILE'] + files[lv] + sets + sets // 5 + 2 + (0x1234 + 0x1AC2 + 0xEA6) // 5
     return max(top(lv) for lv in range(7))
+
+
+def level_plan(prog, syms):
+    """what BuildLevelMasks pre-masks on each level (as the program decides it: GfxPriority while
+    the room up to LEVEL_GFX_LIMIT lasts) -> per level (end of the data, the images left with
+    one-plane masks)"""
+    import struct
+    d = open(prog, 'rb').read()
+    r = lambda a, f: struct.unpack_from(f, d, a - 0x80)
+    sizes, masks = r(syms['BobSetSizes'], '>21H'), r(syms['LevelBobSetMask'], '>7L')
+    ss, sm = r(syms['SmallBobSetSizes'], '>10H'), r(syms['LevelSmallBobMask'], '>7H')
+    files = [r(syms[f'FileLevel{n}'] + 4, '>L')[0] for n in range(7)]
+    pri = d[syms['GfxPriority'] - 0x80:]
+    pri = pri[:pri.index(0xFF)]
+    r1 = syms['ESHOT_LEN'] + syms['ITEM_LEN']
+    plan = []
+    for lv in range(7):
+        def size(c):
+            if c == 0x40: return syms['ESHOT_LEN'], 2 * syms['ESHOT_LEN'], 'enemy shots'
+            if c == 0x41: return syms['ITEM_LEN'], 2 * syms['ITEM_LEN'], 'items/weapons'
+            if c >= 0x20:
+                n = ss[c - 0x20] if sm[lv] >> (c - 0x20) & 1 else 0
+                return n, n - n // 5, f'small set {c - 0x20}'
+            n = sizes[c] if masks[lv] >> c & 1 else 0
+            return n, n - n // 5, f'set {c}'
+        s2 = sum(sizes[i] for i in range(21) if masks[lv] >> i & 1) + sum(ss[i] for i in range(10) if sm[lv] >> i & 1)
+        end = syms['LEVEL_FILE'] + files[lv] + s2 + s2 // 5 + r1 // 5 + 4
+        left = []
+        for c in pri:
+            n, cost, name = size(c)
+            if not n: continue
+            if end + cost <= syms['LEVEL_GFX_LIMIT']: end += cost
+            else: left.append(name)
+        plan.append((end, left))
+    return plan
 
 
 def bootblock(length):
