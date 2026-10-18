@@ -282,7 +282,9 @@ def widen_branches(path):
     vasm = os.environ.get('VASM', 'vasmm68k_mot'); n = 0
     while True:
         r = subprocess.run([vasm, '-Fbin', '-m68000', '-no-opt', '-quiet', '-maxerrors=10000',
-                            '-I', os.path.dirname(path), '-o', os.devnull, path], capture_output=True, text=True)
+                            '-I', os.path.dirname(path), '-o', os.devnull,
+                            '-DRASTER_BUILD=1', '-DNASTY_WAIT=1', path],   # (the largest build)
+                           capture_output=True, text=True)
         out = r.stdout + r.stderr
         bad = [(int(m.group(2)), m.group(1)) for m in re.finditer(r'error (2029|2030) in line (\d+) of "[^"]*gng_game\.s"', out)]
         if not bad:

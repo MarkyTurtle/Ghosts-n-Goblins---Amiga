@@ -442,6 +442,16 @@ on stage 1 21.6 -> 18.1, stage 3 36.5 -> 19.4, stage 6 (the dragon present) 35.2
 blitter words are unchanged, and so are the pictures on all seven stages (512K and 1MB runs in
 step with the originals). The time saved has to be measured in WinUAE (timing build).
 
+**Blitter priority while waiting (`--nasty-wait`, to be measured).** The original sets BLTPRI
+("blitter nasty") once at start-up and never clears it. With all code and data in chip RAM, the
+CPU then cannot fetch an instruction while a blit runs, so the work between blits (the next BOB's
+clipping and addresses, the copper list and the logic after the last blit) never runs alongside
+one. `build_game.py --nasty-wait` (`NASTY_WAIT`) sets BLTPRI only inside `WAITBLIT`, while the CPU
+does nothing but poll, and clears it after (the first wait clears the original's setting). With
+the bus shared, a blit loses up to a quarter of its bus cycles while the CPU uses the bus, but the CPU work it
+overlaps is saved; whether that is a net gain needs WinUAE (cycle-exact): the emulator here does
+not model bus contention. Disks: `gng_game_nastywait.adf`, `gng_game_raster_nastywait.adf`.
+
 **Memory (512K profile).** The program has grown (to $1A19C) and the whole map after it moves
 with it, so the HUD area (`CLEAR_AREA`) and the level file (`LEVEL_FILE`) are moved down into the
 old fourth screen, free above the scroller's storage: the worst level's data (stage 2: tile file

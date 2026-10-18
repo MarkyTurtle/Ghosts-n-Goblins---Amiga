@@ -14564,7 +14564,7 @@ l_0C1A4:
         move.b  (a1)+,d0                        ; 0C1C0/0C154
         lsr.w   #$1,d0                          ; 0C1C2/0C156
         sub.w   d0,d7                           ; 0C1C4/0C158
-        bsr.w   MapTileAt                       ; 0C1C6/0C15A
+        jsr     (MapTileAt).l                       ; 0C1C6/0C15A
         move.b  $4(a1),d0                       ; 0C1CA/0C15E
         andi.b  #$c0,d0                         ; 0C1CE/0C162
         bne.b   l_0C1EA                         ; 0C1D2/0C166

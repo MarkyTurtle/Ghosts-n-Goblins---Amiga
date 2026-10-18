@@ -6,6 +6,8 @@
 --raster: the timing build (RASTER_BUILD): the background colour shows which part of each frame
 is running (grey logic, red new edges / restore, orange text, blue BOBs, yellow copper list,
 green waiting for line $44, black idle); build/game_raster/, build/gng_game_raster.adf
+--nasty-wait: blitter priority only while waiting for the blitter (NASTY_WAIT, scroll.s);
+build/game_nastywait/ (with --raster: game_raster_nastywait/), build/gng_game_nastywait.adf
 
 Writes enhanced/build/game/:
   game.bin, game.lst   the main program (loaded to $80 on every machine)
@@ -24,7 +26,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ENH = os.path.join(HERE, '..')
 ROOT = os.path.join(ENH, '..')
 RASTER = '--raster' in sys.argv
-OUT = os.path.join(ENH, 'build', 'game_raster' if RASTER else 'game')
+NASTY = '--nasty-wait' in sys.argv
+VARIANT = ('_raster' if RASTER else '') + ('_nastywait' if NASTY else '')
+OUT = os.path.join(ENH, 'build', 'game' + VARIANT)
 VASM = os.environ.get('VASM', 'vasmm68k_mot')
 TRACK_SFX, TRACK_MUSIC = 126, 64
 MAIN_TRACK = 134                         # tracks no file of the original disk uses
@@ -144,7 +148,7 @@ def bootblock(length):
 def make_disk(prog, sound):
     import build_enh
     boot, bootbytes = bootblock(os.path.getsize(prog))
-    adf = os.path.abspath(os.path.join(OUT, '..', 'gng_game_raster.adf' if RASTER else 'gng_game.adf'))
+    adf = os.path.abspath(os.path.join(OUT, '..', f'gng_game{VARIANT}.adf'))
     args = [sys.executable, os.path.join('tools', 'disk', 'mkdisk.py'), '-o', adf, '--boot', os.path.abspath(boot),
             '--one', os.path.abspath(prog), '--file', f'{TRACK_SFX}={os.path.abspath(sound[TRACK_SFX])}',
             '--add', f'{TRACK_MUSIC}={os.path.abspath(sound[TRACK_MUSIC])}']
@@ -156,5 +160,5 @@ def make_disk(prog, sound):
 
 
 if __name__ == '__main__':
-    prog, lst, sound, syms = build((('RASTER_BUILD', 1),) if RASTER else ())
+    prog, lst, sound, syms = build((('RASTER_BUILD', 1),) * RASTER + (('NASTY_WAIT', 1),) * NASTY)
     make_disk(prog, sound)

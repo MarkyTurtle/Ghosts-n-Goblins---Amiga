@@ -83,9 +83,20 @@ buf_RListEnd    rs.l    1               ; end of the restore list storage (0: no
 buf_Copper      rs.l    1               ; this buffer's copper list (used by the game glue)
 buf_SIZEOF      rs.b    0
 
+; NASTY_WAIT (build_game.py --nasty-wait, the one program only): blitter priority (BLTPRI,
+; "blitter nasty") only while waiting - the original sets it once for good, so the CPU cannot
+; even fetch an instruction from chip RAM while a blit runs; with it off the CPU's work between
+; blits (the next BOB's clipping and addresses, the logic after the last blit) runs alongside
+; the blit, and while it only polls, BLTPRI on keeps the poll from taking the blitter's cycles
 WAITBLIT        macro
+        ifd     NASTY_WAIT
+        move.w  #$8400,CUSTOM+DMACON    ; BLTPRI on: the poll waits off the bus
+        endif
 .wb\@:  btst    #6,CUSTOM+DMACONR
         bne.b   .wb\@
+        ifd     NASTY_WAIT
+        move.w  #$0400,CUSTOM+DMACON    ; off: the CPU shares the bus with the next blit
+        endif
         endm
 ; blitter set-up that may run outside the interrupts (RedrawScreen runs in user mode while
 ; the game logic, which also blits, can interrupt it): hold the interrupts off around it,
