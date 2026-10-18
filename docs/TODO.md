@@ -31,6 +31,9 @@ Each line points to the item below with the details and measurements.
 - [x] Pre-masked (one-blit) images on 512K as far as each level's memory goes: shots, small
       BOBs, the dragon, items, then the other sets (stages 4 and 7: every image); see
       `enhanced/docs/SCROLLER.md`
+- [x] Look-ahead column: the next column built a few tiles a frame in the spare column's
+      memory, so a crossing no longer draws a whole column in one frame (`ScrPrepare`)
+- [ ] Look-ahead rows (the ring's spare tile row), once the vertical camera speeds are measured
 - [ ] Keep busy scenes at 50 fps on an A500: measure the masks in WinUAE (timing build); then a
       copper-driven blit queue (an interrupt per blit costs about as much as it saves on a 68000)
 - [ ] Fold the scroller into the game source on `enhanced/scroll` (today: module on its own track

@@ -14536,7 +14536,7 @@ ObjectMapCollide:
         move.b  (a1)+,d0                        ; 0C17A/0C10E
         lsr.w   #$1,d0                          ; 0C17C/0C110
         sub.w   d0,d7                           ; 0C17E/0C112
-        bsr.w   MapTileAt                       ; 0C180/0C114
+        jsr     (MapTileAt).l                       ; 0C180/0C114
         move.b  $4(a1),d0                       ; 0C184/0C118
         andi.b  #$c0,d0                         ; 0C188/0C11C
         bne.b   l_0C1A4                         ; 0C18C/0C120

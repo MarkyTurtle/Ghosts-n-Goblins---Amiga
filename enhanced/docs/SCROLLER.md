@@ -442,6 +442,24 @@ on stage 1 21.6 -> 18.1, stage 3 36.5 -> 19.4, stage 6 (the dragon present) 35.2
 blitter words are unchanged, and so are the pictures on all seven stages (512K and 1MB runs in
 step with the originals). The time saved has to be measured in WinUAE (timing build).
 
+**Look-ahead column (`ScrPrepare`).** A frame that crossed a tile column drew the whole new
+column at once: about 15 tile blits into the pristine buffer and 15 tile copies into the display
+buffer, and the other display buffer's 15 the next frame - a spike on top of a busy frame. A
+buffer holds 18 columns' memory and 17 are fetched; the 18th is the column next to the window on
+the side the camera last moved to (it shares its memory with the one on the other side, so it is
+one or the other). `ScrPrepare` (once a frame, after the restore) builds the column that will
+come into view next there, out of sight: the pristine buffer 4 tiles a frame, then, once it is
+finished, its scenery (`ScrDrawScenery` with the window moved over it); each display buffer
+copies 8 tiles per update once the pristine one has finished the same column (so the copies
+carry the scenery). When the camera crosses into it, `DrawColumnNew` draws only the rows not
+done yet; a crossing the other way (a change of direction, rare: 5-9 in 2,000 frames of play)
+draws the whole column as before. Rows: a new top row leaves the rows done valid (the new row
+is after them); a new bottom row starts the column again. Measured: the camera moves at most
+2 px a frame, a column every 10-16 frames when walking, and the look-ahead is finished well
+before the crossing. Blitter words in the crossing frame and the next two, stage 1: 8,870 ->
+6,724 on average; stage 6: 13,601 -> 11,515; the 99th-percentile frame: 4,635 -> 3,840 and
+5,620 -> 4,880 words. Pictures unchanged on all seven stages (512K and 1MB).
+
 **Blitter priority while waiting (`--nasty-wait`, to be measured).** The original sets BLTPRI
 ("blitter nasty") once at start-up and never clears it. With all code and data in chip RAM, the
 CPU then cannot fetch an instruction while a blit runs, so the work between blits (the next BOB's

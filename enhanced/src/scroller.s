@@ -213,6 +213,10 @@ EnhRestoreBackground:
                 bsr.w   EnsureCurrent
                 movea.l DrawRec(pc),a0
                 bsr.w   ScrRestore
+                lea     (RecP).l,a0             ; the look-ahead column: the pristine buffer,
+                bsr.w   ScrPrepare              ; then the buffer being drawn
+                movea.l DrawRec(pc),a0
+                bsr.w   ScrPrepare
                 RASTER  $F80                    ; orange: text replay
                 bsr.w   TextReplay
                 RASTER  $888                    ; back to the logic's grey

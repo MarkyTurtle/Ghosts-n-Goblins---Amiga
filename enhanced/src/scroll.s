@@ -81,7 +81,13 @@ buf_ClipY1      rs.w    1
 buf_CamX        rs.w    1               ; camera x of the last update
 buf_RListEnd    rs.l    1               ; end of the restore list storage (0: no limit)
 buf_Copper      rs.l    1               ; this buffer's copper list (used by the game glue)
+buf_PreCol      rs.w    1               ; look-ahead (ScrPrepare): the column built in the spare
+buf_PreNext     rs.w    1               ; column's memory (PRE_NONE: none), its rows RowB .. PreNext-1 done
+buf_Dir         rs.w    1               ; the last column crossing: 1 right, -1 left (0: none yet)
 buf_SIZEOF      rs.b    0
+PRE_NONE        equ     $8000
+PRE_TILES_P     equ     4               ; look-ahead tiles per frame: pristine buffer (drawn) ...
+PRE_TILES_D     equ     8               ; ... a display buffer (copied; it is updated every other frame)
 
 ; NASTY_WAIT (build_game.py --nasty-wait, the one program only): blitter priority (BLTPRI,
 ; "blitter nasty") only while waiting - the original sets it once for good, so the CPU cannot
@@ -177,6 +183,7 @@ ScrFullDraw:
                 cmp.w   d5,d0
                 ble.b   .row
                 movem.w d2-d5,buf_ColL(a0)      ; ColL, ColR, RowB, RowT
+                move.w  #PRE_NONE,buf_PreCol(a0)
                 move.w  2(a7),d0                ; camera (saved d0 / d1)
                 move.w  6(a7),d1
                 bsr.w   SetClip
@@ -208,6 +215,13 @@ CopyAll:
                 move.l  buf_ClipX0(a1),buf_ClipX0(a0)   ; ClipX0, ClipY0
                 move.l  buf_ClipY1(a1),buf_ClipY1(a0)   ; ClipY1, CamX
                 move.l  buf_RListBase(a0),buf_RList(a0)
+                move.w  buf_Dir(a1),buf_Dir(a0)         ; the spare column came with the copy: only
+                move.w  buf_PreCol(a1),buf_PreCol(a0)   ; a finished one counts (the scenery goes in
+                move.w  buf_PreNext(a1),d0              ; when it is finished)
+                cmp.w   buf_RowT(a1),d0
+                bgt.b   .fin
+                move.w  buf_RowB(a1),d0
+.fin:           move.w  d0,buf_PreNext(a0)
                 move.w  #1,buf_Valid(a0)
                 movem.l (a7)+,d0/a1-a2
                 rts
@@ -239,7 +253,8 @@ ScrScrollTo:
                 ble.b   .left
                 addq.w  #1,buf_ColR(a0)
                 move.w  buf_ColR(a0),d0
-                bsr.w   DrawColumnAll
+                move.w  #1,buf_Dir(a0)
+                bsr.w   DrawColumnNew
                 moveq   #1,d6
                 move.w  buf_ColR(a0),d7
                 sub.w   buf_ColL(a0),d7
@@ -252,7 +267,8 @@ ScrScrollTo:
                 bge.b   .up
                 subq.w  #1,buf_ColL(a0)
                 move.w  buf_ColL(a0),d0
-                bsr.w   DrawColumnAll
+                move.w  #-1,buf_Dir(a0)
+                bsr.w   DrawColumnNew
                 moveq   #1,d6
                 move.w  buf_ColR(a0),d7
                 sub.w   buf_ColL(a0),d7
@@ -272,12 +288,17 @@ ScrScrollTo:
                 cmp.w   #15,d7                  ; at most 16 rows in the 256-line ring
                 ble.b   .up
                 addq.w  #1,buf_RowB(a0)
+                move.w  buf_RowB(a0),d7         ; look-ahead: the rows done start at RowB at least
+                cmp.w   buf_PreNext(a0),d7      ; (the new top row is after them: still to do)
+                ble.b   .up
+                move.w  d7,buf_PreNext(a0)
                 bra.b   .up
 ; rows entering at the bottom
 .down:          cmp.w   buf_RowB(a0),d4
                 bge.b   .done
                 subq.w  #1,buf_RowB(a0)
                 move.w  buf_RowB(a0),d0
+                move.w  d0,buf_PreNext(a0)      ; look-ahead: a new bottom row, start it again
                 bsr.w   DrawRowAll
                 moveq   #1,d6
                 move.w  buf_RowT(a0),d7
@@ -341,6 +362,85 @@ DrawColumnAll:
                 cmp.w   buf_RowT(a0),d0
                 ble.b   .r
                 movem.l (a7)+,d0-d6
+                rts
+
+; d0 = column entering the window: drawn over the buffer's rows, or only the rows the
+; look-ahead has not done if it is the column built in the spare memory. The spare memory is
+; taken either way, so the look-ahead starts again (ScrPrepare)
+DrawColumnNew:
+                movem.l d0-d6,-(a7)
+                move.w  d0,d1                   ; column
+                move.w  buf_RowB(a0),d0         ; row
+                cmp.w   buf_PreCol(a0),d1
+                bne.b   .r
+                move.w  buf_PreNext(a0),d0
+.r:             cmp.w   buf_RowT(a0),d0
+                bgt.b   .done
+                bsr.w   DrawTile
+                addq.w  #1,d0
+                bra.b   .r
+.done:          move.w  #PRE_NONE,buf_PreCol(a0)
+                movem.l (a7)+,d0-d6
+                rts
+
+;------------------------------------------------------------------------------
+; ScrPrepare - a0 = buffer, once a frame after its update: the look-ahead. A buffer holds
+; 18 columns' memory and 17 are fetched; the 18th is the column next to the window on the
+; side the camera last moved to (it shares its memory with the one on the other side), so
+; the column that will come into view next is built there a few tiles a frame, out of sight,
+; and when the camera crosses into it only what is left is drawn (DrawColumnNew) instead of
+; a whole column in one frame. The pristine buffer draws PRE_TILES_P tiles a frame and, once
+; the column is finished, the scenery in it (ScrDrawScenery with the window moved one column
+; that way); a display buffer copies PRE_TILES_D tiles from the pristine one once the
+; pristine one has finished the same column.
+;------------------------------------------------------------------------------
+ScrPrepare:
+                movem.l d0-d7/a1,-(a7)
+                tst.w   buf_Valid(a0)
+                beq.w   .out
+                move.w  buf_PreCol(a0),d1
+                cmp.w   #PRE_NONE,d1
+                bne.b   .have
+                move.w  buf_ColR(a0),d1         ; next column on the side last moved to
+                addq.w  #1,d1
+                tst.w   buf_Dir(a0)
+                bpl.b   .set
+                move.w  buf_ColL(a0),d1
+                subq.w  #1,d1
+.set:           move.w  d1,buf_PreCol(a0)
+                move.w  buf_RowB(a0),buf_PreNext(a0)
+.have:          move.w  buf_PreNext(a0),d0
+                move.w  buf_RowT(a0),d6
+                addq.w  #1,d6                   ; d6 = rows end
+                cmp.w   d6,d0
+                bge.w   .out                    ; finished
+                moveq   #PRE_TILES_P-1,d7
+                move.l  buf_Source(a0),d2
+                beq.b   .tile
+                movea.l d2,a1                   ; a display buffer: the pristine one has finished
+                cmp.w   buf_PreCol(a1),d1       ; the same column?
+                bne.w   .out
+                cmp.w   buf_PreNext(a1),d6
+                bgt.w   .out
+                moveq   #PRE_TILES_D-1,d7
+.tile:          bsr.w   DrawTile
+                addq.w  #1,d0
+                cmp.w   d6,d0
+                dbge    d7,.tile
+                move.w  d0,buf_PreNext(a0)
+                tst.l   buf_Source(a0)
+                bne.b   .out
+                cmp.w   d6,d0                   ; the pristine buffer has just finished it:
+                blt.b   .out                    ; its scenery, the window moved over it
+                move.w  buf_ClipX0(a0),-(a7)
+                moveq   #16,d2
+                tst.w   buf_Dir(a0)
+                bpl.b   .shift
+                moveq   #-16,d2
+.shift:         add.w   d2,buf_ClipX0(a0)
+                bsr.w   ScrDrawScenery
+                move.w  (a7)+,buf_ClipX0(a0)
+.out:           movem.l (a7)+,d0-d7/a1
                 rts
 
 ; d0 = row: draw it over the buffer's columns
