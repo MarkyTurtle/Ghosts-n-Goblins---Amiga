@@ -26,7 +26,7 @@ BUILDS = {
     # the 1MB program as on a machine with 1MB of chip RAM: the bootblock loads it to $80000
     # ($4.w), the stack starts at $100000; its labels are offsets from the load address
     '1mb': dict(base=0x80000, load=0x80000, globals=0x80000+0x1893A, ssp=0x100000,
-                equates='gng_equates_1mb.i', src='gng_main_1mb.s', orig='bin/main_1mb.bin'),
+                equates='gng_equates.i', src='gng_main.s', orig='bin/main_1mb.bin'),
 }
 EQ = equates()
 G = {k: GLOBALS+v for k, v in EQ.items() if k.startswith('g_')}      # (512K; GameRun.G per build)
@@ -71,7 +71,7 @@ class GameRun(Amiga):
         self.redraw_entry, self.redraw_idle = L['RedrawEntry'], L['RedrawEntry'] + 8
         self.vbl, self.level1 = L['VblIRQ'], L['Level1Logic']
         self.palette_addr = L['GamePalette']
-        eq = equates(os.path.join(ROOT, cfg['equates']))
+        eq = equates(os.path.join(ROOT, cfg['equates']), build != '512k')
         self.globals = cfg['globals']
         self.G = {k: cfg['globals'] + v for k, v in eq.items() if k.startswith('g_')}
         orig = open(os.path.join(ROOT, cfg['orig']), 'rb').read()   # RTEs: same places in both programs

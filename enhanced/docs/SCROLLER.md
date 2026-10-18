@@ -376,8 +376,11 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
 
 0. **Fold the scroller into the game source.** Today the enhanced program is the original binary
    with patches written over it, plus the module loaded from track 132. The aim is one source on
-   this branch (`gng_main.s`, edited here) that assembles the enhanced program directly:
-   * **First make the source relocatable** (on `main`, still byte-identical): about 36
+   this branch (`gng_main.s`, edited here) that assembles the enhanced program directly - both
+   builds, since `gng_main.s` on `main` now holds the 512K and the 1MB program in one source
+   (`ifd BUILD_1MB` blocks; `tools/merge_src.py`, both byte-identical):
+   * **First make the source relocatable** (on `main`, still byte-identical; this is the 512K side
+     only, the 1MB code is already position independent): about 36
      instructions still give addresses as numbers (`lea $371e8.l`, `move.l #$1a250,COP2LCH`,
      `move.l #$37468,...`, the HUD sprite blocks...) and a few pieces of code are kept as bytes
      (`RedrawEntry`'s `bsr.w`, the bytes before `PrintChar`). Turn them into symbols and real
@@ -394,9 +397,10 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
      `DrawSceneryOnRedraw`, the save areas).
    * **Check**: the same side-by-side runs as now (all levels, teleporting), with the harness taking
      its addresses (VblIRQ, Level1Logic, LoadFile...) from the listing instead of constants.
-   * Note: `gng_main.s` is generated on `main` (`anno/gen.py`); on this branch it would be edited
-     by hand from then on, so later annotation changes on `main` merge as text. Doing the
-     relocation step on `main` first keeps those merges small.
+   * Note: `gng_main.s` is generated on `main` (`tools/gen.py`, `gen1m.py`, then
+     `merge_src.py`); on this branch it would be edited by hand from then on, so later annotation
+     changes on `main` merge as text. Doing the relocation step on `main` first keeps those merges
+     small.
 
 1. **Real machine timing.** First WinUAE run (played to the end with the cheat): vertical
    scrolling while falling is clearly better (no freezes); the general frame rate is not

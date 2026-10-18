@@ -46,10 +46,10 @@ BUILDS = {
                         'CreditsCall': 0x5EF0, 'CreditsCallEnd': 0x5EF4,
                         'Level1LogicEnd': 0x5EBE, 'LogicExitEnd': 0x6BF8,
                         'PlayFrameExit': 0x71E6, 'PlayFrameExitEnd': 0x71EC}),
-    '1mb': dict(src='gng_main_1mb.s', equates='gng_equates_1mb.i', sha1='e44347679297d5d864ae7b0da689714970e261ad',
+    '1mb': dict(src='gng_main.s', equates='gng_equates.i', sha1='e44347679297d5d864ae7b0da689714970e261ad',
                 load=0,                # assembled at org 0: labels are file offsets
                 track=17, module_track=133, defs=(('BUILD_1MB', 1),),
-                names={'StartLoad': 0x5D88, 'StartLoadEnd': 0x5D90, 'PrintField': 'l_0B142', 'PrintBody': 'l_0B14E',
+                names={'StartLoad': 0x5D88, 'StartLoadEnd': 0x5D90, 'PrintField': 'l_0B0D6', 'PrintBody': 'l_0B0E2',
                        'CreditsCall': 0x5F46, 'CreditsCallEnd': 0x5F4A,
                        'Level1LogicEnd': 0x5F14, 'LogicExitEnd': 0x6C56,
                        'PlayFrameExit': 0x724E, 'PlayFrameExitEnd': 0x7254}),
@@ -137,7 +137,7 @@ def build(name, raster=False, fps25=False):
     V = lambda *a, **k: vasm(*a, inc=out, **k)
     # 1. the original program and its labels
     orig, lst = os.path.join(out, 'orig_main.bin'), os.path.join(out, 'orig_main.lst')
-    V(os.path.join(ROOT, cfg['src']), orig, listing=lst)
+    V(os.path.join(ROOT, cfg['src']), orig, listing=lst, defs=cfg['defs'])
     prog = bytearray(open(orig, 'rb').read())
     if hashlib.sha1(prog).hexdigest() != cfg['sha1']: sys.exit(f'{cfg["src"]} does not build the original')
     osyms = symbols(lst)
@@ -154,7 +154,7 @@ def build(name, raster=False, fps25=False):
     print(f'{name}: module.bin {mlen:,} bytes at ${org:X} (track {cfg["module_track"]})')
     # 3. the patches
     known = dict(osyms); known.update(msyms)
-    header = (f'\tinclude "{cfg["equates"]}"\n\tinclude "orig_syms.i"\n\tinclude "module_syms.i"\n'
+    header = (''.join(f'{k}\tequ\t{v}\n' for k, v in cfg['defs']) + f'\tinclude "{cfg["equates"]}"\n\tinclude "orig_syms.i"\n\tinclude "module_syms.i"\n'
               f'MODULE_ORG\tequ\t${org:X}\nMODULE_LEN\tequ\t{mlen}\nMODULE_TRACK\tequ\t{cfg["module_track"]}\n')
     apply_patches(prog, os.path.join(SRC, 'patches.s'), cfg['load'], header, known, out, name)
     if raster:

@@ -156,10 +156,19 @@ class Amiga(Game):
         Image.fromarray(rgb[img]).save(path)
 
 
-def equates(path=os.path.join(ROOT, 'gng_equates.i')):
-    """name -> value for every equate in an equates file"""
-    out = {}
+def equates(path=os.path.join(ROOT, 'gng_equates.i'), build_1mb=False):
+    """name -> value for every equate in an equates file, as the assembler sees it for one
+    build (ifd / ifnd BUILD_1MB ... else ... endc; values like G_SHIFT+$002)"""
+    out, active = {}, [True]
     for l in open(path):
-        m = re.match(r'^(\w+)\s+equ\s+\$?([0-9A-Fa-f]+)', l)
-        if m: out[m.group(1)] = int(m.group(2), 16)
+        code = l.split(';')[0]
+        m = re.match(r'^\s+(ifd|ifnd)\s+BUILD_1MB', code)
+        if m: active.append(active[-1] and (m.group(1) == 'ifd') == build_1mb); continue
+        if re.match(r'^\s+else\b', code): active[-1] = not active[-1] and active[-2]; continue
+        if re.match(r'^\s+(endc|endif)\b', code): active.pop(); continue
+        m = re.match(r'^(\w+)\s+equ\s+(\S+)', code)
+        if m and active[-1]:
+            expr = re.sub(r'\$([0-9A-Fa-f]+)', lambda h: str(int(h.group(1), 16)), m.group(2))
+            try: out[m.group(1)] = eval(expr, {}, dict(out))
+            except Exception: pass
     return out

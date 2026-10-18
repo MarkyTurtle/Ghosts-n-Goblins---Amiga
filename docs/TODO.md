@@ -498,8 +498,9 @@ room for full-quality effects or a larger frame cache.
 
 Today there are two main programs on the disk (512K at track 110, 1MB at track 17), and the
 bootblock picks one with a rough test (`$4.w` - ExecBase - above 512K, or the stack above
-`$80000`). The two differ in about 130 places (the `<< >>` notes in `gng_main_1mb.s`; 259 lines
-are 1MB-only), all of which come down to memory:
+`$80000`). The two differ in about 190 places (the `ifd BUILD_1MB` blocks of `gng_main.s`, which
+on `main` now assembles both programs: 21,580 lines of code shared, about 640 512K-only and 680
+1MB-only), all of which come down to memory:
 
 | | 512K program | 1MB program |
 |---|---|---|
@@ -543,8 +544,10 @@ are 1MB-only), all of which come down to memory:
   becomes a runtime one (two ScrDrawBob variants behind a pointer).
 * **Disk:** one main program instead of two (about 100 KB less), loaded where the bootblock
   chose; the 1MB music package and the 512K effects package both stay, picked by profile.
-* **Order:** after the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), since this
-  rewrites the same routines. The `<< >>` notes give the complete list of places to merge.
+* **Order:** *One source for both builds: done (on `main`, `tools/merge_src.py`; both programs
+  byte-identical).* Next the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), into
+  both builds of the one source; then this item turns the `ifd BUILD_1MB` blocks into run-time
+  choices. The blocks give the complete list of places to merge.
 * **Testing:** `enhanced/tools/compare_runs.py` already runs both originals side by side with the
   enhanced builds; the merged program can be run in each profile against the matching original
   (512K, 1MB chip), plus a 512K chip + 512K slow configuration in the emulator and in WinUAE.

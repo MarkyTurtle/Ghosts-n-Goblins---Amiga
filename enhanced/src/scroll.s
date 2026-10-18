@@ -29,7 +29,7 @@
 ;
 ; This file is the core only: it is included by module.s (the game module, loaded by the
 ; enhanced build) and by scroll_test.s (the unit tests' build at $7A000). The includer
-; defines the custom-chip / globals equates (gng_equates.i or gng_equates_1mb.i), CellTiles,
+; defines the custom-chip / globals equates (gng_equates.i, with BUILD_1MB for the 1MB build), CellTiles,
 ; ItemBoxSizes, SmallBobSizes and MASKBUF (a one-plane BOB mask, at most 64 x 80 pixels; 512K
 ; only). BUILD_1MB selects the 1MB build: its program tables are offsets from g_BaseAddr, and
 ; its BOB graphics carry their masks, so a BOB is one blit.
