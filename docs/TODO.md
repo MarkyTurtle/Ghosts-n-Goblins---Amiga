@@ -12,9 +12,10 @@ Each line points to the item below with the details and measurements.
 - [ ] Optional second-stage loader to escape the bootblock's 1,024-byte limit (1)
 - [ ] Disk builder lays the files out itself and patches the tables (2)
 - [ ] zx0 compression of every file, decompressed in place (4); about 296 KB less on disk (5)
-- [ ] One main program for every memory size: the bootblock finds the memory and leaves a machine
-      description at a known place; the program picks its layout and features from it. 100 KB
-      less on disk, and slow / fast RAM used properly (7)
+- [x] One main program for every memory size: the bootblock finds the memory and leaves a machine
+      description at a known place; the program picks its features from it (`gng_game.s`) (7)
+- [ ] Slow / fast RAM used on machines that have it (512K chip + 512K slow: code, tables, sound
+      out of chip RAM, leaving room for more pre-masked images or music) (7)
 - [ ] Font stored without its unused bytes: 3 KB less on disk (5)
 
 **Display and drawing**
@@ -34,12 +35,13 @@ Each line points to the item below with the details and measurements.
 - [x] Look-ahead column: the next column built a few tiles a frame in the spare column's
       memory, so a crossing no longer draws a whole column in one frame (`ScrPrepare`)
 - [ ] Look-ahead rows (the ring's spare tile row), once the vertical camera speeds are measured
-- [ ] Keep busy scenes at 50 fps on an A500: measure the masks in WinUAE (timing build); then a
-      copper-driven blit queue (an interrupt per blit costs about as much as it saves on a 68000)
-- [ ] Fold the scroller into the game source on `enhanced/scroll` (today: module on its own track
-      + in-place patches over the original binary); see `enhanced/docs/SCROLLER.md`, *Next steps*
-- [ ] BOB masks: one-plane masks (+20%, stored or built on demand into a small cache) on 512K;
-      fully pre-masked graphics for one-blit BOBs on 1MB (3)
+- [ ] Keep busy scenes at 50 fps on an A500: measured in WinUAE, the stage 6 dragon now fits a
+      frame (one-blit images); if busy scenes still drop: a copper-driven blit queue (an interrupt per blit costs about as much as it saves on a 68000)
+- [x] Fold the scroller into the game source (`enhanced/src/gng_game.s`, `scroller.s`)
+- [x] BOB masks: one-plane masks on 512K; fully pre-masked graphics for one-blit BOBs on 1MB (3)
+- [ ] Blitter priority only while waiting (`--nasty-wait`): measure on the same frames (a key
+      to switch it in the timing build), keep it if it wins
+- [ ] `tools/test_scroll.py`: its test build (`scroll_test.s`) no longer assembles since the merge
 - [x] Draw at 50 fps once the redraw cost is gone (3): see above
 
 **Memory**
