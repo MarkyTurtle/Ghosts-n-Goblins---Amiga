@@ -60,6 +60,13 @@ TEXTQ_MAX       equ     64              ; playfield characters remembered per fr
 TEXTQ_ENTRY     equ     14              ; font.l, ring.w, offset.l, shadow, ink, paper, pad
 MACHINE_INFO    equ     $7FB00          ; where the bootblock leaves the machine description
 
+; the timing build (RASTER): COLOR00 shows which part of the frame is running
+RASTER          macro
+                ifd     RASTER_BUILD
+                move.w  #\1,CUSTOM+$180
+                endif
+                endm
+
 ; a call to a routine of the game program: an absolute address in the 512K program; in the
 ; 1MB one, its label is an offset from g_BaseAddr
 GAMECALL        macro
@@ -86,6 +93,8 @@ COPPER_BYTES    equ     128
                 bra.w   EnhRedrawBackground     ; +32
                 bra.w   EnhCameraJump           ; +36
                 bra.w   EnhShowMachine          ; +40 (after DrawCreditsScreen)
+                bra.w   EnhLogicStart           ; +44 (timing build)
+                bra.w   EnhLogicEnd             ; +48 (timing build)
 
                 include "scroll.s"
 
@@ -222,14 +231,18 @@ EnhSwapScreens:
 
 ;------------------------------------------------------------------------------
 EnhSetBitplanePtrs:
+                RASTER  $FF0                    ; yellow: copper list
                 bsr.w   EnsureCurrent
                 bsr.w   GetCam
                 movea.l DrawRec(pc),a0
                 movea.l buf_Copper(a0),a1
-                bra.w   ScrBuildCopper
+                bsr.w   ScrBuildCopper
+                RASTER  $888
+                rts
 
 ;------------------------------------------------------------------------------
 EnhShowBackBuffer:
+                RASTER  $0F0                    ; green: waiting for the copper interrupt
                 lea     CUSTOM,a0
                 movea.l DrawRec(pc),a1
                 move.l  buf_Copper(a1),d1
@@ -257,23 +270,40 @@ EnhShowBackBuffer:
                 move.l  a1,g_SaveBufB(a6)
                 lea     TextQ(pc),a1            ; this frame's text is on screen now
                 clr.w   (a1)
+                RASTER  $888
                 rts
 
 ;------------------------------------------------------------------------------
 EnhRestoreBackground:
+                RASTER  $F00                    ; red: new edges, restore
                 bsr.w   EnsureCurrent
                 movea.l DrawRec(pc),a0
                 bsr.w   ScrRestore
-                bra.w   TextReplay
+                RASTER  $F80                    ; orange: text replay
+                bsr.w   TextReplay
+                RASTER  $888                    ; back to the logic's grey
+                rts
+
+;------------------------------------------------------------------------------
+; the timing build's logic start / end (raster_patches.s)
+EnhLogicStart:  move.w  #$0004,CUSTOM+INTREQ      ; INTF_SOFTINT
+                RASTER  $888                    ; grey: game logic
+                rts
+EnhLogicEnd:    RASTER  $000                    ; black: idle
+                movem.l (a7)+,d0-d7/a0-a5
+                rte
 
 ;------------------------------------------------------------------------------
 EnhDrawBobs:
+                RASTER  $00F                    ; blue: BOBs
                 bsr.w   EnsureCurrent
                 move.l  g_SaveBufA(a6),g_SavePtr(a6)    ; as the original
                 movea.l g_BlitListPtr(a6),a3
                 lea     g_SaveBufA(a6),a5
                 movea.l DrawRec(pc),a0
-                bra.w   ScrDrawBobs
+                bsr.w   ScrDrawBobs
+                RASTER  $888
+                rts
 
 ;------------------------------------------------------------------------------
 ; EnhPrintField - PrintChar on the playfield. Jumped to from PrintChar ($B0D6) with

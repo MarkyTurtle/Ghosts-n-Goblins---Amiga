@@ -291,6 +291,25 @@ six machines (A500 512K, + 512K slow, A500+ 1MB, 1MB + slow NTSC, A1200 2MB + 4M
 1.5MB slow + 2MB fast) and checks the description; `GameRun(..., machine=...)` puts it in memory
 for the whole-game runs.
 
+### Timing build
+
+`build_enh.py --raster` makes `gng_enhanced_raster.adf` (and `_512k_raster`): the same game with
+the background colour (COLOR00) set at each stage of a frame, so in WinUAE each stage shows as a
+band down the screen (on the black parts) and its height is the time it takes:
+
+| Colour | Stage |
+|---|---|
+| grey | game logic (`Level1Logic`; `src/raster_patches.s` marks its start and its two exits) |
+| red | scroller: new edges, restore of the buffer's BOBs |
+| orange | playfield text printed again (`TextReplay`) |
+| blue | BOBs |
+| yellow | copper list |
+| green | waiting for the copper interrupt at line `$44` (`ShowBackBuffer`) |
+| black | idle: the frame's work is done |
+
+A frame whose logic does not finish before the next vertical blank shows grey (or another stage)
+running on past the bottom; a pause shows as the colours standing still.
+
 ### Trying it
 
 Build (or use the images in the release), then in WinUAE with Kickstart 1.3 insert

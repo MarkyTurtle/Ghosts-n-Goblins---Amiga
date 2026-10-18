@@ -2,7 +2,7 @@
 builds (512K and 1MB), and the disk images.
 
   cd enhanced/tools
-  VASM=/path/to/vasmm68k_mot python3 build_enh.py
+  VASM=/path/to/vasmm68k_mot python3 build_enh.py [--raster]
 
 Writes enhanced/build/:
   512k/  main.bin, module.bin (and the generated symbol files, listings)
@@ -12,6 +12,8 @@ Writes enhanced/build/:
                          program; otherwise the 512K one) - as the original disk
   gng_enhanced_512k.adf  the 512K program only: the bootblock is changed (two instructions) to
                          load it whatever the memory
+--raster: the timing build (outputs *_raster): the background colour shows which part of each
+frame is running (src/raster_patches.s, RASTER in src/module.s)
 
 For each build:
  1. assemble the original source (checked against its original binary) with a listing, and
@@ -36,12 +38,16 @@ BUILDS = {
                  load=0x80,            # labels are addresses; the file starts at $80
                  track=110, module_track=132, defs=(),
                  names={'StartLoad': 0x5D32, 'StartLoadEnd': 0x5D3A, 'PrintField': 'l_0B0D6', 'PrintBody': 'l_0B0E2',
-                        'CreditsCall': 0x5EF0, 'CreditsCallEnd': 0x5EF4}),
+                        'CreditsCall': 0x5EF0, 'CreditsCallEnd': 0x5EF4,
+                        'Level1LogicEnd': 0x5EBE, 'LogicExitEnd': 0x6BF8,
+                        'PlayFrameExit': 0x71E6, 'PlayFrameExitEnd': 0x71EC}),
     '1mb': dict(src='gng_main_1mb.s', equates='gng_equates_1mb.i', sha1='e44347679297d5d864ae7b0da689714970e261ad',
                 load=0,                # assembled at org 0: labels are file offsets
                 track=17, module_track=133, defs=(('BUILD_1MB', 1),),
                 names={'StartLoad': 0x5D88, 'StartLoadEnd': 0x5D90, 'PrintField': 'l_0B142', 'PrintBody': 'l_0B14E',
-                       'CreditsCall': 0x5F46, 'CreditsCallEnd': 0x5F4A}),
+                       'CreditsCall': 0x5F46, 'CreditsCallEnd': 0x5F4A,
+                       'Level1LogicEnd': 0x5F14, 'LogicExitEnd': 0x6C56,
+                       'PlayFrameExit': 0x724E, 'PlayFrameExitEnd': 0x7254}),
 }
 
 
@@ -119,9 +125,9 @@ def build_boot(out):
     return boot
 
 
-def build(name):
+def build(name, raster=False):
     cfg = BUILDS[name]
-    out = os.path.join(OUT, name)
+    out = os.path.join(OUT, name + ('_raster' if raster else ''))
     os.makedirs(out, exist_ok=True)
     V = lambda *a, **k: vasm(*a, inc=out, **k)
     # 1. the original program and its labels
@@ -134,7 +140,8 @@ def build(name):
     write_syms(os.path.join(out, 'orig_syms.i'), osyms)
     # 2. the module
     mod, mlst = os.path.join(out, 'module.bin'), os.path.join(out, 'module.lst')
-    V(os.path.join(SRC, 'module.s'), mod, listing=mlst, defs=cfg['defs'])
+    V(os.path.join(SRC, 'module.s'), mod, listing=mlst,
+      defs=cfg['defs'] + ((('RASTER_BUILD', 1),) if raster else ()))
     msyms = symbols(mlst, lambda n: n.startswith('Enh'))
     write_syms(os.path.join(out, 'module_syms.i'), msyms)
     org = int(re.search(r'^MODULE_ORG\s+E:([0-9A-F]+)$', open(mlst).read(), re.M).group(1), 16)
@@ -142,10 +149,11 @@ def build(name):
     print(f'{name}: module.bin {mlen:,} bytes at ${org:X} (track {cfg["module_track"]})')
     # 3. the patches
     known = dict(osyms); known.update(msyms)
-    apply_patches(prog, os.path.join(SRC, 'patches.s'), cfg['load'],
-                  f'\tinclude "{cfg["equates"]}"\n\tinclude "orig_syms.i"\n\tinclude "module_syms.i"\n'
-                  f'MODULE_ORG\tequ\t${org:X}\nMODULE_LEN\tequ\t{mlen}\nMODULE_TRACK\tequ\t{cfg["module_track"]}\n',
-                  known, out, name)
+    header = (f'\tinclude "{cfg["equates"]}"\n\tinclude "orig_syms.i"\n\tinclude "module_syms.i"\n'
+              f'MODULE_ORG\tequ\t${org:X}\nMODULE_LEN\tequ\t{mlen}\nMODULE_TRACK\tequ\t{cfg["module_track"]}\n')
+    apply_patches(prog, os.path.join(SRC, 'patches.s'), cfg['load'], header, known, out, name)
+    if raster:
+        apply_patches(prog, os.path.join(SRC, 'raster_patches.s'), cfg['load'], header, known, out, name + ' raster')
     main_out = os.path.join(out, 'main.bin')
     open(main_out, 'wb').write(prog)
     return main_out, mod
@@ -161,16 +169,17 @@ def mkdisk(adf, boot, files, adds):
     if r.returncode: sys.exit('mkdisk failed')
 
 
-def main():
+def main(raster=False):
     os.makedirs(OUT, exist_ok=True)
-    built = {name: build(name) for name in BUILDS}
+    built = {name: build(name, raster) for name in BUILDS}
+    sfx = '_raster' if raster else ''
     (m512, mod512), (m1mb, mod1mb) = built['512k'], built['1mb']
     bootdir = os.path.join(OUT, 'boot')
     boot = build_boot(bootdir)
     boot_out = os.path.join(bootdir, 'boot.bin')
     open(boot_out, 'wb').write(boot)
     # both programs; the bootblock chooses by memory, as the original
-    adf = os.path.join(OUT, 'gng_enhanced.adf')
+    adf = os.path.join(OUT, f'gng_enhanced{sfx}.adf')
     mkdisk(adf, boot_out, {'main512': m512, 'main1mb': m1mb},
            {BUILDS['512k']['module_track']: mod512, BUILDS['1mb']['module_track']: mod1mb})
     verify_image(adf, bytes(boot), {110: m512, 17: m1mb,
@@ -183,7 +192,7 @@ def main():
         boot[off:off+len(new)//2] = bytes.fromhex(new)
     boot_out = os.path.join(bootdir, 'boot_512k_only.bin')
     open(boot_out, 'wb').write(boot)
-    adf = os.path.join(OUT, 'gng_enhanced_512k.adf')
+    adf = os.path.join(OUT, f'gng_enhanced_512k{sfx}.adf')
     mkdisk(adf, boot_out, {'main512': m512}, {BUILDS['512k']['module_track']: mod512})
     verify_image(adf, bytes(boot), {110: m512, BUILDS['512k']['module_track']: mod512})
 
@@ -212,4 +221,4 @@ def verify_image(adf, boot, files):
 
 
 if __name__ == '__main__':
-    main()
+    main(raster='--raster' in sys.argv)
