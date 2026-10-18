@@ -122,7 +122,8 @@ patch sources, into `build/512k/` and `build/1mb/`:
 * `module.bin` - `src/module.s` (which includes `src/scroll.s`): the scroller and the game glue,
   about 2.5 KB, at `$5C000` (512K) or `$24400` (1MB, `BUILD_1MB`). Its storage (records, copper
   lists, restore lists) follows it in memory but is not in the file (EnhInit clears it).
-* `main.bin` - the original program with the blocks of `src/patches.s` written over it in place.
+* `main.bin` - the original program with the blocks of `src/patches.s` written over it in place
+  (and, for the 512K program, `src/fps50_patches.s`: it draws every frame, see *Frame rate*).
   Each block is assembled on its own at its address and checked to fit, so nothing else in the
   program moves (the tables `scroll.s` uses, `CellTiles` and so on, stay where they are). The
   labels come from the original's assembler listing (`orig_syms.i`, generated).
@@ -137,6 +138,22 @@ that the bootblock and every file it changed read back exactly:
   machine description*).
 * `gng_enhanced_512k.adf` - the 512K program only, with the bootblock's two memory tests
   changed so the load base is always 0 (to try the 512K program on a bigger machine).
+
+`--fps25` makes `gng_enhanced_512k_25hz.adf` instead: the 512K program at the original's fixed
+25 fps (into `build/512k_25hz/`), to compare.
+
+### Frame rate
+
+The original 512K program moves everything every frame but sets the camera and draws only on
+odd frames (`btst #0,g_GameFrame+1` / `beq` in `PlayFrame`, `$6E76`): a fixed 25 fps. The 1MB
+program has no such test. Without the original's background redraws the 512K program can draw
+every frame too, so the enhanced build removes the test (`src/fps50_patches.s`, five `nop`s).
+When a frame's work does not fit in 20 ms, `VblIRQ` sees the logic still running and skips the
+next run, so the game drops to 25 fps for those frames rather than tearing.
+
+On a 512K A500 in WinUAE (played to the big men of level 2) it runs at 50 fps most of the time
+and is much smoother than the locked 25 fps; it dropped to 25 fps when the screen was busy (on
+level 1: a flower, projectiles and zombies at once).
 
 ### The 1MB build
 
@@ -397,16 +414,11 @@ VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, the
      the one before, so the CPU idles through the red and blue bands. A queue of blits fed by
      the blitter-finished interrupt (or the logic of the next objects running between blits)
      would overlap the two.
-   * **Draw every frame (50 fps) on the 512K program:** *trial build: `build_enh.py --fps50`
-     (with `--raster` for the timing colours) makes `gng_enhanced_512k_50hz.adf`, the 512K program
-     with the odd-frame test removed (`src/fps50_patches.s`). In the emulator it shows a frame
-     every logic frame (830 of 831 in play), and 1,000 of those frames checked against the
-     original's display code for the same state (`check_game.py`) were identical; whether an A500
-     keeps up is for WinUAE to tell.* Drop the odd-frame test so the camera and drawing run every
-     frame. Needs the whole frame (logic + restore + BOBs + new edges) to fit in one 20 ms frame;
-     if it does not, VblIRQ already skips the next logic run (it sees IPL 1 still running), which
-     would slow the game down rather than tear. The raster-time build shows whether it fits; an
-     option would keep 25 fps for busy scenes or slower machines.
+   * **Draw every frame (50 fps) on the 512K program:** *done, now the default (see *Frame
+     rate*).* In the emulator it shows a frame every logic frame (830 of 831 in play), and 1,000
+     of those frames checked against the original's display code (`check_game.py`) were
+     identical. On a 512K A500 in WinUAE it holds 50 fps except in busy scenes, where it drops to
+     25 fps; the CPU/blitter overlap above is what would keep those at 50.
 2. **Use the freed memory** (43 KB of screens, the 24 KB of save areas): the first step towards
    music on 512K machines and the other items in `docs/TODO.md`.
 3. **One-plane masks** stored per frame (or the on-demand cache) instead of the 512K build's 2

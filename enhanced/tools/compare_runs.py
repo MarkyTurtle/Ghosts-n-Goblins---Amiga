@@ -35,6 +35,8 @@ def main(frames=3000, seed=1, png=None, level=None, teleport=0, build='512k'):
     if build == '512k':
         orig.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))  # DrawBob top-clip fix (the 1MB build is right)
         orig.u.mem_write(0xC2EA, bytes.fromhex('c4c6'))  # and in DrawSceneryOnRedraw
+        orig.u.mem_write(0x6E76, bytes.fromhex('4e71'*5))  # draw every frame, as the enhanced 512K build
+                                                           # (src/fps50_patches.s) and the 1MB program
     enh = enhanced(build)
     for m in (orig, enh): m.boot()
     inputs = list(script_start()); play = play_script(seed)

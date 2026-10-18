@@ -23,13 +23,16 @@ Each line points to the item below with the details and measurements.
       Integrated into both programs (512K and 1MB) on branch `enhanced/scroll`, with a disk image;
       tested in the emulator side by side with the originals. Still to do: real-machine timing (WinUAE)
 - [x] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
-- [ ] Raster-time debug build (COLOR00 per stage), then try drawing every frame (50 fps instead
-      of the game's 25); see `enhanced/docs/SCROLLER.md`, *Next steps* 1
+- [x] Raster-time debug build (COLOR00 per stage), then drawing every frame (50 fps instead of
+      the game's 25) on the 512K program too: 50 fps on an A500 except in busy scenes (25 fps
+      there); see `enhanced/docs/SCROLLER.md`, *Frame rate*
+- [ ] Keep busy scenes at 50 fps on an A500: let the CPU work while the blitter draws (a blit
+      queue), one-plane masks; see `enhanced/docs/SCROLLER.md`, *Next steps* 1
 - [ ] Fold the scroller into the game source on `enhanced/scroll` (today: module on its own track
       + in-place patches over the original binary); see `enhanced/docs/SCROLLER.md`, *Next steps*
 - [ ] BOB masks: one-plane masks (+20%, stored or built on demand into a small cache) on 512K;
       fully pre-masked graphics for one-blit BOBs on 1MB (3)
-- [ ] Possibly draw at 50 fps once the redraw cost is gone (3)
+- [x] Draw at 50 fps once the redraw cost is gone (3): see above
 
 **Memory**
 - [ ] Per-level files: tiles, map / cell / attribute tables, zones, spawns, placements and the

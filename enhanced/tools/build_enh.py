@@ -12,8 +12,11 @@ Writes enhanced/build/:
                          program; otherwise the 512K one) - as the original disk
   gng_enhanced_512k.adf  the 512K program only: the bootblock is changed (two instructions) to
                          load it whatever the memory
---fps50: the 512K program drawing every frame (src/fps50_patches.s), on a 512K-only disk:
-gng_enhanced_512k_50hz.adf (with --raster too: gng_enhanced_512k_50hz_raster.adf)
+The 512K program draws every frame, as the 1MB one does (src/fps50_patches.s: the original
+draws only on even frames, a fixed 25 fps); when a frame's work does not fit, the game skips
+the next logic step and drops to 25 fps by itself.
+--fps25: the 512K program as the original, drawing on even frames only, on a 512K-only disk:
+gng_enhanced_512k_25hz.adf (with --raster too: gng_enhanced_512k_25hz_raster.adf), to compare
 --raster: the timing build (outputs *_raster): the background colour shows which part of each
 frame is running (src/raster_patches.s, RASTER in src/module.s)
 
@@ -127,9 +130,9 @@ def build_boot(out):
     return boot
 
 
-def build(name, raster=False, fps50=False):
+def build(name, raster=False, fps25=False):
     cfg = BUILDS[name]
-    out = os.path.join(OUT, name + ('_50hz' if fps50 else '') + ('_raster' if raster else ''))
+    out = os.path.join(OUT, name + ('_25hz' if fps25 else '') + ('_raster' if raster else ''))
     os.makedirs(out, exist_ok=True)
     V = lambda *a, **k: vasm(*a, inc=out, **k)
     # 1. the original program and its labels
@@ -156,8 +159,7 @@ def build(name, raster=False, fps50=False):
     apply_patches(prog, os.path.join(SRC, 'patches.s'), cfg['load'], header, known, out, name)
     if raster:
         apply_patches(prog, os.path.join(SRC, 'raster_patches.s'), cfg['load'], header, known, out, name + ' raster')
-    if fps50:
-        assert name == '512k', 'the 1MB program already draws every frame'
+    if name == '512k' and not fps25:          # (the 1MB program already draws every frame)
         assert prog[0x6E76-cfg['load']:0x6E80-cfg['load']].hex() == '082e0000000767000314', 'odd-frame test'
         apply_patches(prog, os.path.join(SRC, 'fps50_patches.s'), cfg['load'], header, known, out, name + ' 50fps')
     main_out = os.path.join(out, 'main.bin')
@@ -175,11 +177,11 @@ def mkdisk(adf, boot, files, adds):
     if r.returncode: sys.exit('mkdisk failed')
 
 
-def main(raster=False, fps50=False):
+def main(raster=False, fps25=False):
     os.makedirs(OUT, exist_ok=True)
     sfx = '_raster' if raster else ''
-    if fps50:                                    # the 512K program drawing every frame: one image
-        m512, mod512 = build('512k', raster, fps50=True)
+    if fps25:                                    # the 512K program at the original 25 fps: one image
+        m512, mod512 = build('512k', raster, fps25=True)
         bootdir = os.path.join(OUT, 'boot')
         boot = build_boot(bootdir)
         for off, old, new in ((0x2C, '20380004', '70004e71'), (0x40, '203c00080000', '70004e714e71')):
@@ -187,7 +189,7 @@ def main(raster=False, fps50=False):
             boot[off:off+len(new)//2] = bytes.fromhex(new)
         boot_out = os.path.join(bootdir, 'boot_512k_only.bin')
         open(boot_out, 'wb').write(boot)
-        adf = os.path.join(OUT, f'gng_enhanced_512k_50hz{sfx}.adf')
+        adf = os.path.join(OUT, f'gng_enhanced_512k_25hz{sfx}.adf')
         mkdisk(adf, boot_out, {'main512': m512}, {BUILDS['512k']['module_track']: mod512})
         verify_image(adf, bytes(boot), {110: m512, BUILDS['512k']['module_track']: mod512})
         return
@@ -240,4 +242,4 @@ def verify_image(adf, boot, files):
 
 
 if __name__ == '__main__':
-    main(raster='--raster' in sys.argv, fps50='--fps50' in sys.argv)
+    main(raster='--raster' in sys.argv, fps25='--fps25' in sys.argv)
