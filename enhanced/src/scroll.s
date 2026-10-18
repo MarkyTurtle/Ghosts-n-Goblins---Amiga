@@ -568,6 +568,9 @@ ScrDrawBob:
 .room:          moveq   #15,d6
                 add.w   d3,d6
                 lsr.w   #4,d6                   ; d6 = graphics words per plane line
+                ifd     BUILD_ONE
+                bsr.w   BobMaskFind             ; 512K: this image's one-plane mask, if made (scroller.s)
+                endif
                 ; ---- vertical clip
                 move.w  d2,d7
                 add.w   d4,d7                   ; top (exclusive)
@@ -721,7 +724,45 @@ ScrDrawBob:
                 endif
                 ifd     BUILD_ONE
                 bra.w   .pdone
-.p512:
+.p512:          ; ---- 512K with the image's one-plane mask made at level load (BuildLevelMasks):
+                ; no mask blits, the 5 cookie-cut blits read it. The graphics pointer has moved
+                ; by whole lines (clipped at the top, or the bottom part of a ring wrap) and by
+                ; bytes (clipped at the left) since BobMaskFind: the mask moves by a fifth of
+                ; the lines and by the same bytes.
+                move.l  (BobMask).l,d7
+                beq.w   .mkmask
+                move.l  a1,d1
+                sub.l   (BobGfx).l,d1           ; lines x 5 x line bytes + left bytes
+                move.w  d6,d2
+                add.w   d2,d2
+                mulu.w  #5,d2                   ; graphics bytes per image line
+                divu.w  d2,d1                   ; d1.w = lines, high word = left bytes
+                move.l  d1,d2
+                clr.w   d2
+                swap    d2                      ; left bytes
+                add.l   d2,d7
+                mulu.w  d6,d1
+                add.l   d1,d1                   ; lines x mask bytes per line
+                add.l   d1,d7
+                movea.l d7,a5                   ; the mask of this part
+                move.w  d4,d2                   ; BLTSIZE for one plane
+                lsl.w   #6,d2
+                or.w    d0,d2
+                move.w  d6,d1
+                add.w   d1,d1                   ; d1 = bytes per plane line of the graphics
+                move.w  d1,d7
+                mulu.w  #5,d7
+                sub.w   d0,d7
+                sub.w   d0,d7                   ; d7 = graphics modulo
+                lea     CUSTOM,a3
+                WAITBLIT
+                move.w  d7,BLTBMOD(a3)
+                move.w  d1,d7
+                sub.w   d0,d7
+                sub.w   d0,d7
+                move.w  d7,BLTAMOD(a3)          ; mask modulo (one line of it per image line)
+                bra.w   .cookie
+.mkmask:
                 endif
                 ifnd    BUILD_1MB
                 move.w  d4,d2                   ; BLTSIZE for one plane
@@ -758,6 +799,9 @@ ScrDrawBob:
                 move.l  a2,BLTCPTH(a3)
                 move.l  a5,BLTDPTH(a3)
                 move.w  d2,BLTSIZE(a3)
+                ifd     BUILD_ONE
+.cookie:
+                endif
                 move.w  #LINEBYTES,d7           ; screen modulo: next line of the same plane
                 sub.w   d0,d7
                 sub.w   d0,d7

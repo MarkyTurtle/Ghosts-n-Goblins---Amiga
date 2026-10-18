@@ -4239,7 +4239,7 @@ Start:
         move    a6,usp                          ; 05B2A/       USP = globals block (user-mode stack grows down from here)
         bsr.w   ReadProfile                     ; what machine this is (Profile)
         lea.l   FileTable(pc),a1                ; 05B2C/05AB6
-        bsr.w   LoadFile                        ; 05B30/05ABA  load Arthur sprite file (tracks 33-36) to $37468
+        jsr     (LoadFile).l                        ; 05B30/05ABA  load Arthur sprite file (tracks 33-36) to $37468
 
 ;---------------------------------------------------------------------------
 ; Arthur's sprite graphics (file tracks 33-36, 42 frames of 32x32, 4 planes).
@@ -5472,6 +5472,7 @@ ll_sets:
 ll_small:
         moveq   #$9,d7                          ; 0689A/068F8
         bsr.w   BuildFrameTable                 ; 0689C/068FA
+        jsr     BuildLevelMasks                 ; 512K: the one-plane masks of the level's images
         clr.b   g_LevelDone(a6)                 ; 068A0/068FE
         addq.b  #SS_PLAYLEVEL,g_SubState(a6)    ; 068A4/06902
         clr.b   g_SubState2(a6)                 ; 068A8/06906

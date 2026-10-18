@@ -26,8 +26,10 @@ Each line points to the item below with the details and measurements.
 - [x] Raster-time debug build (COLOR00 per stage), then drawing every frame (50 fps instead of
       the game's 25) on the 512K program too: 50 fps on an A500 except in busy scenes (25 fps
       there); see `enhanced/docs/SCROLLER.md`, *Frame rate*
-- [ ] Keep busy scenes at 50 fps on an A500: let the CPU work while the blitter draws (a blit
-      queue), one-plane masks; see `enhanced/docs/SCROLLER.md`, *Next steps* 1
+- [x] One-plane BOB masks made at level load on 512K (7 blits per BOB -> 5, about a quarter less
+      blitter work); see `enhanced/docs/SCROLLER.md`, One program for every machine
+- [ ] Keep busy scenes at 50 fps on an A500: measure the masks in WinUAE (timing build); then a
+      copper-driven blit queue (an interrupt per blit costs about as much as it saves on a 68000)
 - [ ] Fold the scroller into the game source on `enhanced/scroll` (today: module on its own track
       + in-place patches over the original binary); see `enhanced/docs/SCROLLER.md`, *Next steps*
 - [ ] BOB masks: one-plane masks (+20%, stored or built on demand into a small cache) on 512K;

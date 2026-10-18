@@ -394,6 +394,21 @@ text*). The originals' globals overlay the end of the program
 file and some are used before they are set (the fraction of `g_ArthurX` in the opening scene),
 so for the 1MB comparison the original starts with the same junk.
 
+**One-plane masks (512K profile).** The 512K drawing built each BOB's mask with two blits (the
+OR of its 5 planes into `MASKBUF`) before its 5 cookie-cut blits. Now `BuildLevelMasks` (called
+by `LoadLevel` after the sets are copied) makes the masks once per level, strip by strip from the
+graphics files' strip tables (`CacheSizes*`): for the level's BOB sets (region 2, after the
+copies) and for the item / weapon / shot graphics (region 1). A mask line is the OR of an image
+line's 5 plane lines, so a region's masks are a fifth of its size and an image's mask is at
+`mask base + (graphics - region base) / 5`; `BobMaskFind` looks it up when a BOB is drawn, and
+each drawn part finds its place from how far clipping has moved the graphics pointer (whole
+lines: a fifth; bytes at the left: the same). A BOB with no mask (none found in the runs) is
+drawn the old way. 7 blits per BOB become 5, and the blitter work per BOB falls by about a
+quarter. Measured in the emulator over 600 frames of level 0 (restore and new edges included):
+20.9 blits and 3,803 channel-words per frame before, 15.8 and 3,016 after. Every BOB in the
+runs found its mask; the pictures are the same as before on all seven levels. Memory: at most
+13 KB per level plus 3 KB (the worst level's data now ends at $7DD56).
+
 **Memory (512K profile).** The program has grown (to $1A19C) and the whole map after it moves
 with it, so the HUD area (`CLEAR_AREA`) and the level file (`LEVEL_FILE`) are moved down into the
 old fourth screen, free above the scroller's storage: the worst level's data (stage 2: tile file

@@ -60,10 +60,11 @@ def build(extra_defs=()):
               ("the scroller's buffers end before its storage", syms['SCREEN_0'] + 3 * 47120 <= syms['SCROLL_STORE']),
               ("the scroller's storage ends before the HUD area", syms['ScrollStoreEnd'] <= syms['CLEAR_AREA'])]
     top = level_data_top(prog, syms)
-    checks.append((f'the level data (file + BOB sets, worst ${top:X}) ends below $7F4DE, as the original\'s',
+    checks.append((f'the level data (file, BOB sets, masks; worst ${top:X}) ends below $7F4DE, as the original\'s',
                    top <= 0x7F4DE))
     for what, ok in checks:
         if not ok: sys.exit('layout: ' + what + ' - no')
+    print(f'level data up to ${top:X}')
     print(f'game.bin {os.path.getsize(prog):,} bytes ($80-${end:X}); globals ${syms["GlobalsBlock"]:X}, '
           f'memory map from ${syms["MAP_LOW"]:X} (screens ${syms["SCREEN_0"]:X}, level file ${syms["LEVEL_FILE"]:X}); '
           f'effects package for ${syms["MUSIC_FILE"]:X}, music package for ${syms["MUSIC1M_FILE"]:X}')
@@ -72,15 +73,18 @@ def build(extra_defs=()):
 
 def level_data_top(prog, syms):
     """the highest address the 512K profile fills when a level loads: the level file at
-    LEVEL_FILE, then the level's BOB sets copied after it (BuildFrameTable)"""
+    LEVEL_FILE, the level's BOB sets copied after it (BuildFrameTable), then their masks"""
     import struct
     d = open(prog, 'rb').read()
     r = lambda a, f: struct.unpack_from(f, d, a - 0x80)
     sizes, masks = r(syms['BobSetSizes'], '>21H'), r(syms['LevelBobSetMask'], '>7L')
     ss, sm = r(syms['SmallBobSetSizes'], '>10H'), r(syms['LevelSmallBobMask'], '>7H')
     files = [r(syms[f'FileLevel{n}'] + 4, '>L')[0] for n in range(7)]
-    return max(syms['LEVEL_FILE'] + files[lv] + sum(sizes[i] for i in range(21) if masks[lv] >> i & 1)
-               + sum(ss[i] for i in range(10) if sm[lv] >> i & 1) for lv in range(7))
+    def top(lv):
+        sets = sum(sizes[i] for i in range(21) if masks[lv] >> i & 1) + sum(ss[i] for i in range(10) if sm[lv] >> i & 1)
+        # then the one-plane masks (BuildLevelMasks): a fifth of the sets and of the item graphics
+        return syms['LEVEL_FILE'] + files[lv] + sets + sets // 5 + 2 + (0x1234 + 0x1AC2 + 0xEA6) // 5
+    return max(top(lv) for lv in range(7))
 
 
 def bootblock(length):

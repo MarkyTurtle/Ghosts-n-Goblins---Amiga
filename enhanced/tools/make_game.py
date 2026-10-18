@@ -255,6 +255,9 @@ def fold_scroller(S):
     S.sub("        lea.l   FileCopyrightScreen(pc),a1      ; 05D32/05D88\n",
           I('jsr     EnhInit', 'the scroller\'s records (and the machine description)') + '\n'
           "        lea.l   FileCopyrightScreen(pc),a1      ; 05D32/05D88\n")
+    S.sub("        bsr.w   BuildFrameTable                 ; 0689C/068FA\n",
+          "        bsr.w   BuildFrameTable                 ; 0689C/068FA\n"
+          + I('jsr     BuildLevelMasks', '512K: the one-plane masks of the level\'s images') + '\n')
     S.sub("        bsr.w   DrawCreditsScreen               ; 05EF0/05F46\n",
           "        bsr.w   DrawCreditsScreen               ; 05EF0/05F46\n" + I('jsr     EnhShowMachine', 'and the memory the bootblock found') + '\n')
     # the timing build: the logic's start and end colour the background
@@ -287,8 +290,11 @@ def widen_branches(path):
             return n
         L = open(path).read().split('\n')
         for k, e in bad:
-            if e == '2029':                   # short branch -> word branch
+            if e == '2029':                   # short branch -> word branch; word bsr / bra -> jsr / jmp
                 new = re.sub(r'^(\s+b(?:ra|sr|eq|ne|cc|cs|pl|mi|hi|ls|ge|gt|le|lt|vc|vs))\.b(\s)', r'\1.w\2', L[k - 1])
+                if new == L[k - 1]:
+                    new = re.sub(r'^(\s+)bsr\.w(\s+)(\w+)', r'\1jsr  \2(\3).l', L[k - 1])
+                    new = re.sub(r'^(\s+)bra\.w(\s+)(\w+)', r'\1jmp  \2(\3).l', new)
             else:                             # lea x(pc) out of reach -> lea (x).l (no flags either way)
                 new = re.sub(r'^(\s+lea\.l\s+)(\w+)\(pc\),(a\d)', r'\1(\2).l,\3', L[k - 1])
             assert new != L[k - 1], L[k - 1]

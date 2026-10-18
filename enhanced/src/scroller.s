@@ -394,6 +394,180 @@ PrCopy:         movea.l DrawRec(pc),a3
                 rts
 
 ;------------------------------------------------------------------------------
+; One-plane BOB masks (512K profile). The 512K drawing used to build each BOB's mask with
+; two blits (the OR of its 5 planes) before its 5 cookie-cut blits; now the masks are made
+; once, at level load, for every image the level can draw: the level's BOB sets (copied
+; after the level file, region 2) and the item / weapon / shot graphics (ESHOT_GFX_BUF ..
+; the end of ITEM_GFX2_BUF, region 1). A mask line is the OR of an image line's 5 plane
+; lines, so a region's masks are a fifth of its size and an image's mask is at
+;     mask base + (graphics - region base) / 5.
+; With the cache (PF_CACHE) the graphics carry their own masks and none of this runs.
+;------------------------------------------------------------------------------
+ITEMS_GFX_LEN   equ     $1234+$1AC2+$EA6        ; shots, items, items 2: contiguous in memory
+
+; BobMaskFind - ScrDrawBob, at the start: a1 = the image -> BobGfx = a1, BobMask = its mask
+; (0: none; the BOB is then drawn the old way). All registers kept.
+BobMaskFind:    move.l  d0,-(a7)
+                move.l  a1,(BobGfx).l
+                move.l  a1,d0
+                sub.l   (MaskG2).l,d0           ; region 2: the level's sets
+                cmp.l   (MaskL2).l,d0           ; (unsigned: below the region is huge)
+                bcs.b   .r2
+                move.l  a1,d0
+                sub.l   #ESHOT_GFX_BUF,d0       ; region 1: items, weapons, shots
+                cmp.l   (MaskL1).l,d0
+                bcc.b   .none
+                divu.w  #5,d0
+                swap    d0
+                tst.w   d0                      ; (an image starts on a line: no remainder)
+                bne.b   .none
+                clr.w   d0
+                swap    d0
+                add.l   (MaskM1).l,d0
+                bra.b   .set
+.r2:            divu.w  #5,d0
+                swap    d0
+                tst.w   d0
+                bne.b   .none
+                clr.w   d0
+                swap    d0
+                add.l   (MaskM2).l,d0
+                bra.b   .set
+.none:          moveq   #0,d0
+.set:           move.l  d0,(BobMask).l
+                move.l  (a7)+,d0
+                rts
+
+; BuildLevelMasks - LoadLevel, after BuildFrameTable has copied the level's sets: a2 = the
+; end of the copies (they start at g_LevelFileEnd). The masks go after them: region 2's,
+; then region 1's.
+BuildLevelMasks:
+                btst    #PF_CACHE,(Profile).l
+                bne.w   .out
+                movem.l d0-d7/a0-a5,-(a7)
+                clr.l   (MaskL1).l              ; (no lookups match while they are being made)
+                move.l  g_LevelFileEnd(a6),d0
+                move.l  d0,(MaskG2).l
+                move.l  a2,d1
+                sub.l   d0,d1
+                move.l  d1,(MaskL2).l
+                move.l  a2,(MaskM2).l
+                lea     g_BobSets(a6),a4        ; enemy sets: copies, file offsets, sizes, strips
+                lea     (BobSetOffsets).l,a5
+                lea     (BobSetSizes).l,a0
+                lea     (CacheSizesEnemyGfx).l,a3
+                moveq   #21-1,d6
+                moveq   #39-1,d5
+                bsr.w   MasksForSets
+                lea     g_SmallBobSets(a6),a4   ; small BOB sets
+                lea     (SmallBobSetOffsets).l,a5
+                lea     (SmallBobSetSizes).l,a0
+                lea     (CacheSizesSmallBobs).l,a3
+                moveq   #10-1,d6
+                moveq   #10-1,d5
+                bsr.w   MasksForSets
+                move.l  (MaskL2).l,d0           ; region 1 after region 2's masks
+                divu.w  #5,d0
+                ext.l   d0
+                andi.l  #$FFFF,d0
+                add.l   (MaskM2).l,d0
+                addq.l  #1,d0
+                andi.w  #$FFFE,d0
+                move.l  d0,(MaskM1).l
+                movea.l d0,a2
+                lea     (ESHOT_GFX_BUF).l,a1
+                lea     (CacheSizesEnemyShots).l,a3
+                moveq   #3-1,d7
+                bsr.w   MakeMasks
+                lea     (ITEM_GFX_BUF).l,a1
+                lea     (CacheSizesItems).l,a3
+                moveq   #4-1,d7
+                bsr.w   MakeMasks
+                lea     (ITEM_GFX2_BUF).l,a1
+                lea     (CacheSizesItemGfx2).l,a3
+                moveq   #3-1,d7
+                bsr.w   MakeMasks
+                move.l  a2,(MaskEnd).l          ; (the highest address the level's data uses)
+                move.l  #ITEMS_GFX_LEN,(MaskL1).l
+                movem.l (a7)+,d0-d7/a0-a5
+.out:           rts
+
+; MasksForSets - a4 = the sets' copies (longs, 0: not in this level), a5 = their offsets in
+; the graphics file (longs), a0 = their sizes (words), a3 = the file's strips (width px,
+; lines), d6 = sets - 1, d5 = strips - 1. Each strip of a copied set gets its masks.
+MasksForSets:
+.set:           move.l  (a4)+,d0                ; the copy
+                move.l  (a5)+,d1                ; its offset in the file
+                moveq   #0,d2
+                move.w  (a0)+,d2                ; its size
+                tst.l   d0
+                beq.b   .next
+                add.l   d1,d2                   ; its end in the file
+                movem.l d5-d6/a0/a3-a5,-(a7)
+                moveq   #0,d3                   ; strip offset in the file
+.strip:         cmp.l   d1,d3
+                bcs.b   .skip
+                cmp.l   d2,d3
+                bcc.b   .done
+                movem.l d0-d3/d5/a3,-(a7)
+                movea.l d0,a1
+                adda.l  d3,a1
+                suba.l  d1,a1                   ; the strip in the copy
+                move.l  a1,d7
+                sub.l   (MaskG2).l,d7
+                divu.w  #5,d7
+                andi.l  #$FFFF,d7
+                add.l   (MaskM2).l,d7
+                movea.l d7,a2                   ; its masks
+                moveq   #0,d7                   ; one strip
+                bsr.w   MakeMasks
+                movem.l (a7)+,d0-d3/d5/a3
+.skip:          moveq   #15,d4                  ; the strip's size: words x 2 x 5 x lines
+                add.w   (a3)+,d4
+                lsr.w   #4,d4
+                mulu.w  (a3)+,d4
+                mulu.w  #10,d4
+                add.l   d4,d3
+                dbra    d5,.strip
+.done:          movem.l (a7)+,d5-d6/a0/a3-a5
+.next:          dbra    d6,.set
+                rts
+
+; MakeMasks - a1 = graphics strips, a2 = where their masks go, a3 = the strips (width px,
+; lines), d7 = strips - 1. Per image line: the OR of the 5 plane lines. a1, a2 and a3 end
+; after the strips.
+MakeMasks:
+.strip:         moveq   #15,d4
+                add.w   (a3)+,d4
+                lsr.w   #4,d4                   ; words per plane line
+                move.w  (a3)+,d5
+                subq.w  #1,d5                   ; lines - 1
+                move.w  d4,d6
+                add.w   d6,d6                   ; bytes per plane line
+                subq.w  #1,d4
+.line:          move.w  d4,d3
+.word:          movea.l a1,a4
+                move.w  (a4),d0
+                adda.w  d6,a4
+                or.w    (a4),d0
+                adda.w  d6,a4
+                or.w    (a4),d0
+                adda.w  d6,a4
+                or.w    (a4),d0
+                adda.w  d6,a4
+                or.w    (a4),d0
+                move.w  d0,(a2)+
+                addq.l  #2,a1
+                dbra    d3,.word
+                move.w  d6,d0                   ; past planes 1-4 of this line
+                add.w   d0,d0
+                add.w   d0,d0
+                adda.w  d0,a1
+                dbra    d5,.line
+                dbra    d7,.strip
+                rts
+
+;------------------------------------------------------------------------------
 ; EnhShowMachine - after DrawCreditsScreen (the title screen): one line in the free row
 ; under the credits with the memory the bootblock found, for example
 ;       CHIP 512K SLOW 512K FAST 0K
@@ -472,6 +646,15 @@ ShowRec:        dc.l    0               ; the buffer on screen
 PrRet:          dc.l    0
 PrOff:          dc.l    0
 PrRing:         dc.w    0
+                cnop    0,4
+BobGfx:         dc.l    0               ; the image ScrDrawBob is drawing (BobMaskFind) ...
+BobMask:        dc.l    0               ; ... and its one-plane mask (0: none)
+MaskG2:         dc.l    0               ; region 2 (the level's sets): start, length, masks
+MaskL2:         dc.l    0
+MaskM2:         dc.l    0
+MaskL1:         dc.l    0               ; region 1 (items, weapons, shots): length, masks
+MaskM1:         dc.l    0
+MaskEnd:        dc.l    0               ; end of the masks
                 cnop    0,4
                 rsset   SCROLL_STORE            ; (cleared by EnhInit)
 RecP            rs.b    buf_SIZEOF
