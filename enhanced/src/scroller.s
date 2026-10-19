@@ -381,12 +381,43 @@ TextReplay:
                 lea     (TextQ).l,a4
                 move.w  (a4)+,d5
                 move.w  d5,(TextDone).l
-                subq.w  #1,d5
-                bmi.b   .out
-.char:          bsr.w   TextEntry
+                beq.w   .out
+.next:          movea.l a4,a5                   ; d6 = the run of characters from here on one
+                moveq   #1,d6                   ; line, one after the other, in one colour set
+.run:           cmp.w   d5,d6
+                beq.b   .rundone
+                move.w  4(a5),d0                ; ring line
+                cmp.w   4+TEXTQ_ENTRY(a5),d0
+                bne.b   .rundone
+                move.l  6(a5),d0                ; byte column + 1
+                addq.l  #1,d0
+                cmp.l   6+TEXTQ_ENTRY(a5),d0
+                bne.b   .rundone
+                move.l  10(a5),d0               ; colours
+                move.l  10+TEXTQ_ENTRY(a5),d1
+                clr.b   d0
+                clr.b   d1
+                cmp.l   d1,d0
+                bne.b   .rundone
+                lea     TEXTQ_ENTRY(a5),a5
+                addq.w  #1,d6
+                bra.b   .run
+.rundone:       cmp.w   #STRIP_MIN,d6
+                blt.b   .char
+                cmp.w   #STRIP_MAX,d6
+                bgt.b   .char
+                bsr.w   DrawStrip               ; a line of text: one blit (a BOB)
+                move.w  d6,d0
+                mulu.w  #TEXTQ_ENTRY,d0
+                adda.l  d0,a4
+                sub.w   d6,d5
+                bne.b   .next
+                bra.b   .out
+.char:          bsr.w   TextEntry               ; one character
                 bsr.w   PrFast
                 bsr.w   .restore
-                dbra    d5,.char
+                subq.w  #1,d5
+                bne.b   .next
 .out:           movem.l (a7)+,d0-d7/a0-a5
                 rts
 ; a restore entry for the character at PrRing / PrOff (its word, 8 lines; two entries
@@ -427,6 +458,112 @@ TextReplay:
                 move.l  a1,buf_RList(a0)
 .full:          rts
 
+;------------------------------------------------------------------------------
+; DrawStrip - a4 = the first of d6 queued characters on one line, one after the other, in
+; one set of colours (the game's messages: 'TAKE A KEY FOR COMING IN !' every frame): drawn
+; as one BOB (ScrDrawBob, pre-masked: one blit and one restore entry) from a strip made from
+; their glyphs in TEXT_STRIP, made again only when the line changes (StripLen, StripCol,
+; StripFonts). The strip is in the 1MB BOB format: per line, each plane's row followed by
+; the mask's (1: the text, where either font plane is set).
+;------------------------------------------------------------------------------
+STRIP_MIN       equ     4               ; characters: shorter runs are drawn one by one
+TEXT_STRIP      equ     SCREEN_2+$DA40  ; chip RAM the progress map's picture stops short of,
+STRIP_MAXW      equ     (SCROLL_STORE-TEXT_STRIP)/(10*8*2)      ; up to SCROLL_STORE
+STRIP_MAX       equ     2*STRIP_MAXW
+
+DrawStrip:      movem.l d0-d7/a0-a5,-(a7)
+                move.w  d6,d5
+                addq.w  #1,d5
+                lsr.w   #1,d5                   ; d5 = words per plane row
+                move.l  10(a4),d7
+                clr.b   d7                      ; d7 = colours
+                cmp.w   StripLen(pc),d6         ; the strip made last time?
+                bne.b   .make
+                cmp.l   StripCol(pc),d7
+                bne.b   .make
+                movea.l a4,a5
+                lea     StripFonts(pc),a1
+                move.w  d6,d0
+                subq.w  #1,d0
+.cmp:           move.l  (a5),d1
+                cmp.l   (a1)+,d1
+                bne.b   .make
+                lea     TEXTQ_ENTRY(a5),a5
+                dbra    d0,.cmp
+                bra.w   .draw
+.make:          move.w  d6,StripLen             ; the key
+                move.l  d7,StripCol
+                lea     (TEXT_STRIP).l,a1       ; clear the strip: 8 lines x 10 rows x d5 words
+                move.w  d5,d0
+                mulu.w  #8*10,d0
+                subq.w  #1,d0
+.clr:           clr.w   (a1)+
+                dbra    d0,.clr
+                move.w  d5,d4
+                add.w   d4,d4                   ; d4 = bytes per row
+                movea.l a4,a5
+                lea     StripFonts(pc),a2
+                moveq   #0,d3                   ; character
+.ch:            bsr.w   TextEntry0              ; a5 = entry -> a0 = font data, PrCol
+                move.l  a0,(a2)+
+                bsr.w   PrGlyph                 ; a3 = its glyph
+                lea     (TEXT_STRIP).l,a1
+                adda.w  d3,a1                   ; its byte in each row
+                moveq   #7,d2
+.gl:            move.b  (a3)+,d0
+                not.b   d0                      ; the text's pixels
+                movea.l a1,a0
+                moveq   #4,d1
+.gp:            move.b  (a3)+,(a0)              ; plane row
+                adda.w  d4,a0
+                move.b  d0,(a0)                 ; then the mask row
+                adda.w  d4,a0
+                dbra    d1,.gp
+                adda.w  d4,a1                   ; next line: 10 rows on
+                adda.w  d4,a1
+                adda.w  d4,a1
+                adda.w  d4,a1
+                adda.w  d4,a1
+                adda.w  d4,a1
+                adda.w  d4,a1
+                adda.w  d4,a1
+                adda.w  d4,a1
+                adda.w  d4,a1
+                dbra    d2,.gl
+                lea     TEXTQ_ENTRY(a5),a5
+                addq.w  #1,d3
+                cmp.w   d6,d3
+                bne.b   .ch
+.draw:          bsr.w   GetCam                  ; d0 = camera x, d1 = camera y
+                move.w  4(a4),d2                ; ring line of the top line -> world line:
+                addq.w  #1,d2                   ; the one = -1 - ring (mod 256) among the
+                neg.w   d2                      ; 256 from the bottom visible line up
+                add.w   #16,d1
+                sub.w   d1,d2
+                andi.w  #$FF,d2
+                add.w   d1,d2                   ; top line
+                subq.w  #7,d2                   ; bottom line
+                move.l  6(a4),d1                ; byte column -> world x: 8 x byte - 16
+                lsl.w   #3,d1
+                sub.w   #16,d1
+                move.w  d5,d3
+                lsl.w   #4,d3                   ; width
+                moveq   #8,d4
+                movea.l DrawRec(pc),a0
+                lea     (TEXT_STRIP).l,a1
+                st.b    (BobForce).l            ; pre-masked as it is
+                bsr.w   ScrDrawBob
+                sf.b    (BobForce).l
+                movem.l (a7)+,d0-d7/a0-a5
+                rts
+
+; TextEntry0 - as TextEntry, a5 = the entry (a5 kept)
+TextEntry0:     move.l  a4,-(a7)
+                movea.l a5,a4
+                bsr.b   TextEntry
+                movea.l (a7)+,a4
+                rts
+
 ; TextEntry - a4 = a queue entry -> a0 = font data, PrRing, PrOff, PrCol; a4 = the next
 TextEntry:      movea.l (a4)+,a0
                 move.w  (a4)+,PrRing
@@ -458,10 +595,10 @@ TextFlush:      movem.l d0-d7/a0-a5,-(a7)
                 rts
 
 ;------------------------------------------------------------------------------
-; PrFast - a0 = font data: the character at PrRing / PrOff in the colours PrCol, drawn into
-; the buffer being drawn, transparent where the font is 0 (as PrintBody on the playfield)
+; PrGlyph - a0 = font data, colours PrCol -> a3 = its glyph (GLYPH_CACHE): 8 lines of the
+; mask byte (1: background) and the 5 plane bytes; worked out if it is not there
 ;------------------------------------------------------------------------------
-PrFast:         movem.l d0-d7/a0-a5,-(a7)
+PrGlyph:        movem.l d0-d7/a0-a2/a4-a5,-(a7)
                 move.l  a0,d0                   ; the character code ...
                 sub.l   #MASK_BUF,d0
                 lsr.l   #4,d0
@@ -479,7 +616,7 @@ PrFast:         movem.l d0-d7/a0-a5,-(a7)
                 lea     (GLYPH_CACHE).l,a2
                 adda.l  d0,a2                   ; its slot
                 cmp.l   (a2),d3
-                beq.w   .draw
+                beq.w   .done
                 move.l  d3,(a2)                 ; not there: work it out
                 lea     -16(a7),a7              ; 5 plane selectors, then 8 unions
                 movea.l a7,a4
@@ -537,8 +674,17 @@ PrFast:         movem.l d0-d7/a0-a5,-(a7)
                 cmpa.l  a1,a0
                 bne.b   .line
                 lea     16(a7),a7
-.draw:          WAITBLIT                        ; (a blit may still be writing this buffer: CopyAll)
-                lea     4(a2),a3                ; the glyph
+.done:          lea     4(a2),a3
+                movem.l (a7)+,d0-d7/a0-a2/a4-a5
+                rts
+
+;------------------------------------------------------------------------------
+; PrFast - a0 = font data: the character at PrRing / PrOff in the colours PrCol, drawn into
+; the buffer being drawn, transparent where the font is 0 (as PrintBody on the playfield)
+;------------------------------------------------------------------------------
+PrFast:         movem.l d0-d7/a0-a5,-(a7)
+                bsr.w   PrGlyph
+                WAITBLIT                        ; (a blit may still be writing this buffer: CopyAll)
                 movea.l DrawRec(pc),a0
                 move.l  buf_Base(a0),d0
                 add.l   PrOff(pc),d0
@@ -604,6 +750,8 @@ LEVEL_GFX_LIMIT equ     $7F4DE                  ; the level data's end in the or
 ; BobGfx = a1 and BobMask = its one-plane mask (0: none; the BOB is then drawn the old way).
 ; Other registers kept.
 BobMaskFind:    move.l  d0,-(a7)
+                tst.b   (BobForce).l            ; (a text strip: DrawStrip)
+                bne.b   .masked
                 btst    #PF_CACHE,(Profile).l
                 bne.b   .masked
                 move.l  a1,d0
@@ -657,6 +805,7 @@ GfxPriority:    dc.b    $40,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,12,$41
 ; replaced: every set of the level is marked 1 until it is placed): the sets are taken again from the files still in memory (enemy sets at
 ; SCREEN_0, small sets at BOB_GFX_A) and laid out as above.
 BuildLevelMasks:
+                clr.w   StripLen                ; (the text strip is made again)
                 btst    #PF_CACHE,(Profile).l
                 bne.w   .out
                 movem.l d0-d7/a0-a5,-(a7)
@@ -1077,6 +1226,11 @@ ShowRec:        dc.l    0               ; the buffer on screen
 PrOff:          dc.l    0               ; the character being drawn: byte offset, ring line, colours
 PrRing:         dc.w    0
 PrCol:          dc.b    0,0,0,0         ; shadow, ink, paper (, pad)
+StripLen:       dc.w    0               ; the text strip (DrawStrip): characters (0: none), ...
+StripCol:       dc.l    0               ; ... colours, ...
+StripFonts:     ds.l    STRIP_MAX       ; ... and their font data
+BobForce:       dc.b    0               ; ScrDrawBob: the image is pre-masked as it is (BobMaskFind)
+                even
                 cnop    0,4
 BobGfx:         dc.l    0               ; the image ScrDrawBob is drawing (BobMaskFind) ...
 BobMask:        dc.l    0               ; ... and its one-plane mask (0: none)

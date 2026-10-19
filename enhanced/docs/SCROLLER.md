@@ -280,8 +280,17 @@ byte and the 5 plane bytes, worked out as the original `PrintBody` does. NameEnt
 redraw at every cursor move (`EnhRedrawSame`) keeps the pristine buffer when it already shows the
 camera (it was 255 tile blits a move).
 
+**Lines of text as one BOB (`DrawStrip`).** In play, a run of 4-28 queued characters on one line,
+one after the other in one set of colours (the game's messages), is drawn as a single pre-masked
+BOB: its glyphs are put together once into a strip in the 1MB BOB format (`TEXT_STRIP`, the
+2,392 bytes of chip RAM between the end of the progress map's picture, `SCREEN_2 + $DA40`, and
+the scroller's storage), and each frame it is one `ScrDrawBob` call - one blit, one restore
+entry - instead of 26 characters drawn by the CPU. The strip is made again only when the line
+changes (length, colours, characters) or a level loads.
+
 CPU work (instruction bytes executed, emulator): the key message ('TAKE A KEY FOR COMING IN !')
-adds about 18 K a frame instead of 203 K (play alone is 13 K); drawing the title screen 0.57 M
+adds about 18 K a frame instead of 203 K (play alone is 13 K) drawn character by character,
+and next to nothing as a strip; drawing the title screen 0.57 M
 instead of 1.74 M; a name-entry cursor move about 130 K instead of 365 K plus the full redraw.
 The pictures are the same as the original's (title, high scores, the key message for 60 frames,
 201 name-entry frames with moves and letters, and the usual runs on every stage).
