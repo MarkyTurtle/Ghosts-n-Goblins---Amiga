@@ -309,7 +309,9 @@ TBLTRK4	equ	26
 TBLTRK5	equ	28
 TBLTRK6	equ	30
 	endc
-LEVEL_TABLES        	equ	CLEAR_AREA+$10E0	; the level's map tables (LoadLevelTables): at most TBL_SLOTS cells
+LEVEL_TABLES        	equ	CLEAR_AREA+$B40	; the level's map tables (LoadLevelTables): at most TBL_SLOTS cells
+                    			; (the HUD is 16 lines of 5 planes, $B40 bytes: ClearHudArea; the
+                    			; original kept $10E0, the rest never written or shown)
 LEVEL_SLOTS         	equ	LEVEL_TABLES	;   cell -> slot (256 bytes)
 LEVEL_BLOCKS        	equ	LEVEL_SLOTS+256	;   the slots' BlockTiles (64 bytes each)
 LEVEL_CELLS         	equ	LEVEL_BLOCKS+TBL_SLOTS*64	;   the slots' CellTiles (256 bytes each)

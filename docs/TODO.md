@@ -64,7 +64,7 @@ Each line points to the item below with the details and measurements.
 - [x] Music on 512K machines with an expansion (slow or fast RAM): the whole 1MB package, in the
       chip RAM the program moved out of
 - [ ] Music on a plain 512K A500: needs about 43 KB of chip RAM; the per-level map tables freed
-      17 KB (the fullest level now leaves 20 KB free, 3 KB before), so about 23 KB more (mirrored
+      17 KB and two joined gaps 3 KB (the fullest stage now leaves 23 KB free, 3 KB before), so about 20 KB more (mirrored
       Arthur / enemy frames), and a combined package (the tunes' samples and note data added to
       the 512K effects package) (4)
 - [ ] Music quality tiers chosen by the machine's memory (4)

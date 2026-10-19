@@ -445,6 +445,16 @@ level data now ends at most at `$7A5E0`, before at `$7E806`). The program is 77,
 `bin/main_512k.bin`; `build_game.py` checks that the map's readable span (`FrameOffsets1 -
 WorldMap`) is still the one it assumed.
 
+**Two unused gaps joined to the level data (3 KB).** A scan of chip RAM (fill everything from
+`MAP_LOW` with a pattern, play every stage, see what is never written; then fill only those gaps
+and check nothing reads or shows them) found two gaps next to the level data: the last third of
+the HUD area (the HUD is 16 lines of 5 planes, `$B40` bytes, as `ClearHudArea` clears and the
+copper shows; the original kept `$10E0`), and `$7F4DE-$7FB00` between the original's end of
+level data and the bootblock's machine description (`EnhInit` copies that, and the loader above
+it is finished with; the supervisor stack comes down from `$80000`, 318 bytes deep at most in
+the emulator). The level tables now start at `CLEAR_AREA+$B40` and `LEVEL_GFX_LIMIT` is
+`$7FB00`: the fullest stage (2) leaves 23,232 bytes free without pre-masking (20,222 before).
+
 With the smaller program the memory map moved down, and the slow / fast RAM music needed a new
 order: the effects package's area now comes first after the program (`SFX_AREA`), and
 `LoadSound` runs right after `ReadProfile`, so that the 1MB music package, loaded over the
@@ -503,7 +513,7 @@ every plane line followed by its mask line, `BuildMaskedGfx`) is drawn in one bl
 The blitter moves the same words either way; what goes is the 4 set-ups between blits (the CPU
 waiting for the blitter, then loading it, with the blitter idle) and the mask lookup with its
 divisions: about 1.5 raster lines per BOB, a large part of a small BOB's cost. `BuildLevelMasks`
-now fills the room up to `LEVEL_GFX_LIMIT` ($7F4DE, the original's end of level data) in the
+now fills the room up to `LEVEL_GFX_LIMIT` ($7FB00; at first $7F4DE, the original's end of level data) in the
 order of `GfxPriority`: the enemy shots, the small BOB sets, the dragon's set, the items /
 weapons / effects, then the other enemy sets, smallest first; whatever does not fit gets
 one-plane masks as above. A set costs 0.8 x its size more than with a one-plane mask; the shots

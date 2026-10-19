@@ -745,7 +745,11 @@ PrFast:         movem.l d0-d7/a0-a5,-(a7)
 ESHOT_LEN       equ     $1234                   ; enemy shots
 ITEM_LEN        equ     $1AC2+$EA6              ; items, weapons, effects (ITEM_GFX_BUF, ITEM_GFX2_BUF)
 ITEMS_GFX_LEN   equ     ESHOT_LEN+ITEM_LEN      ; region 1: contiguous in memory from ESHOT_GFX_BUF
-LEVEL_GFX_LIMIT equ     $7F4DE                  ; the level data's end in the original 512K program
+LEVEL_GFX_LIMIT equ     $7FB00                  ; the level data's end: up to the bootblock's machine
+                                                ; description (copied by EnhInit, so free after it, as is
+                                                ; the loader above it); the supervisor stack comes down
+                                                ; from $80000 (318 bytes deep at most, measured). The
+                                                ; original's level data ended at $7F4DE
 
 ; BobMaskFind - ScrDrawBob, at the start: a1 = the image. Pre-masked (the cache, or a key of
 ; a converted image): BobMasked set and a1 = the masked copy. Otherwise BobMasked clear,

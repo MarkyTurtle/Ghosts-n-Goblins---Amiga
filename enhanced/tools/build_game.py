@@ -170,7 +170,7 @@ def build(extra_defs=()):
               ("the text strip is after the buffers and holds 28 characters",
                syms['TEXT_STRIP'] >= syms['SCREEN_0'] + 3 * 47120 and syms['STRIP_MAX'] >= 28)]
     top = level_data_top(prog, syms)
-    checks.append((f'the level data (file, BOB sets, masks; worst ${top:X}) ends below $7F4DE, as the original\'s',
+    checks.append((f'the level data (file, BOB sets, masks; worst ${top:X}) ends below LEVEL_GFX_LIMIT',
                    top <= syms['LEVEL_GFX_LIMIT']))
     for what, ok in checks:
         if not ok: sys.exit('layout: ' + what + ' - no')
