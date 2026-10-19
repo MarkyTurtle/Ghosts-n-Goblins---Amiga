@@ -14,8 +14,9 @@ Each line points to the item below with the details and measurements.
 - [ ] zx0 compression of every file, decompressed in place (4); about 296 KB less on disk (5)
 - [x] One main program for every memory size: the bootblock finds the memory and leaves a machine
       description at a known place; the program picks its features from it (`gng_game.s`) (7)
-- [ ] Slow / fast RAM used on machines that have it (512K chip + 512K slow: code, tables, sound
-      out of chip RAM, leaving room for more pre-masked images or music) (7)
+- [x] Slow / fast RAM used on machines that have it: under 1MB of chip RAM the program moves to
+      the expansion at start-up (`EnhRelocate`, a relocation file made by `build_game.py`), and
+      the 1MB music package goes into the chip RAM it left (7)
 - [ ] Font stored without its unused bytes: 3 KB less on disk (5)
 
 **Display and drawing**
@@ -57,8 +58,11 @@ Each line points to the item below with the details and measurements.
       trimming sample tails) (5)
 
 **Sound**
-- [ ] Music on 512K: add the tunes' samples and note data (about 43 KB) to the 512K effects
-      package, not the whole 79 KB of the 1MB package (4)
+- [x] Music on 512K machines with an expansion (slow or fast RAM): the whole 1MB package, in the
+      chip RAM the program moved out of
+- [ ] Music on a plain 512K A500: needs about 43 KB of chip RAM freed first (per-level files,
+      mirrored frames) and a combined package (the tunes' samples and note data added to the
+      512K effects package) (4)
 - [ ] Music quality tiers chosen by the machine's memory (4)
 - [ ] Resample the music samples (2/3 saves about 11 KB) by scaling the instruments' period
       multipliers; also fixes periods below Paula's minimum of 124 (5)

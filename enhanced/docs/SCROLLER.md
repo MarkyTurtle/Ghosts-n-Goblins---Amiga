@@ -386,12 +386,42 @@ machine description (`MACHINE_INFO`) and sets `Profile`:
 | Bit | When | What it turns on |
 |---|---|---|
 | `PF_CACHE` | 1MB or more of chip RAM | graphics cached with masks in upper chip RAM (`CacheGraphics`, `BuildMaskedGfx`); one-blit BOBs (`DrawBobMasked`, `DrawSceneryMasked`); no graphics loads per level, the frame tables point into the cache; frame offsets doubled in place; progress map kept |
-| `PF_MUSIC` | (with `PF_CACHE`) | the 1MB music package (assembled for `$80000`), its tunes and the extra effects |
+| `PF_MUSIC` | with `PF_CACHE`, or the program moved to slow / fast RAM (below) | the 1MB music package (assembled for `$80000`; at `$80` when the program moved), its tunes and the extra effects |
 | `PF_EVERY` | (with `PF_CACHE`) | draw every frame |
 
-Without them (512K of chip RAM, with or without slow/fast RAM, or no machine description) it
-is the 512K program. Upper chip RAM: music `$80000`, progress map `$9B400`, enemy sets
+Without them (512K of chip RAM and no expansion with room, or no machine description) it is
+the 512K program. Upper chip RAM: music `$80000`, progress map `$9B400`, enemy sets
 `$9D200`, small sets `$D7300`, shots `$D8D80`, items `$DB200`-`$E04D0` (checked at assembly).
+
+**Slow / fast RAM: the program moves out of chip RAM (`EnhRelocate`).** With less than 1MB of
+chip RAM and an expansion with room (fast RAM first, else slow RAM: the last region of each
+kind in the bootblock's description), the first thing `Start` does is copy everything from
+`$80` to the memory map (`MAP_LOW`: code, tables, globals - about 114 KB) to the expansion, load
+the relocation file after it (track 17, one of the original 1MB program's tracks, free on this
+disk), add the distance to every 32-bit address of the program in the copy, and run `Start`
+again there (`RelocDone`). The memory map - screens, BOB graphics, copper lists, sprites, the
+sound package - stays in chip RAM where it was: only the CPU reads the program. The chip RAM
+from `$80` is then free, and `ReadProfile` turns on `PF_MUSIC`: `LoadSound` loads the 1MB music
+package to `$80` (`MUSICB_FILE`; 18 whole tracks end below `MAP_LOW`, checked) and moves its
+addresses too, so an A500 with a 512K trapdoor expansion plays the music and the 1MB effects.
+The graphics are the 512K program's (one-plane masks and pre-masked images in the level data
+area, as on 512K), and the title says MUSIC.
+
+The relocation file is made by `build_game.py`: the program is assembled a second time 2MB on
+(`RELOC_ORG`) with the memory map where it is (`MAP_FIX`), and every long that differs by 2MB
+is an address to move; anything else that differs stops the build (a 16-bit address, or a
+number worked out from one). The music package likewise (it turns out to be position
+independent: no addresses). The file is a count and word gaps (238 addresses in the program,
+484 bytes). `make_game.py` widens `(pc)` references the larger program puts out of reach.
+
+In the emulator (`compare_game.py --machine slow|fast`: 512K chip + 512K slow, and 512K chip +
+1.5MB slow + 2MB fast, against the original 1MB program, whose sound code it runs) the games
+stay in step on every stage, the pictures as on the 512K machine. `tools/amiga.py` now checks
+that every DMA pointer (blitter channels, copper lists and the bitplane / sprite pointers they
+set, audio samples) is in chip RAM, and none of these runs read anywhere else. `game.py` maps
+the expansion memory, works out where the program goes (`relocation()`, as `EnhRelocate` does)
+and moves its labels and hooks; it also drops Unicorn's translated code where a file is loaded
+over code that ran before (the 68000 has no cache).
 
 **Where the originals differ** both versions are in the source, chosen at run time. In the
 sound code the choice keeps the condition codes (`move sr,-(a7)` ... `move (a7)+,ccr`; game

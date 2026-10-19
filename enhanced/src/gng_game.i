@@ -245,8 +245,12 @@ VEC_LEVEL3          	equ	$0006C
 GLOBALS             	equ	GlobalsBlock	; a6 points here for the whole game (variables block; $1898C)
 GLOBALS_P2          	equ	GLOBALS+$10	; player-2 view of the per-player block ($1899C)
 GLOBALS_SIZE        	equ	$178C	; the globals block and the object slots
+	ifd	MAP_FIX			; (build_game.py's relocation pass: the program assembled
+MAP_LOW             	equ	MAP_FIX	; somewhere else, the memory map where it is at $80)
+	else
 MAP_LOW             	equ	GLOBALS+GLOBALS_SIZE	; ($1A118) the memory map below starts here, right after
                     			; the globals, so it moves with the program
+	endc
 COPPER_INIT         	equ	MAP_LOW+$00000	; $1A118: copper list template ($180 bytes copied from CopperTemplate)
 COPPER_A1           	equ	MAP_LOW+$00078	; $1A190
 COPPER_A2           	equ	MAP_LOW+$000A8	; $1A1C0
@@ -648,6 +652,8 @@ PF_EVERY            	equ	2	;   draw every frame (no odd-frame test)
 UPPER_CHIP          	equ	$80000
 MUSIC1M_FILE        	equ	UPPER_CHIP	; the 1MB music package ($1B394), assembled for here
 MUSIC1M_PLAYER      	equ	MUSIC1M_FILE+$20	; its driver entry
+MUSICB_FILE         	equ	$80	; ... or, with the program moved out of chip RAM (EnhRelocate),
+                    			; loaded here, where the program was, and relocated
 PROGRESS_MAP_CACHE  	equ	MUSIC1M_FILE+$1B400	; the packed progress map ($1D5C)
 ENEMY_GFX_CACHE     	equ	PROGRESS_MAP_CACHE+$1E00	; enemy BOB sets with masks (2 x $1D042); the
                     			; level's frame tables point into it (BuildFrameTable)

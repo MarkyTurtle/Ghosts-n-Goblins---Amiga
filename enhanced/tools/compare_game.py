@@ -4,6 +4,8 @@ with its DrawBob top-clip bug fixed, both originals with the one program's MapTi
 
   --machine 512k   an A500 with 512K of chip RAM   against the original 512K program
   --machine 1mb    an A500+ with 1MB of chip RAM   against the original 1MB program
+  --machine slow   an A500 with 512K chip + 512K slow RAM  against the original 1MB program
+  --machine fast   512K chip + 1.5MB slow + 2MB fast RAM   against the original 1MB program
 
 The game state must stay the same every frame and so must the picture (compare_runs.py does
 the comparing; the camera tables are not compared byte for byte, as they hold pointers).
@@ -13,7 +15,11 @@ import sys
 import compare_runs, test_bootinfo
 from game import GameRun, game
 
-MACHINES = {'512k': (test_bootinfo.MACHINES[0], '512k'), '1mb': (test_bootinfo.MACHINES[2], '1mb')}
+MACHINES = {'512k': (test_bootinfo.MACHINES[0], '512k'), '1mb': (test_bootinfo.MACHINES[2], '1mb'),
+            # 512K chip + 512K slow: the program moves to slow RAM and loads the music where it was
+            # (EnhRelocate): the sound code is the 1MB program's, so it is compared with that
+            'slow': (test_bootinfo.MACHINES[1], '1mb'),
+            'fast': (test_bootinfo.MACHINES[5], '1mb')}
 
 
 def main(frames, seed, machine, level=None, teleport=0, png=None):
@@ -26,7 +32,8 @@ def main(frames, seed, machine, level=None, teleport=0, png=None):
         # tail Arthur reaches his armour a frame later. Give the original the same starting junk
         # as the one program (its globals from +2 on are 4 bytes further on: g_BaseAddr).
         n = 0x1780
-        junk = bytes(test.u.mem_read(test.globals, n))
+        junk = bytes(test.u.mem_read(test.globals - test.reloc, n))     # (a program that moves itself
+                                                                        # takes them along: EnhRelocate)
         ref.u.mem_write(ref.globals, junk[:2]); ref.u.mem_write(ref.globals + 6, junk[2:])
     if build == '512k':     # as the enhanced builds were always compared (compare_runs.py): the
         ref.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))    # DrawBob top-clip fix, the one program

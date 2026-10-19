@@ -256,7 +256,15 @@ INTF_SOFTINT	equ	$0004
 INTF_DSKBLK	equ	$0002
 INTF_TBE	equ	$0001
 
+	ifd	RELOC_ORG		; build_game.py's relocation pass
+	org	RELOC_ORG
+	else
 	org	$80
+	endc
+	ifnd	RELOC_LEN
+RELOC_LEN	equ	0		; the relocation file (EnhRelocate), from build_game.py
+	endc
+RELOC_TRACK	equ	17		; (the original 1MB program's tracks, free on this disk)
 
 
 ;---------------------------------------------------------------------------
@@ -4214,6 +4222,7 @@ CrashReset:
 ; ==================================================================
 ;---------------------------------------------------------------------------
 Start:
+        jsr     EnhRelocate                     ; with an expansion and under 1MB of chip RAM: the program moves there
         lea.l   $8.w,a1                         ; 05AEE/05A80  CPU exceptions $08-$24 (bus error ... trace) -> CrashReset
         lea.l   CrashReset(pc),a0               ; 05AF2/05A84
         move.l  a0,(a1)+                        ; 05AF6/05A88
@@ -4503,7 +4512,7 @@ l_05E36:
         clr.b   g_Checkpoint(a6)                ; 05E4A/05EA0
         clr.b   g_CheatOn(a6)                   ; 05E4E/05EA4
         move.l  #LEVEL_FILE,g_LevelFileAddr(a6) ; 05E52/05EA8
-        bsr.w   RedrawScreen                    ; 05E5A/05EB0
+        jsr     (RedrawScreen).l                    ; 05E5A/05EB0
         bsr.w   SwapScreens                     ; 05E5E/05EB4
         bsr.w   SetBitplanePtrs                 ; 05E62/05EB8
         bsr.w   ShowBackBuffer                  ; 05E66/05EBC
@@ -4513,7 +4522,7 @@ l_05E36:
         movem.l d0-d7,COLOR00(a0)               ; 05E78/05ECE
         movem.l (a1)+,d0-d7                     ; 05E7E/05ED4
         movem.l d0-d7,COLOR16(a0)               ; 05E82/05ED8
-        bsr.w   RedrawScreen                    ; 05E88/05EDE
+        jsr     (RedrawScreen).l                    ; 05E88/05EDE
         bsr.w   SwapScreens                     ; 05E8C/05EE2
         move.b  #GS_TITLE,g_GameState(a6)       ; 05E90/05EE6
         clr.b   g_SubState(a6)                  ; 05E96/05EEC
@@ -6933,11 +6942,14 @@ ProgressMap:
         cmpi.b  #$1,g_SubState3(a6)             ; 07736/0779E
         beq.w   ProgressMap_Scroll              ; 0773C/077A4
         bhi.w   ProgressMap_Wait                ; 07740/077A8
+        btst    #PF_MUSIC,(Profile).l           
+        beq.b   pm_nomus                        
+        moveq   #TUNE_START,d0                  ; with music: the start tune
+        bsr.w   PlayMusic                       
+pm_nomus:
         btst    #PF_CACHE,(Profile).l           
         beq.b   pm_load                         
-        moveq   #TUNE_START,d0                  ; 1MB: the start tune, and the map from the cache
-        bsr.w   PlayMusic                       
-        lea.l   (PROGRESS_MAP_CACHE).l,a0       
+        lea.l   (PROGRESS_MAP_CACHE).l,a0       ; 1MB: the map from the cache
         bra.b   pm_have                         
 pm_load:
         lea.l   FileProgressMap(pc),a1          ; 07744/       load the packed map picture
@@ -7660,6 +7672,8 @@ FileLevel6:
 	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
 FileMusic1M:
 	FENTRY	MUSIC1M_FILE,$1B394,64                 ; tracks 64-81: the 1MB music package (PF_MUSIC), for upper chip RAM
+FileRelocs:
+	FENTRY	0,RELOC_LEN,RELOC_TRACK                ; the relocation tables (EnhRelocate; build_game.py)
 
 ;---------------------------------------------------------------------------
 ; ==================================================================
@@ -7667,8 +7681,9 @@ FileMusic1M:
 ; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
 ; (MACHINE_INFO). With 1MB or more of chip RAM: PF_CACHE, PF_MUSIC - the 1MB program's
-; features (PF_EVERY, drawing every frame, is set for every machine). Without a description (the original bootblock) or with less chip RAM:
-; none, the 512K program. Also the two texts the 1MB program has its own way: the credit line
+; features (PF_EVERY, drawing every frame, is set for every machine). With less chip RAM but the
+; program moved to an expansion (EnhRelocate): PF_MUSIC as well. Otherwise (or without a
+; description: the original bootblock) none, the 512K program. Also the two texts the 1MB program has its own way: the credit line
 ; ('MUSIC' for 'SOUND') and the initials stored for a blank name ('501' for '504').
 ;---------------------------------------------------------------------------
 ReadProfile:
@@ -7676,8 +7691,9 @@ ReadProfile:
         cmpi.l  #'GNGM',MI_MAGIC(a0)
         bne.b   rp_done
         cmpi.l  #$100000,MI_CHIP_UPPER(a0)      ; end of chip RAM: 1MB or more?
-        bcs.b   rp_done
+        bcs.b   rp_small
         move.b  #(1<<PF_CACHE)|(1<<PF_MUSIC)|(1<<PF_EVERY),(Profile).l
+rp_texts:
         lea.l   (TxtCreditSound).l,a0           ; 'SOUND' -> 'MUSIC'
         lea.l   TxtMusic(pc),a1
         moveq   #4,d0
@@ -7687,6 +7703,11 @@ rp_text:
         move.b  #'1',(NameBlank+2).l            ; '504' -> '501'
 rp_done:
         rts
+rp_small:
+        tst.b   (RelocDone).l                   ; moved out of chip RAM (EnhRelocate): the music,
+        beq.b   rp_done                         ; in the chip RAM the program left
+        move.b  #(1<<PF_MUSIC)|(1<<PF_EVERY),(Profile).l
+        bra.b   rp_texts
 TxtMusic:
         dc.b    'MUSIC'
 Profile:
@@ -7711,9 +7732,121 @@ LoadSound:
         bra.w   LoadFile
 ls_music:
         lea.l   (FileMusic1M).l,a1
+        tst.b   (RelocDone).l                   ; the program moved out of chip RAM: the package
+        bne.b   ls_low                          ; goes where it was
         bsr.w   LoadFile
         move.l  #MUSIC1M_PLAYER,(MusicPlayerPtr).l
         rts
+ls_low:
+        move.l  #MUSICB_FILE,(a1)
+        bsr.w   LoadFile
+        movea.l (MusicRelocs).l,a3              ; its relocations (EnhRelocate loaded them)
+        lea.l   (MUSICB_FILE).l,a2
+        move.l  #MUSICB_FILE-MUSIC1M_FILE,d5
+        bsr.w   ApplyRelocs
+        move.l  #MUSICB_FILE+$20,(MusicPlayerPtr).l
+        rts
+
+;---------------------------------------------------------------------------
+; EnhRelocate - Start, first thing, still at $80: with less than 1MB of chip RAM and an
+; expansion (fast RAM, else slow RAM: MACHINE_INFO) with room, the program moves there -
+; everything from $80 to the memory map (MAP_LOW: the code, the tables, the globals; the
+; memory map stays where it is, in chip RAM). It is copied, the relocation file (tables of
+; the program's and the 1MB music package's absolute addresses, made by build_game.py by
+; assembling each at two origins) is loaded after it, the program's addresses are moved,
+; and Start runs again there (RelocDone: once). The chip RAM from $80 is then free for the
+; 1MB music package (ReadProfile: PF_MUSIC; LoadSound). The CPU alone reads the program: the
+; blitter, copper, sprites and Paula read only the memory map.
+;---------------------------------------------------------------------------
+IMAGE_BASE      equ     $80                     ; where the bootblock loads the program
+IMAGE_SIZE      equ     (MAP_LOW-IMAGE_BASE+3)&-4
+RELOC_ROOM      equ     IMAGE_SIZE+((RELOC_LEN+$18A7)/$18A8)*$18A8      ; LoadFile writes whole tracks
+EnhRelocate:
+        tst.b   (RelocDone).l
+        bne.w   er_out
+        tst.l   (FileRelocs+4).l                ; (a build without the relocation file)
+        beq.w   er_out
+        lea.l   (MACHINE_INFO).l,a0
+        cmpi.l  #'GNGM',MI_MAGIC(a0)
+        bne.w   er_out
+        cmpi.l  #$100000,MI_CHIP_UPPER(a0)      ; 1MB of chip RAM: the program stays
+        bcc.w   er_out
+        movem.l 24(a0),d0-d1                    ; fast RAM: lower, upper
+        bsr.w   er_fit
+        beq.b   er_go
+        lea.l   (MACHINE_INFO).l,a0
+        movem.l 16(a0),d0-d1                    ; slow RAM
+        bsr.w   er_fit
+        bne.w   er_out
+er_go:  move.l  d0,d6                           ; d6 = where it goes
+        lea.l   (IMAGE_BASE).w,a1
+        movea.l d0,a2
+        move.w  #IMAGE_SIZE/4-1,d7
+er_copy:
+        move.l  (a1)+,(a2)+
+        dbra    d7,er_copy
+        move.l  a2,-(a7)                        ; the relocation file after it
+        lea.l   (FileRelocs).l,a1
+        move.l  a2,(a1)
+        move.l  d6,-(a7)
+        jsr     (LoadFile).l
+        move.l  (a7)+,d6
+        movea.l (a7)+,a3
+        movea.l d6,a2                           ; the program's addresses: + (d6 - $80)
+        move.l  d6,d5
+        sub.l   #IMAGE_BASE,d5
+        bsr.w   ApplyRelocs                     ; (a3 = the music package's table after it)
+        move.l  d6,d0                           ; in the copy: the music table, done, and on
+        add.l   #MusicRelocs-IMAGE_BASE,d0
+        movea.l d0,a0
+        move.l  a3,(a0)
+        move.l  d6,d0
+        add.l   #RelocDone-IMAGE_BASE,d0
+        movea.l d0,a0
+        st.b    (a0)
+        addq.l  #4,a7                           ; (Start called this)
+        add.l   #Start-IMAGE_BASE,d6
+        movea.l d6,a0
+        jmp     (a0)
+er_out:
+        rts
+; d0 = lower, d1 = upper end of a region -> d0 = where the program would go (on 256 bytes);
+; Z set if it fits
+er_fit:
+        tst.l   d1
+        beq.b   er_no
+        add.l   #$FF,d0
+        and.l   #$FFFFFF00,d0
+        move.l  d1,d2
+        sub.l   d0,d2
+        bls.b   er_no
+        cmp.l   #RELOC_ROOM,d2
+        bcs.b   er_no
+        moveq   #0,d2
+        rts
+er_no:  moveq   #1,d2
+        rts
+
+; ApplyRelocs - a3 = a table (count.l, then word gaps between the offsets of the longs to
+; move), a2 = the image's base, d5 = how far it moved -> a3 = after the table
+ApplyRelocs:
+        move.l  (a3)+,d7
+        beq.b   ar_done
+ar_next:
+        moveq   #0,d0
+        move.w  (a3)+,d0
+        adda.l  d0,a2
+        add.l   d5,(a2)
+        subq.l  #1,d7
+        bne.b   ar_next
+ar_done:
+        rts
+
+RelocDone:
+        dc.b    0                               ; this is the copy (EnhRelocate)
+        even
+MusicRelocs:
+        dc.l    0                               ; the music package's relocation table
 
 ;---------------------------------------------------------------------------
 ; CacheGraphics - with PF_CACHE, as the 1MB program's Start: every BOB graphics file is
@@ -14358,7 +14491,7 @@ l_0BFB4:
         beq.b   l_0BFD8                         ; 0BFC4/0BF58
         clr.b   g_RedrawPending(a6)             ; 0BFC6/0BF5A
         addq.l  #$4,a7                          ; 0BFCA/0BF5E  replace the return address; reset the user stack
-        pea.l   RedrawEntry(pc)                 ; 0BFCC/0BF60  redirect user-mode return to RedrawEntry
+        pea.l   (RedrawEntry).l                 ; 0BFCC/0BF60  redirect user-mode return to RedrawEntry
         andi.w  #$dfff,g_SavedSR(a6)            ; 0BFD0/0BF64
         move    a6,usp                          ; 0BFD6/0BF6A
 l_0BFD8:

@@ -30,7 +30,9 @@ class Amiga(Game):
     def __init__(self, binfile=None, extra_mem=False):
         super().__init__(binfile)
         self.blits = 0; self.blit_words = 0
+        self.chip_end = None                   # set: every DMA pointer must be below it (chip RAM)
         self.u.hook_add(UC_HOOK_MEM_WRITE, self._custom_write, begin=CUSTOM+0x58, end=CUSTOM+0x59)
+        self.u.hook_add(UC_HOOK_MEM_WRITE, self._dma_write, begin=CUSTOM+0x80, end=CUSTOM+0xD3)
         self.w16(CUSTOM+0x1E, 0x0010)          # INTREQR: copper interrupt always pending
         self.w16(CUSTOM+0x02, 0)               # DMACONR: blitter never busy
 
@@ -44,6 +46,18 @@ class Amiga(Game):
         if addr == CUSTOM+0x58:
             self.blit(value & 0xFFFF)
 
+    def dma_check(self, what, addr):
+        if self.chip_end is not None and not 0 <= addr < self.chip_end:
+            raise RuntimeError(f'{what} reads ${addr:X}, not chip RAM (below ${self.chip_end:X})')
+
+    def _dma_write(self, uc, access, addr, size, value, ud):
+        """copper list and audio sample pointers written by the CPU: in chip RAM?"""
+        r = addr - CUSTOM
+        if r in (0x80, 0x84) and size == 4: self.dma_check('the copper', value & 0xFFFFFF)
+        elif 0xA0 <= r < 0xE0 and r & 15 == 0:
+            v = value & 0xFFFFFF if size == 4 else (value & 0xFFFF) << 16
+            self.dma_check(f'audio channel {(r - 0xA0) >> 4}', v)
+
     def blit(self, size):
         con0, con1 = self.custom16(0x40), self.custom16(0x42)
         if con1 & 1: raise RuntimeError('line mode not emulated')
@@ -53,6 +67,9 @@ class Amiga(Game):
         desc = bool(con1 & 2)
         fwm, lwm = self.custom16(0x44), self.custom16(0x46)
         ptr = {k: self.custom32(r) & 0x1FFFFE for k, r in (('c', 0x48), ('b', 0x4C), ('a', 0x50), ('d', 0x54))}
+        if self.chip_end is not None:
+            for k, bit in (('a', 8), ('b', 4), ('c', 2), ('d', 1)):
+                if con0 >> 8 & bit: self.dma_check(f'the blitter (channel {k.upper()})', self.custom32({'a': 0x50, 'b': 0x4C, 'c': 0x48, 'd': 0x54}[k]) & 0xFFFFFF)
         mod = {k: struct.unpack('>h', struct.pack('>H', self.custom16(r)))[0]
                for k, r in (('c', 0x60), ('b', 0x62), ('a', 0x64), ('d', 0x66))}
         adat, bdat, cdat = self.custom16(0x74), self.custom16(0x72), self.custom16(0x70)
@@ -108,6 +125,8 @@ class Amiga(Game):
                 if vp == 0xFF: line, high = 0xFF, 0x100; continue    # the PAL wrap
                 line = max(line, high | vp); continue
             reg = w1 & 0x1FE
+            if (0xE0 <= reg < 0xF8 or 0x120 <= reg < 0x140) and not reg & 2:     # bitplane / sprite pointers
+                self.dma_check(f'register ${reg:X} (copper)', w2 << 16)
             if reg == 0x8A: pc = self.custom32(0x84); continue        # COPJMP2
             if reg == 0x88: pc = self.custom32(0x80); continue        # COPJMP1
             events.append((line, reg, w2))

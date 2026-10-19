@@ -30,7 +30,7 @@ NASTY = '--nasty-wait' in sys.argv
 VARIANT = ('_raster' if RASTER else '') + ('_nastywait' if NASTY else '')
 OUT = os.path.join(ENH, 'build', 'game' + VARIANT)
 VASM = os.environ.get('VASM', 'vasmm68k_mot')
-TRACK_SFX, TRACK_MUSIC = 126, 64
+TRACK_SFX, TRACK_MUSIC, TRACK_RELOC = 126, 64, 17
 MAIN_TRACK = 134                         # tracks no file of the original disk uses
 
 
@@ -48,14 +48,55 @@ def symbols(listing):
     return {m.group(1): int(m.group(3), 16) for m in re.finditer(r'^(\S+)\s+([AE]):([0-9A-F]+)$', part, re.M)}
 
 
+RELOC_DELTA = 0x200000                   # the relocation pass assembles 2MB further on
+
+
+def relocations(a, b, what, lst=None):
+    """the offsets of the longs that differ by RELOC_DELTA between two assemblies of the same
+    source at two origins (everything else must be the same)"""
+    import struct
+    assert len(a) == len(b), what
+    offs, i = [], 0
+    while i < len(a) - 1:
+        if a[i:i+2] == b[i:i+2]: i += 2; continue
+        va, vb = struct.unpack_from('>L', a, i)[0], struct.unpack_from('>L', b, i)[0]
+        if (vb - va) & 0xFFFFFFFF != RELOC_DELTA:
+            sys.exit(f'{what}: offset ${i:X} (address ${0x80 + i:X}) is not a 32-bit address of the program '
+                     f'(${va:08X} / ${vb:08X})')
+        offs.append(i); i += 4
+    return offs
+
+
+def reloc_table(offs):
+    import struct
+    out, prev = bytearray(struct.pack('>L', len(offs))), 0
+    for o in offs:
+        assert 0 < o - prev < 0x10000 or (prev == 0 and o < 0x10000), (o, prev)
+        out += struct.pack('>H', o - prev); prev = o
+    return bytes(out)
+
+
 def build(extra_defs=()):
     os.makedirs(OUT, exist_ok=True)
     prog, lst = os.path.join(OUT, 'game.bin'), os.path.join(OUT, 'game.lst')
-    vasm(os.path.join(ENH, 'src', 'gng_game.s'), prog, lst, extra_defs)
+    src = os.path.join(ENH, 'src', 'gng_game.s')
+    vasm(src, prog, lst, extra_defs)
     syms = symbols(lst)
     sfx, music = os.path.join(OUT, 'sfx.bin'), os.path.join(OUT, 'music.bin')
     vasm(os.path.join(ROOT, 'sound', 'gng_sfx_512k.s'), sfx, defs=(('SND_ORG', syms['MUSIC_FILE']),))
     vasm(os.path.join(ROOT, 'sound', 'gng_music_1mb.s'), music, defs=(('SND_ORG', syms['MUSIC1M_FILE']),))
+    # the relocation file (EnhRelocate): the program assembled 2MB on with the memory map where
+    # it is, and the music package likewise; then the program again with the file's length
+    moved, music2 = os.path.join(OUT, 'moved.bin'), os.path.join(OUT, 'music_moved.bin')
+    vasm(src, moved, defs=tuple(extra_defs) + (('RELOC_ORG', 0x80 + RELOC_DELTA), ('MAP_FIX', syms['MAP_LOW'])))
+    vasm(os.path.join(ROOT, 'sound', 'gng_music_1mb.s'), music2, defs=(('SND_ORG', syms['MUSIC1M_FILE'] + RELOC_DELTA),))
+    rp = relocations(open(prog, 'rb').read(), open(moved, 'rb').read(), 'the program')
+    rm = relocations(open(music, 'rb').read(), open(music2, 'rb').read(), 'the music package')
+    relocs = os.path.join(OUT, 'relocs.bin')
+    open(relocs, 'wb').write(reloc_table(rp) + reloc_table(rm))
+    vasm(src, prog, lst, tuple(extra_defs) + (('RELOC_LEN', os.path.getsize(relocs)),))
+    syms = symbols(lst)
+    print(f'relocations: {len(rp):,} in the program, {len(rm):,} in the music package ({os.path.getsize(relocs):,} bytes)')
     end = 0x80 + os.path.getsize(prog)
     # layout checks the assembler cannot make where the symbols are defined (the map moves with
     # the program, so it is only known at the end)
@@ -63,6 +104,8 @@ def build(extra_defs=()):
               ('the scroller code is inside the program file', syms['ScrDrawBob'] < syms['GlobalsBlock']),
               ("the scroller's buffers end before its storage", syms['SCREEN_0'] + 3 * 47120 <= syms['SCROLL_STORE']),
               ("the scroller's storage ends before the HUD area", syms['ScrollStoreEnd'] <= syms['CLEAR_AREA']),
+              ("the music package fits where the program was (MUSICB_FILE, whole tracks)",
+               syms['MUSICB_FILE'] + -(-os.path.getsize(music) // 0x18A8) * 0x18A8 <= syms['MAP_LOW']),
               ("the text strip is after the buffers and holds 28 characters",
                syms['TEXT_STRIP'] >= syms['SCREEN_0'] + 3 * 47120 and syms['STRIP_MAX'] >= 28)]
     top = level_data_top(prog, syms)
@@ -76,7 +119,7 @@ def build(extra_defs=()):
     print(f'game.bin {os.path.getsize(prog):,} bytes ($80-${end:X}); globals ${syms["GlobalsBlock"]:X}, '
           f'memory map from ${syms["MAP_LOW"]:X} (screens ${syms["SCREEN_0"]:X}, level file ${syms["LEVEL_FILE"]:X}); '
           f'effects package for ${syms["MUSIC_FILE"]:X}, music package for ${syms["MUSIC1M_FILE"]:X}')
-    return prog, lst, {TRACK_SFX: sfx, TRACK_MUSIC: music}, syms
+    return prog, lst, {TRACK_SFX: sfx, TRACK_MUSIC: music, TRACK_RELOC: relocs}, syms
 
 
 def level_data_top(prog, syms):
@@ -153,11 +196,13 @@ def make_disk(prog, sound):
     adf = os.path.abspath(os.path.join(OUT, '..', f'gng_game{VARIANT}.adf'))
     args = [sys.executable, os.path.join('tools', 'disk', 'mkdisk.py'), '-o', adf, '--boot', os.path.abspath(boot),
             '--one', os.path.abspath(prog), '--file', f'{TRACK_SFX}={os.path.abspath(sound[TRACK_SFX])}',
-            '--add', f'{TRACK_MUSIC}={os.path.abspath(sound[TRACK_MUSIC])}']
+            '--add', f'{TRACK_MUSIC}={os.path.abspath(sound[TRACK_MUSIC])}',
+            '--add', f'{TRACK_RELOC}={os.path.abspath(sound[TRACK_RELOC])}']
     r = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
     print(r.stdout + r.stderr, end='')
     if r.returncode: sys.exit('mkdisk failed')
-    build_enh.verify_image(adf, bootbytes, {MAIN_TRACK: prog, TRACK_SFX: sound[TRACK_SFX], TRACK_MUSIC: sound[TRACK_MUSIC]})
+    build_enh.verify_image(adf, bootbytes, {MAIN_TRACK: prog, TRACK_SFX: sound[TRACK_SFX], TRACK_MUSIC: sound[TRACK_MUSIC],
+                                            TRACK_RELOC: sound[TRACK_RELOC]})
     return adf
 
 

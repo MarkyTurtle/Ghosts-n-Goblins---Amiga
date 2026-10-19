@@ -67,20 +67,34 @@ class GameRun(Amiga):
         if machine:                            # the enhanced bootblock's machine description:
             import test_bootinfo                # its own code, run on a fake exec memory list
             self.u.mem_write(test_bootinfo.MACHINE_INFO, test_bootinfo.run(*machine))
+            for attr, start, end in machine[0]:          # expansion memory
+                if not attr & 2:
+                    self.u.mem_map(start & ~0xFFF, (end - (start & ~0xFFF) + 0xFFF) & ~0xFFF)
+        chip = [e for a, st, e in machine[0] if a & 2] if machine else []
+        self.chip_end = max(chip) if chip else (0x80000 if build == '512k' else 0x100000)
         self.L = L = labels(build, listing)
+        # the one program moves itself out of chip RAM on some machines (EnhRelocate): where to
+        self.reloc = relocation(machine, listing) if listing else 0
+        if self.reloc:
+            top = L['GlobalsBlock'] + 0x178C            # MAP_LOW: the memory map stays
+            self.L0 = dict(L)
+            self.L = L = {k: v + self.reloc if 0x80 <= v < top else v for k, v in L.items()}
+            self.entry_orig = self.L0['ProgramEntry']
         self.entry, self.idle = L['ProgramEntry'], L['IdleLoop']
         self.copyright_wait = L[copyright_wait(build)]
         self.redraw_entry = L['RedrawEntry']           # ... and its idle loop (bra.b *): the first $60FE
-        o = self.redraw_entry - cfg['load']
+        o = self.redraw_entry - self.reloc - cfg['load']
         self.redraw_idle = self.redraw_entry + next(i for i in range(0, 32, 2) if prog[o+i:o+i+2] == b'\x60\xfe')
         self.vbl, self.level1 = L['VblIRQ'], L['Level1Logic']
         self.palette_addr = L['GamePalette']
         eq = equates(os.path.join(ROOT, cfg['equates']), build != '512k')
         # the globals: where the listing puts them (a program that has moved), else the build's
         self.globals = L['GlobalsBlock'] if listing and 'GlobalsBlock' in L else cfg['globals']
+        if self.reloc: self.entry = self.entry_orig
         self.G = {k: self.globals + v for k, v in eq.items() if k.startswith('g_')}
         # every RTE in the program loaded (a hook on a data word that looks like one is harmless)
         rtes = [cfg['load'] + i for i in range(0, len(prog) - 1, 2) if prog[i:i+2] == b'\x4e\x73']
+        if self.reloc: rtes = [a + self.reloc for a in rtes]     # (the first copy only runs Start's beginning)
         self.extra = extra_files or {}
         self.u.mem_map(0xFFFF0000, 0x10000)    # the game sometimes reads a little below 0 (MapTileAt
                                                # with a map byte >= $80); on the Amiga's 24-bit bus that
@@ -88,6 +102,11 @@ class GameRun(Amiga):
         self.w16(CUSTOM+0x1E, 0x0790)          # INTREQR: copper and audio interrupts always pending
                                                # (ShowBackBuffer and the sound driver wait for them)
         self._stub_loadfile(L['LoadFile'])
+        if self.reloc:                         # EnhRelocate loads from the first copy, which the music
+            first = self._stub_loadfile(self.L0['LoadFile'])    # package then overwrites
+            def moved(uc, a, sz, ud):
+                uc.hook_del(first); uc.hook_del(self._moved)
+            self._moved = self.u.hook_add(UC_HOOK_CODE, moved, begin=L['Start'], end=L['Start'])
         for a in rtes:
             self.u.hook_add(UC_HOOK_CODE, self._rte, begin=a, end=a)
         self.u.hook_add(UC_HOOK_MEM_WRITE, self._intreq, begin=CUSTOM+0x9C, end=CUSTOM+0x9D)
@@ -105,10 +124,11 @@ class GameRun(Amiga):
             dest, length, track = self.r32(a1), self.r32(a1+4), self.r16(a1+8)
             data = open(names[track], 'rb').read()[:length]
             self.u.mem_write(dest, data)
-            self.reg('a5', dest+len(data))
+            if self.reloc: uc.ctl_remove_cache(dest, dest + len(data))   # (code ran there before: the
+            self.reg('a5', dest+len(data))                               # first copy of the program)
             sp = self.reg('a7'); ret = self.r32(sp); self.reg('a7', sp+4)
             uc.reg_write(UC_M68K_REG_PC, ret)
-        self.u.hook_add(UC_HOOK_CODE, hook, begin=addr, end=addr)
+        return self.u.hook_add(UC_HOOK_CODE, hook, begin=addr, end=addr)
 
     def _rte(self, uc, a, sz, ud):
         sp = self.reg('a7')
@@ -162,12 +182,36 @@ class GameRun(Amiga):
 MODULE_TRACK = {'512k': 132, '1mb': 133}
 
 
+def relocation(machine, listing):
+    """how far the one program moves itself (EnhRelocate) on this machine: 0 or the distance
+    to the expansion it goes to (fast RAM, else slow RAM: the last region of each kind, as the
+    bootblock's description; on 256 bytes; with RELOC_ROOM bytes of room)"""
+    if not machine: return 0
+    import build_game
+    S = build_game.symbols(listing)
+    if not S.get('RELOC_LEN'): return 0
+    regions = machine[0]
+    chip = [e for a, s, e in regions if a & 2]
+    if not chip or max(chip) >= 0x100000: return 0
+    slot = {}
+    for a, s, e in regions:
+        if a & 2: continue
+        slot['slow' if 0xC00000 <= s + 0x20 < 0xDC0000 else 'fast'] = (s + 0x20, e)
+    for k in ('fast', 'slow'):
+        if k in slot:
+            lo, hi = slot[k]
+            dest = (lo + 0xFF) & ~0xFF
+            if hi > dest and hi - dest >= S['RELOC_ROOM']: return dest - 0x80
+    return 0
+
+
 def game(machine=None):
     """the one program for every machine (build_game.py), on a machine as in
     test_bootinfo.MACHINES (regions, vblank, attnflags); None: no machine description"""
     import build_game
     d = build_game.OUT
-    files = {build_game.TRACK_SFX: os.path.join(d, 'sfx.bin'), build_game.TRACK_MUSIC: os.path.join(d, 'music.bin')}
+    files = {build_game.TRACK_SFX: os.path.join(d, 'sfx.bin'), build_game.TRACK_MUSIC: os.path.join(d, 'music.bin'),
+             build_game.TRACK_RELOC: os.path.join(d, 'relocs.bin')}
     return GameRun(os.path.join(d, 'game.bin'), files, '512k', machine, listing=os.path.join(d, 'game.lst'))
 
 

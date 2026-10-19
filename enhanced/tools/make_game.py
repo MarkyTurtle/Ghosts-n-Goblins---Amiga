@@ -124,12 +124,16 @@ class Src:
 
 
 def hand_edits(S, V1):
+    S.sub("\torg\t$80\n", "\tifd\tRELOC_ORG\t\t; build_game.py's relocation pass\n\torg\tRELOC_ORG\n\telse\n\torg\t$80\n\tendc\n"
+          "\tifnd\tRELOC_LEN\nRELOC_LEN\tequ\t0\t\t; the relocation file (EnhRelocate), from build_game.py\n\tendc\n"
+          "RELOC_TRACK\tequ\t17\t\t; (the original 1MB program's tracks, free on this disk)\n")
     hdr = lambda t: ';---------------------------------------------------------------------------\n' + t + \
         '\n;---------------------------------------------------------------------------\n'
     # --- Start: profile, caches, sound, level 0 --------------------------------------
     S.sub("        move    a6,usp                          ; 05B2A/       USP = globals block (user-mode stack grows down from here)\n",
           "        move    a6,usp                          ; 05B2A/       USP = globals block (user-mode stack grows down from here)\n"
           + I('bsr.w   ReadProfile', 'what machine this is (Profile)') + '\n')
+    S.sub("\nStart:\n", "\nStart:\n" + I('jsr     EnhRelocate', 'with an expansion and under 1MB of chip RAM: the program moves there') + '\n')
     for n in (58, 59, 60, 62, 63, 64, 65): S.rep(n, '')
     S.rep(61, I('bsr.w   CacheGraphics', '1MB+ chip: cache the graphics with masks, the progress map') + '\n')
     S.sub("""        lea.l   FileMusic(pc),a1                ; 05D2A/05D76
@@ -163,9 +167,10 @@ l_06E80:
           + I('lea.l   (ENEMY_GFX_CACHE).l,a5', 'the masked enemy sets') + '\nll_sets:\n')
     S.rep(78, I('btst    #PF_CACHE,(Profile).l') + '\n' + I('beq.b   ll_small') + '\n' + I('lea.l   (SMALLBOB_CACHE).l,a5', 'the masked small sets') + '\nll_small:\n')
     # --- ProgressMap, Astaroth_Dying --------------------------------------------------------
-    S.rep(91, I('btst    #PF_CACHE,(Profile).l') + '\n' + I('beq.b   pm_load') + '\n'
-          + I('moveq   #TUNE_START,d0', '1MB: the start tune, and the map from the cache') + '\n' + I('bsr.w   PlayMusic') + '\n'
-          + I('lea.l   (PROGRESS_MAP_CACHE).l,a0') + '\n' + I('bra.b   pm_have') + '\npm_load:\n{5K}pm_have:\n')
+    S.rep(91, I('btst    #PF_MUSIC,(Profile).l') + '\n' + I('beq.b   pm_nomus') + '\n'
+          + I('moveq   #TUNE_START,d0', 'with music: the start tune') + '\n' + I('bsr.w   PlayMusic') + '\npm_nomus:\n'
+          + I('btst    #PF_CACHE,(Profile).l') + '\n' + I('beq.b   pm_load') + '\n'
+          + I('lea.l   (PROGRESS_MAP_CACHE).l,a0', '1MB: the map from the cache') + '\n' + I('bra.b   pm_have') + '\npm_load:\n{5K}pm_have:\n')
     S.rep(154, I('btst    #PF_MUSIC,(Profile).l') + '\n' + I('beq.b   ad_explode') + '\n'
           + I('moveq   #TUNE_ASTAROTH_BEATEN,d0', 'with music: the final tune (the explosion starts next frame)') + '\n'
           + I('bra.w   PlayMusic') + '\nad_explode:\n{5K}')
@@ -195,6 +200,8 @@ l_06E80:
 	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
 FileMusic1M:
 	FENTRY	MUSIC1M_FILE,$1B394,64                 ; tracks 64-81: the 1MB music package (PF_MUSIC), for upper chip RAM
+FileRelocs:
+	FENTRY	0,RELOC_LEN,RELOC_TRACK                ; the relocation tables (EnhRelocate; build_game.py)
 
 """ + open(os.path.join(HERE, 'make_game_support.s')).read())
     # --- FRAME runs, for CacheGraphics ---------------------------------------------------------
@@ -310,6 +317,8 @@ def widen_branches(path):
                     new = re.sub(r'^(\s+)bra\.w(\s+)(\w+)', r'\1jmp  \2(\3).l', new)
             else:                             # lea x(pc) out of reach -> lea (x).l (no flags either way)
                 new = re.sub(r'^(\s+lea\.l\s+)(\w+)\(pc\),(a\d)', r'\1(\2).l,\3', L[k - 1])
+                if new == L[k - 1]:           # pea x(pc), move x(pc),... -> (x).l
+                    new = re.sub(r'^(\s+\S+\s+)(\w+)\(pc\)', r'\1(\2).l', L[k - 1])
             assert new != L[k - 1], L[k - 1]
             L[k - 1] = new; n += 1
         open(path, 'w').write('\n'.join(L))
