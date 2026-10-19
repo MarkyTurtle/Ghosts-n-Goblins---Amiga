@@ -84,10 +84,15 @@ buf_Copper      rs.l    1               ; this buffer's copper list (used by the
 buf_PreCol      rs.w    1               ; look-ahead (ScrPrepare): the column built in the spare
 buf_PreNext     rs.w    1               ; column's memory (PRE_NONE: none), its rows RowB .. PreNext-1 done
 buf_Dir         rs.w    1               ; the last column crossing: 1 right, -1 left (0: none yet)
+buf_PreRow      rs.w    1               ; look-ahead (ScrPrepareRow): the row built in the ring's
+buf_PreRowNext  rs.w    1               ; spare row (PRE_NONE: none), its columns ColL .. PreRowNext-1 done
+buf_DirY        rs.w    1               ; the last row crossing: 1 up, -1 down (0: none yet)
 buf_SIZEOF      rs.b    0
 PRE_NONE        equ     $8000
 PRE_TILES_P     equ     4               ; look-ahead tiles per frame: pristine buffer (drawn) ...
 PRE_TILES_D     equ     8               ; ... a display buffer (copied; it is updated every other frame)
+PRE_ROW_P       equ     6               ; rows (17 tiles) come faster: the camera moves up to 4 px
+PRE_ROW_D       equ     12              ; a frame climbing, 4-10 falling
 
 ; NASTY_WAIT (build_game.py --nasty-wait, the one program only): blitter priority (BLTPRI,
 ; "blitter nasty") only while waiting - the original sets it once for good, so the CPU cannot
@@ -184,6 +189,7 @@ ScrFullDraw:
                 ble.b   .row
                 movem.w d2-d5,buf_ColL(a0)      ; ColL, ColR, RowB, RowT
                 move.w  #PRE_NONE,buf_PreCol(a0)
+                move.w  #PRE_NONE,buf_PreRow(a0)
                 move.w  2(a7),d0                ; camera (saved d0 / d1)
                 move.w  6(a7),d1
                 bsr.w   SetClip
@@ -222,6 +228,13 @@ CopyAll:
                 bgt.b   .fin
                 move.w  buf_RowB(a1),d0
 .fin:           move.w  d0,buf_PreNext(a0)
+                move.w  buf_DirY(a1),buf_DirY(a0)       ; the same for the spare row
+                move.w  buf_PreRow(a1),buf_PreRow(a0)
+                move.w  buf_PreRowNext(a1),d0
+                cmp.w   buf_ColR(a1),d0
+                bgt.b   .finr
+                move.w  buf_ColL(a1),d0
+.finr:          move.w  d0,buf_PreRowNext(a0)
                 move.w  #1,buf_Valid(a0)
                 movem.l (a7)+,d0/a1-a2
                 rts
@@ -261,12 +274,17 @@ ScrScrollTo:
                 cmp.w   #17,d7                  ; at most 18 columns (a 19th would alias)
                 ble.b   .right
                 addq.w  #1,buf_ColL(a0)
+                move.w  buf_ColL(a0),d7         ; row look-ahead: its columns done start at ColL
+                cmp.w   buf_PreRowNext(a0),d7   ; at least (the new right column is after them)
+                ble.b   .right
+                move.w  d7,buf_PreRowNext(a0)
                 bra.b   .right
 ; columns entering on the left
 .left:          cmp.w   buf_ColL(a0),d2
                 bge.b   .up
                 subq.w  #1,buf_ColL(a0)
                 move.w  buf_ColL(a0),d0
+                move.w  d0,buf_PreRowNext(a0)   ; row look-ahead: a new left column, start it again
                 move.w  #-1,buf_Dir(a0)
                 bsr.w   DrawColumnNew
                 moveq   #1,d6
@@ -281,7 +299,8 @@ ScrScrollTo:
                 ble.b   .down
                 addq.w  #1,buf_RowT(a0)
                 move.w  buf_RowT(a0),d0
-                bsr.w   DrawRowAll
+                move.w  #1,buf_DirY(a0)
+                bsr.w   DrawRowNew
                 moveq   #1,d6
                 move.w  buf_RowT(a0),d7
                 sub.w   buf_RowB(a0),d7
@@ -299,7 +318,8 @@ ScrScrollTo:
                 subq.w  #1,buf_RowB(a0)
                 move.w  buf_RowB(a0),d0
                 move.w  d0,buf_PreNext(a0)      ; look-ahead: a new bottom row, start it again
-                bsr.w   DrawRowAll
+                move.w  #-1,buf_DirY(a0)
+                bsr.w   DrawRowNew
                 moveq   #1,d6
                 move.w  buf_RowT(a0),d7
                 sub.w   buf_RowB(a0),d7
@@ -440,6 +460,86 @@ ScrPrepare:
 .shift:         add.w   d2,buf_ClipX0(a0)
                 bsr.w   ScrDrawScenery
                 move.w  (a7)+,buf_ClipX0(a0)
+.out:           movem.l (a7)+,d0-d7/a1
+                rts
+
+; d0 = row entering the window: drawn over the buffer's columns, or only the columns the row
+; look-ahead has not done if it is the row built in the ring's spare row (which is taken
+; either way: the look-ahead starts again)
+DrawRowNew:
+                movem.l d0-d6,-(a7)
+                move.w  buf_ColL(a0),d1
+                move.w  buf_ColR(a0),d6
+                cmp.w   buf_PreRow(a0),d0
+                bne.b   .draw
+                cmp.w   buf_PreRowNext(a0),d1
+                bge.b   .draw
+                move.w  buf_PreRowNext(a0),d1
+.draw:          cmp.w   d6,d1
+                bgt.b   .done
+                bsr.w   DrawRow
+.done:          move.w  #PRE_NONE,buf_PreRow(a0)
+                movem.l (a7)+,d0-d6
+                rts
+
+;------------------------------------------------------------------------------
+; ScrPrepareRow - a0 = buffer, once a frame after ScrPrepare: the same look-ahead for rows.
+; The 256-line ring holds 16 tile rows; while the window has 15 or fewer, the row next to it
+; on the side the camera last moved to (vertically) is built in the spare row's memory, a few
+; tiles a frame; DrawRowNew then draws only what is left. The pristine buffer adds the
+; scenery when it has finished it (the window moved over it); a display buffer copies the
+; tiles once the pristine one has finished the same row.
+;------------------------------------------------------------------------------
+ScrPrepareRow:
+                movem.l d0-d7/a1,-(a7)
+                tst.w   buf_Valid(a0)
+                beq.w   .out
+                move.w  buf_RowT(a0),d2
+                sub.w   buf_RowB(a0),d2
+                cmp.w   #14,d2                  ; 16 rows in the window: no spare row
+                bgt.w   .out
+                move.w  buf_PreRow(a0),d0
+                cmp.w   #PRE_NONE,d0
+                bne.b   .have
+                move.w  buf_RowT(a0),d0         ; next row on the side last moved to
+                addq.w  #1,d0
+                tst.w   buf_DirY(a0)
+                bpl.b   .set
+                move.w  buf_RowB(a0),d0
+                subq.w  #1,d0
+.set:           move.w  d0,buf_PreRow(a0)
+                move.w  buf_ColL(a0),buf_PreRowNext(a0)
+.have:          move.w  buf_PreRowNext(a0),d1
+                move.w  buf_ColR(a0),d6
+                addq.w  #1,d6                   ; d6 = columns end
+                cmp.w   d6,d1
+                bge.w   .out                    ; finished
+                moveq   #PRE_ROW_P-1,d7
+                move.l  buf_Source(a0),d2
+                beq.b   .tile
+                movea.l d2,a1                   ; a display buffer: the pristine one has finished
+                cmp.w   buf_PreRow(a1),d0       ; the same row?
+                bne.w   .out
+                cmp.w   buf_PreRowNext(a1),d6
+                bgt.w   .out
+                moveq   #PRE_ROW_D-1,d7
+.tile:          bsr.w   DrawTile
+                addq.w  #1,d1
+                cmp.w   d6,d1
+                dbge    d7,.tile
+                move.w  d1,buf_PreRowNext(a0)
+                tst.l   buf_Source(a0)
+                bne.b   .out
+                cmp.w   d6,d1                   ; the pristine buffer has just finished it:
+                blt.b   .out                    ; its scenery, the window grown over it
+                move.l  buf_ClipY0(a0),-(a7)    ; (ClipY0, ClipY1)
+                tst.w   buf_DirY(a0)
+                bmi.b   .lower
+                add.w   #16,buf_ClipY1(a0)
+                bra.b   .scen
+.lower:         sub.w   #16,buf_ClipY0(a0)
+.scen:          bsr.w   ScrDrawScenery
+                move.l  (a7)+,buf_ClipY0(a0)
 .out:           movem.l (a7)+,d0-d7/a1
                 rts
 

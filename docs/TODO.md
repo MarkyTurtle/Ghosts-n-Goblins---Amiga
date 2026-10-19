@@ -37,7 +37,7 @@ Each line points to the item below with the details and measurements.
       memory, so a crossing no longer draws a whole column in one frame (`ScrPrepare`)
 - [x] Playfield text: queued and drawn once a frame from a glyph cache straight into the ring;
       name entry keeps the background (key message ~11x less CPU, title 3x, name entry ~3x)
-- [ ] Look-ahead rows (the ring's spare tile row), once the vertical camera speeds are measured
+- [x] Look-ahead rows (the ring's spare tile row): `ScrPrepareRow`
 - [ ] Keep busy scenes at 50 fps on an A500: measured in WinUAE, the stage 6 dragon now fits a
       frame (one-blit images); if busy scenes still drop: a copper-driven blit queue (an interrupt per blit costs about as much as it saves on a 68000)
 - [x] Fold the scroller into the game source (`enhanced/src/gng_game.s`, `scroller.s`)

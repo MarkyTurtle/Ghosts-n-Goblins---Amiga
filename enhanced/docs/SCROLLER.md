@@ -497,6 +497,16 @@ on stage 1 21.6 -> 18.1, stage 3 36.5 -> 19.4, stage 6 (the dragon present) 35.2
 blitter words are unchanged, and so are the pictures on all seven stages (512K and 1MB runs in
 step with the originals). The time saved has to be measured in WinUAE (timing build).
 
+**Look-ahead rows (`ScrPrepareRow`).** The same for vertical scrolling. The 256-line ring holds
+16 tile rows and the window needs 14-16; while it has 15 or fewer, the row next to it on the
+side the camera last moved to (vertically) is built in the spare row's memory - 6 tiles a frame
+in the pristine buffer, then its scenery (the clip grown by a row that way), then 12 per update
+in each display buffer - and `DrawRowNew` draws only the columns still missing when the row
+comes into view. A column entering on the right leaves the columns done valid; one on the left
+starts the row again (as rows do for the look-ahead column). Measured with teleporting play: the
+camera climbs at up to 4 px a frame and falls at 4-10, a new row every 4-8 frames; on stage 5,
+144 of 155 row crossings found the row already complete in the pristine buffer.
+
 **Cheat key (testing).** On the title and high-score screens, **C** turns the game's own cheat
 (`g_CheatOn`, the one entering `)!(` on the high-score table sets: lives never decrease, no harm
 once the armour is gone) on or off, and shows the title again with `CHEAT ON` under the key
