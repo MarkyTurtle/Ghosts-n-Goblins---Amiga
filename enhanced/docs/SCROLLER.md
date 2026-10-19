@@ -423,6 +423,33 @@ the expansion memory, works out where the program goes (`relocation()`, as `EnhR
 and moves its labels and hooks; it also drops Unicorn's translated code where a file is loaded
 over code that ran before (the 68000 has no cache).
 
+**Per-level map tables (`LoadLevelTables`).** The originals keep every level's collision and
+graphics tables for the map cells resident: `BlockTiles` (64 bytes a cell) and `CellTiles` (256
+bytes a cell), 33 KB for the 104 cell types. Now `build_game.py` writes one file per level with
+only the cells that level can read (`tables0.bin`-`tables6.bin`, tracks 18-32, the original 1MB
+program's place), and `LoadLevelTables` loads the level's file to `LEVEL_TABLES`, below the
+level file, whenever a level is set up (including from the cache on 1MB machines and at a
+restart). A file is a slot byte for each of the 256 cell values, then `TBL_SLOTS` x 64 bytes of
+block tiles and 256 bytes of cell tiles per slot; `MapTileAt` (collision) and `DrawTile` (the
+scroller) look up the cell's slot first. Cell `$67` (empty: tile 0 everywhere) is slot 0, and so
+is any cell a level never reads. Which cells a level reads follows from how the map is
+addressed (`g_MapPtr + (X >> 8) + (Y >> 8) * 32`, with no bounds): the level's rectangle of
+`WorldMap` from its origin (`LevelMapTable`, so level 6, the throne room, is `WorldMap+352` and
+the bytes after the map) and size (`LevelBounds`), one cell more on every side, and columns 254
+and 255 of those rows (an object just off the left edge has X >> 8 = 255). Bytes past the map
+that `MapTileAt` still reads count as cells too, with the table entries the original reads for
+them (it indexes both tables with the byte sign extended). The largest level needs 49 slots, so
+the area is 256 + 49 x 320 = 15,936 bytes: about 17 KB less than the resident tables (the 512K
+level data now ends at most at `$7A5E0`, before at `$7E806`). The program is 77,270 bytes
+(110,140 before). The tables are the original 512K program's data, read from
+`bin/main_512k.bin`; `build_game.py` checks that the map's readable span (`FrameOffsets1 -
+WorldMap`) is still the one it assumed.
+
+With the smaller program the memory map moved down, and the slow / fast RAM music needed a new
+order: the effects package's area now comes first after the program (`SFX_AREA`), and
+`LoadSound` runs right after `ReadProfile`, so that the 1MB music package, loaded over the
+program's old place, can run on into buffers that are only filled later.
+
 **Where the originals differ** both versions are in the source, chosen at run time. In the
 sound code the choice keeps the condition codes (`move sr,-(a7)` ... `move (a7)+,ccr`; game
 logic runs in supervisor mode), so each profile sees exactly the flags and `d0` its original
@@ -447,7 +474,14 @@ screen (the machine line), the loading frames, one progress-map frame, and where
 leaves playfield text on screen that the game no longer prints (the key message; see *Playfield
 text*). The originals' globals overlay the end of the program
 file and some are used before they are set (the fraction of `g_ArthurX` in the opening scene),
-so for the 1MB comparison the original starts with the same junk.
+so for the 1MB comparison the original starts with the same junk. The enemy slots are such
+globals too (Astaroth's first X fraction is whatever the slot held), and the one program is now
+shorter than the 512K original: `game.py` clears the memory after it (the bootblock loads whole
+tracks, and the rest of the program's last track is zeros), where it used to leave the
+original's bytes. `LoadFile` also writes whole tracks; `GNG_OVERRUN=1` makes `game.py` fill the
+rest of each file's last track with `$EE` bytes, to check that nothing needed lies in the way
+(off by default: the originals and the one program then leave different junk where unused
+sprites show it).
 
 **One-plane masks (512K profile).** The 512K drawing built each BOB's mask with two blits (the
 OR of its 5 planes into `MASKBUF`) before its 5 cookie-cut blits. Now `BuildLevelMasks` (called

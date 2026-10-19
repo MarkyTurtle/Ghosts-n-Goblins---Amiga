@@ -584,7 +584,13 @@ DrawTile:
                 movea.l g_LevelFileAddr(a6),a3
                 cmp.b   #$67,d6
                 beq.b   .src                    ; cell $67: tile 0 everywhere
+                ifd     BUILD_ONE
+                lea     (LEVEL_SLOTS).l,a4      ; the cell's slot in this level's tables
+                moveq   #0,d5
+                move.b  (a4,d6.w),d5
+                else
                 move.w  d6,d5                   ; tile = CellTiles[cell][row][col]
+                endif
                 lsl.w   #4,d5
                 moveq   #15,d4
                 and.w   d3,d4

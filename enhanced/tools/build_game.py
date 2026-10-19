@@ -76,12 +76,72 @@ def reloc_table(offs):
     return bytes(out)
 
 
+TRACK_TABLES = 18                        # the per-level map tables: tracks 18- (free on this disk)
+
+
+MAP_LIMIT = 0xB40                         # FrameOffsets1 - WorldMap: the map bytes MapTileAt reads
+
+
+def level_tables():
+    """the per-level map table files (LoadLevelTables), from the original 512K program's
+    BlockTiles and CellTiles -> (slots, [file bytes]). A level reads the map at
+    g_MapPtr + (X >> 8) + (Y >> 8) * 32 (MapTileAt, the scroll), so a level's cells are the
+    bytes at its origin (LevelMapTable) plus its size (LevelBounds) in cells, one cell more
+    on every side (Arthur and the look-ahead at the edges), and columns 254 and 255 of each
+    of those rows (a small negative X, an object going off the left edge, gives X >> 8 = 255).
+    Bytes past the map that MapTileAt reads (up to FrameOffsets1) count as cells too, with
+    the tables the original reads for them: it indexes both tables with the byte sign
+    extended, so cell $FA reads 6 entries before the start (zeros below the program).
+    Cell $67 (empty) takes slot 0, and so does a cell the level never reads."""
+    import struct
+    D = open(os.path.join(ROOT, 'bin', 'main_512k.bin'), 'rb').read(); B = 0x80
+    WM, LMT, LB, BT, CT = 0x44D6, 0x44BA, 0x4466, 0x114, 0x1222C
+    LIMIT = MAP_LIMIT                     # FrameOffsets1 - WorldMap (checked against the build)
+    rw = lambda a: struct.unpack('>H', D[a-B:a-B+2])[0]
+    def mem(a, n):                        # the original's memory (zeros outside the program)
+        return bytes(D[x-B] if B <= x < B + len(D) else 0 for x in range(a, a + n))
+    sets = []
+    for l in range(7):
+        org = LMT + rw(LMT + 2*l)
+        x0, x1, y1, y0 = D[LB-B+4*l:LB-B+4*l+4]
+        cols = list(range(-1, x1 - x0 + 2)) + [254, 255]
+        cells = {D[a-B] if a < WM + LIMIT else 0x67
+                 for cy in range(-1, y1 - y0 + 2) for cx in cols for a in [org + cx + 32*cy]}
+        cells.discard(0x67)
+        sets.append([0x67] + sorted(cells))
+    slots = max(len(c) for c in sets)
+    files = []
+    for cells in sets:
+        slot = bytearray(256)
+        for i, c in enumerate(cells): slot[c] = i
+        blocks = bytearray(64 * slots); tiles = bytearray()
+        for i, c in enumerate(cells):
+            sc = c - 256 if c >= 0x80 else c
+            blocks[64*i:64*i+64] = mem(BT + 64*sc, 64)
+            tiles += mem(CT + 256*sc, 256) if c != 0x67 else bytes(256)
+        files.append(bytes(slot + blocks + tiles))
+    return slots, files
+
+
 def build(extra_defs=()):
     os.makedirs(OUT, exist_ok=True)
     prog, lst = os.path.join(OUT, 'game.bin'), os.path.join(OUT, 'game.lst')
     src = os.path.join(ENH, 'src', 'gng_game.s')
+    slots, tables = level_tables()
+    tdefs, track, tfiles = [('TBL_SLOTS', slots)], TRACK_TABLES, {}
+    for l, data in enumerate(tables):
+        path = os.path.join(OUT, f'tables{l}.bin')
+        open(path, 'wb').write(data)
+        tdefs += [(f'TBLLEN{l}', len(data)), (f'TBLTRK{l}', track)]
+        tfiles[track] = path
+        track += -(-len(data) // 0x18A8)
+    if track > 33: sys.exit('the level tables run into track 33 (Arthur\'s sprites)')
+    extra_defs = tuple(extra_defs) + tuple(tdefs)
+    print(f'level tables: {slots} cells at most, {", ".join(f"{len(t):,}" for t in tables)} bytes')
     vasm(src, prog, lst, extra_defs)
     syms = symbols(lst)
+    if syms['FrameOffsets1'] - syms['WorldMap'] != MAP_LIMIT:
+        sys.exit('MAP_LIMIT is not FrameOffsets1 - WorldMap: the level tables would miss cells')
     sfx, music = os.path.join(OUT, 'sfx.bin'), os.path.join(OUT, 'music.bin')
     vasm(os.path.join(ROOT, 'sound', 'gng_sfx_512k.s'), sfx, defs=(('SND_ORG', syms['MUSIC_FILE']),))
     vasm(os.path.join(ROOT, 'sound', 'gng_music_1mb.s'), music, defs=(('SND_ORG', syms['MUSIC1M_FILE']),))
@@ -104,8 +164,9 @@ def build(extra_defs=()):
               ('the scroller code is inside the program file', syms['ScrDrawBob'] < syms['GlobalsBlock']),
               ("the scroller's buffers end before its storage", syms['SCREEN_0'] + 3 * 47120 <= syms['SCROLL_STORE']),
               ("the scroller's storage ends before the HUD area", syms['ScrollStoreEnd'] <= syms['CLEAR_AREA']),
-              ("the music package fits where the program was (MUSICB_FILE, whole tracks)",
-               syms['MUSICB_FILE'] + -(-os.path.getsize(music) // 0x18A8) * 0x18A8 <= syms['MAP_LOW']),
+              ("the music package fits where the program was and the effects package's area (MUSICB_FILE)",
+               syms['MUSICB_FILE'] + os.path.getsize(music) <= syms['MAP_LOW'] + syms['SFX_AREA']),
+              ("the 512K effects package fits its area", os.path.getsize(sfx) <= syms['SFX_AREA']),
               ("the text strip is after the buffers and holds 28 characters",
                syms['TEXT_STRIP'] >= syms['SCREEN_0'] + 3 * 47120 and syms['STRIP_MAX'] >= 28)]
     top = level_data_top(prog, syms)
@@ -119,7 +180,7 @@ def build(extra_defs=()):
     print(f'game.bin {os.path.getsize(prog):,} bytes ($80-${end:X}); globals ${syms["GlobalsBlock"]:X}, '
           f'memory map from ${syms["MAP_LOW"]:X} (screens ${syms["SCREEN_0"]:X}, level file ${syms["LEVEL_FILE"]:X}); '
           f'effects package for ${syms["MUSIC_FILE"]:X}, music package for ${syms["MUSIC1M_FILE"]:X}')
-    return prog, lst, {TRACK_SFX: sfx, TRACK_MUSIC: music, TRACK_RELOC: relocs}, syms
+    return prog, lst, {TRACK_SFX: sfx, TRACK_MUSIC: music, TRACK_RELOC: relocs, **tfiles}, syms
 
 
 def level_data_top(prog, syms):
@@ -198,11 +259,12 @@ def make_disk(prog, sound):
             '--one', os.path.abspath(prog), '--file', f'{TRACK_SFX}={os.path.abspath(sound[TRACK_SFX])}',
             '--add', f'{TRACK_MUSIC}={os.path.abspath(sound[TRACK_MUSIC])}',
             '--add', f'{TRACK_RELOC}={os.path.abspath(sound[TRACK_RELOC])}']
+    for t, path in sound.items():
+        if TRACK_TABLES <= t < 33: args += ['--add', f'{t}={os.path.abspath(path)}']
     r = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
     print(r.stdout + r.stderr, end='')
     if r.returncode: sys.exit('mkdisk failed')
-    build_enh.verify_image(adf, bootbytes, {MAIN_TRACK: prog, TRACK_SFX: sound[TRACK_SFX], TRACK_MUSIC: sound[TRACK_MUSIC],
-                                            TRACK_RELOC: sound[TRACK_RELOC]})
+    build_enh.verify_image(adf, bootbytes, {MAIN_TRACK: prog, **sound})
     return adf
 
 

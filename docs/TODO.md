@@ -48,8 +48,11 @@ Each line points to the item below with the details and measurements.
 - [x] Draw at 50 fps once the redraw cost is gone (3): see above
 
 **Memory**
-- [ ] Per-level files: tiles, map / cell / attribute tables, zones, spawns, placements and the
-      level's enemy graphics; about 30 KB less resident, no 118 KB load into a screen buffer (4)
+- [x] Per-level map tables: each level's `BlockTiles` / `CellTiles` entries in a file of its
+      own (`LoadLevelTables`): 17 KB less resident, the program 77 KB instead of 110 KB
+- [ ] Per-level `TileAttr` banks (8 KB resident; a level uses 1-3 of the 4 banks): a few KB (5)
+- [ ] The rest of the per-level data: zones, spawns, placements and the level's enemy graphics
+      (no 118 KB load into a screen buffer) (4)
 - [ ] File cache in expansion memory on 1MB machines: the disk is read once (4)
 - [ ] Drop mirrored enemy frames (39% of the enemy graphics) and flip them when the frame cache
       builds them: about 24 KB less on level 5 (5)
@@ -60,9 +63,10 @@ Each line points to the item below with the details and measurements.
 **Sound**
 - [x] Music on 512K machines with an expansion (slow or fast RAM): the whole 1MB package, in the
       chip RAM the program moved out of
-- [ ] Music on a plain 512K A500: needs about 43 KB of chip RAM freed first (per-level files,
-      mirrored frames) and a combined package (the tunes' samples and note data added to the
-      512K effects package) (4)
+- [ ] Music on a plain 512K A500: needs about 43 KB of chip RAM; the per-level map tables freed
+      17 KB (the fullest level now leaves 20 KB free, 3 KB before), so about 23 KB more (mirrored
+      Arthur / enemy frames), and a combined package (the tunes' samples and note data added to
+      the 512K effects package) (4)
 - [ ] Music quality tiers chosen by the machine's memory (4)
 - [ ] Resample the music samples (2/3 saves about 11 KB) by scaling the instruments' period
       multipliers; also fixes periods below Paula's minimum of 124 (5)
@@ -316,6 +320,12 @@ The last region is nearly full: level 1 needs 49,440 + 55,950 = 105,390 bytes, l
 All levels' tables are resident today: `CellTiles` 26,368 + `BlockTiles` 6,656 + `TileAttr` 8,192 =
 41,216 bytes. Per-level files would keep at most 10,584 (level 2), saving about **30 KB**. Spawn,
 zone and placement tables (a few KB) would move too.
+
+**Done (per-level map tables):** `BlockTiles` and `CellTiles` now come from a file per level
+(`enhanced/docs/SCROLLER.md`, *Per-level map tables*). The estimate above counted only the
+level's own cells; a level also reads the cells round it and some bytes past the map, so the
+largest level needs 49 cells and the saving is about 17 KB, not 30. `TileAttr` (8 KB) is still
+resident.
 
 **Music** (`sound/tools/tune_samples.py`, which follows each tune's patterns to its instruments,
 and counts the samples their lengths run into when they overrun):

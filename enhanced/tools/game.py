@@ -50,6 +50,8 @@ def copyright_wait(build):
             return re.match(r'(\w+):', lines[i-1]).group(1)
 
 
+OVERRUN = os.environ.get('GNG_OVERRUN') == '1'
+
 class GameRun(Amiga):
     """build: '512k' or '1mb'; binfile: the main program (default: the original); extra_files:
     {track: path} for files LoadFile reads that are not in disk/files (the modules)"""
@@ -63,6 +65,10 @@ class GameRun(Amiga):
         self.u.mem_write(0, bytes(0x60))
         prog = open(binfile or os.path.join(ROOT, cfg['orig']), 'rb').read()
         self.u.mem_write(cfg['load'], prog)
+        orig = os.path.getsize(os.path.join(ROOT, BUILDS['512k']['orig']))
+        if len(prog) < orig:                   # a shorter program: no trace of the original after it
+            self.u.mem_write(cfg['load'] + len(prog), bytes(orig - len(prog)))   # (the bootblock loads
+                                               # whole tracks, and the rest of its last one is zeros)
         self.w32(4, cfg['load'] if build == '512k' else cfg['base'])   # $4.w as the bootblock leaves it
         if machine:                            # the enhanced bootblock's machine description:
             import test_bootinfo                # its own code, run on a fake exec memory list
@@ -125,7 +131,15 @@ class GameRun(Amiga):
             dest, length, track = self.r32(a1), self.r32(a1+4), self.r16(a1+8)
             data = open(names[track], 'rb').read()[:length]
             self.u.mem_write(dest, data)
-            if self.reloc: uc.ctl_remove_cache(dest, dest + len(data))   # (code ran there before: the
+            pad = (-len(data)) % 0x18A8 if OVERRUN else 0   # LoadFile writes whole tracks: what follows
+            if pad:                                  # a file on its last track lands after it (GNG_OVERRUN=1
+                                                     # fills that with $EE bytes, to check nothing needed
+                                                     # is in the way; off by default, because the originals
+                                                     # and the enhanced game leave different junk in
+                                                     # memory that unused sprites then show)
+                try: self.u.mem_write(dest + len(data), b'\xEE' * pad)
+                except Exception: pass
+            if self.reloc: uc.ctl_remove_cache(dest, dest + len(data) + pad)   # (code ran there before: the
             self.reg('a5', dest+len(data))                               # first copy of the program)
             sp = self.reg('a7'); ret = self.r32(sp); self.reg('a7', sp+4)
             uc.reg_write(UC_M68K_REG_PC, ret)
@@ -213,6 +227,11 @@ def game(machine=None):
     d = build_game.OUT
     files = {build_game.TRACK_SFX: os.path.join(d, 'sfx.bin'), build_game.TRACK_MUSIC: os.path.join(d, 'music.bin'),
              build_game.TRACK_RELOC: os.path.join(d, 'relocs.bin')}
+    track = build_game.TRACK_TABLES                  # the per-level map tables
+    for l in range(7):
+        path = os.path.join(d, f'tables{l}.bin')
+        files[track] = path
+        track += -(-os.path.getsize(path) // 0x18A8)
     return GameRun(os.path.join(d, 'game.bin'), files, '512k', machine, listing=os.path.join(d, 'game.lst'))
 
 

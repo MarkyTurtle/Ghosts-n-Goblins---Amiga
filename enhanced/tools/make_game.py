@@ -123,7 +123,32 @@ class Src:
         self.s, n = re.subn(pat, new, self.s); assert n, pat
 
 
+def level_tables(S):
+    """the map cells' tables move to per-level files (build_game.py makes them from the original
+    program): BlockTiles and CellTiles leave the program; MapTileAt and the scroller's DrawTile
+    find a cell's slot in the level's table (LEVEL_SLOTS)"""
+    s = S.s
+    i = s.index('BlockTiles:\n'); j = s.index(';---------------------------------------------------------------------------\n; TileAttr - 4 banks')
+    s = s[:i] + '; (BlockTiles: in the per-level table files now - LEVEL_BLOCKS, LoadLevelTables)\n\n' + s[j:]
+    i = s.index('CellTiles:\n'); j = s.index(';---------------------------------------------------------------------------\n; HUNK_END and padding.')
+    s = s[:i] + '; (CellTiles: in the per-level table files now - LEVEL_CELLS, LoadLevelTables)\n\n' + s[j:]
+    S.s = s
+    S.sub("""        swap    d0                              ; 05AA6/05A26
+        lsl.w   #$6,d0                          ; 05AA8/05A28
+        lea.l   BlockTiles(pc),a1               ; 05AAA/05A2A
+        adda.w  d0,a1                           ; 05AAE/05A2E
+""", """        swap    d0                              ; 05AA6/05A26
+        andi.w  #$FF,d0                         ; the cell's slot in this level's tables
+        lea.l   (LEVEL_SLOTS).l,a1
+        move.b  (a1,d0.w),d0
+        lsl.w   #$6,d0                          ; 05AA8/05A28
+        lea.l   (LEVEL_BLOCKS).l,a1             ; its BlockTiles
+        adda.w  d0,a1                           ; 05AAE/05A2E
+""")
+
+
 def hand_edits(S, V1):
+    level_tables(S)
     S.sub("\torg\t$80\n", "\tifd\tRELOC_ORG\t\t; build_game.py's relocation pass\n\torg\tRELOC_ORG\n\telse\n\torg\t$80\n\tendc\n"
           "\tifnd\tRELOC_LEN\nRELOC_LEN\tequ\t0\t\t; the relocation file (EnhRelocate), from build_game.py\n\tendc\n"
           "RELOC_TRACK\tequ\t17\t\t; (the original 1MB program's tracks, free on this disk)\n")
@@ -132,13 +157,15 @@ def hand_edits(S, V1):
     # --- Start: profile, caches, sound, level 0 --------------------------------------
     S.sub("        move    a6,usp                          ; 05B2A/       USP = globals block (user-mode stack grows down from here)\n",
           "        move    a6,usp                          ; 05B2A/       USP = globals block (user-mode stack grows down from here)\n"
-          + I('bsr.w   ReadProfile', 'what machine this is (Profile)') + '\n')
+          + I('bsr.w   ReadProfile', 'what machine this is (Profile)') + '\n'
+          + I('bsr.w   LoadSound', 'the sound package first: whole tracks run past its end, into') + '\n'
+          + I('', 'buffers loaded after it (the 512K effects at MAP_LOW, the music where the program was)') + '\n')
     S.sub("\nStart:\n", "\nStart:\n" + I('jsr     EnhRelocate', 'with an expansion and under 1MB of chip RAM: the program moves there') + '\n')
     for n in (58, 59, 60, 62, 63, 64, 65): S.rep(n, '')
     S.rep(61, I('bsr.w   CacheGraphics', '1MB+ chip: cache the graphics with masks, the progress map') + '\n')
     S.sub("""        lea.l   FileMusic(pc),a1                ; 05D2A/05D76
         bsr.w   LoadFile                        ; 05D2E/05D7A  load music/sfx player (tracks 126-131) -> $28E54
-""", I('bsr.w   LoadSound', 'the 512K effects package, or the 1MB music package') + '\n')
+""", '')
     S.sub("        bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68\n",
           "        bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68\n"
           + I('btst    #PF_CACHE,(Profile).l', 'the 1MB program loads level 0 here, so the title') + '\n'
@@ -329,6 +356,17 @@ def main():
     V1 = view(src.split('\n'), True)
     S = Src(first_pass(src))
     hand_edits(S, V1)
+    S.sub("""ll_cached:
+        lea.l   LevelFileIndex(pc),a1           ; 06842/06898
+""", """ll_cached:
+        move.w  g_Level(a6),d0                  ; the level's map tables (LoadLevelTables), then its
+        jsr     LoadLevelTables                 ; tile file
+        lea.l   LevelFileIndex(pc),a1           ; 06842/06898
+""")
+    n = len(re.findall(r'\n        lea\.l   FileLevel0\(pc\),a1', S.s))
+    assert n == 2, n                  # Start loads level 0's tile file (1MB early, 512K later): its tables too
+    ins = I('moveq   #0,d0', "level 0's map tables (the title shows level 0)") + '\n        jsr     LoadLevelTables\n'
+    S.s = re.sub(r'\n(        lea\.l   FileLevel0\(pc\),a1)', lambda m: '\n' + ins + m.group(1), S.s)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)
     print(f'{os.path.relpath(OUT, ROOT)}: {S.s.count(chr(10))} lines; {n} references out of reach made longer')

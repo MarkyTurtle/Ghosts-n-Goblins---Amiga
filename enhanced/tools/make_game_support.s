@@ -72,6 +72,30 @@ ls_low:
         rts
 
 ;---------------------------------------------------------------------------
+; LoadLevelTables - d0 = level: its map tables (per-level files build_game.py makes from the
+; original program's BlockTiles and CellTiles, which are no longer in the program), to
+; LEVEL_TABLES: the cells' slots (LEVEL_SLOTS: 256 bytes, cell -> slot; a cell the level
+; never reads -> slot 0, cell $67's: empty), their BlockTiles (LEVEL_BLOCKS, 64 bytes a slot)
+; and their CellTiles (LEVEL_CELLS, 256 bytes a slot). All registers kept.
+;---------------------------------------------------------------------------
+LoadLevelTables:
+        movem.l d0-d7/a0-a6,-(a7)
+        lea.l   (FileTables).l,a1
+        mulu.w  #10,d0
+        adda.w  d0,a1
+        jsr     (LoadFile).l
+        movem.l (a7)+,d0-d7/a0-a6
+        rts
+FileTables:
+	FENTRY	LEVEL_TABLES,TBLLEN0,TBLTRK0
+	FENTRY	LEVEL_TABLES,TBLLEN1,TBLTRK1
+	FENTRY	LEVEL_TABLES,TBLLEN2,TBLTRK2
+	FENTRY	LEVEL_TABLES,TBLLEN3,TBLTRK3
+	FENTRY	LEVEL_TABLES,TBLLEN4,TBLTRK4
+	FENTRY	LEVEL_TABLES,TBLLEN5,TBLTRK5
+	FENTRY	LEVEL_TABLES,TBLLEN6,TBLTRK6
+
+;---------------------------------------------------------------------------
 ; EnhRelocate - Start, first thing, still at $80: with less than 1MB of chip RAM and an
 ; expansion (fast RAM, else slow RAM: MACHINE_INFO) with room, the program moves there -
 ; everything from $80 to the memory map (MAP_LOW: the code, the tables, the globals; the
