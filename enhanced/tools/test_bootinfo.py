@@ -23,6 +23,8 @@ MACHINES = [
     ('A500 512K chip + 512K slow', [(MEMF_PUBLIC | MEMF_FAST, 0xC00000, 0xC80000),
                                    (MEMF_PUBLIC | MEMF_CHIP, 0x400, 0x80000)], 50, 0),
     ('A500+ 1MB chip', [(MEMF_PUBLIC | MEMF_CHIP, 0x400, 0x100000)], 50, 0),
+    # Kickstart 1.3 on a 1MB-chip A500 (ECS Agnus) keeps the top of chip RAM: it lists $FE800
+    ('A500 1MB chip, Kickstart 1.3', [(MEMF_PUBLIC | MEMF_CHIP, 0x400, 0xFE800)], 50, 0),
     ('1MB chip + 512K slow (NTSC)', [(MEMF_PUBLIC | MEMF_FAST, 0xC00000, 0xC80000),
                                      (MEMF_PUBLIC | MEMF_CHIP, 0x400, 0x100000)], 60, 0),
     ('A1200 2MB chip + 4MB fast', [(MEMF_PUBLIC | MEMF_FAST, 0x200000, 0x600000),

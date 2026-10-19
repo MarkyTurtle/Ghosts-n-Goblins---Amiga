@@ -385,7 +385,7 @@ machine description (`MACHINE_INFO`) and sets `Profile`:
 
 | Bit | When | What it turns on |
 |---|---|---|
-| `PF_CACHE` | 1MB or more of chip RAM | graphics cached with masks in upper chip RAM (`CacheGraphics`, `BuildMaskedGfx`); one-blit BOBs (`DrawBobMasked`, `DrawSceneryMasked`); no graphics loads per level, the frame tables point into the cache; frame offsets doubled in place; progress map kept |
+| `PF_CACHE` | 1MB or more of chip RAM (any chip RAM above `$80000`: Kickstart 1.3 on a 1MB A500 keeps the top for itself and lists chip RAM as ending at `$FE800`) | graphics cached with masks in upper chip RAM (`CacheGraphics`, `BuildMaskedGfx`); one-blit BOBs (`DrawBobMasked`, `DrawSceneryMasked`); no graphics loads per level, the frame tables point into the cache; frame offsets doubled in place; progress map kept |
 | `PF_MUSIC` | with `PF_CACHE`, or the program moved to slow / fast RAM (below) | the 1MB music package (assembled for `$80000`; at `$80` when the program moved), its tunes and the extra effects |
 | `PF_EVERY` | (with `PF_CACHE`) | draw every frame |
 

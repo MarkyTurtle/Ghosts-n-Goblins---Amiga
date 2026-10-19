@@ -71,7 +71,8 @@ class GameRun(Amiga):
                 if not attr & 2:
                     self.u.mem_map(start & ~0xFFF, (end - (start & ~0xFFF) + 0xFFF) & ~0xFFF)
         chip = [e for a, st, e in machine[0] if a & 2] if machine else []
-        self.chip_end = max(chip) if chip else (0x80000 if build == '512k' else 0x100000)
+        self.chip_end = (0x80000 if max(chip) <= 0x80000 else 0x100000 << (max(chip) > 0x100000)) if chip \
+            else (0x80000 if build == '512k' else 0x100000)      # (the physical end: exec may keep the top)
         self.L = L = labels(build, listing)
         # the one program moves itself out of chip RAM on some machines (EnhRelocate): where to
         self.reloc = relocation(machine, listing) if listing else 0
@@ -192,7 +193,7 @@ def relocation(machine, listing):
     if not S.get('RELOC_LEN'): return 0
     regions = machine[0]
     chip = [e for a, s, e in regions if a & 2]
-    if not chip or max(chip) >= 0x100000: return 0
+    if not chip or max(chip) > 0x80000: return 0
     slot = {}
     for a, s, e in regions:
         if a & 2: continue

@@ -4,6 +4,7 @@ with its DrawBob top-clip bug fixed, both originals with the one program's MapTi
 
   --machine 512k   an A500 with 512K of chip RAM   against the original 512K program
   --machine 1mb    an A500+ with 1MB of chip RAM   against the original 1MB program
+  --machine ks13   an A500 with 1MB chip, Kickstart 1.3 ($FE800)  against the original 1MB program
   --machine slow   an A500 with 512K chip + 512K slow RAM  against the original 1MB program
   --machine fast   512K chip + 1.5MB slow + 2MB fast RAM   against the original 1MB program
 
@@ -15,11 +16,14 @@ import sys
 import compare_runs, test_bootinfo
 from game import GameRun, game
 
-MACHINES = {'512k': (test_bootinfo.MACHINES[0], '512k'), '1mb': (test_bootinfo.MACHINES[2], '1mb'),
+M = {m[0]: m for m in test_bootinfo.MACHINES}
+MACHINES = {'512k': (M['A500 512K chip'], '512k'), '1mb': (M['A500+ 1MB chip'], '1mb'),
+            # Kickstart 1.3 lists a 1MB machine's chip RAM as ending at $FE800
+            'ks13': (M['A500 1MB chip, Kickstart 1.3'], '1mb'),
             # 512K chip + 512K slow: the program moves to slow RAM and loads the music where it was
             # (EnhRelocate): the sound code is the 1MB program's, so it is compared with that
-            'slow': (test_bootinfo.MACHINES[1], '1mb'),
-            'fast': (test_bootinfo.MACHINES[5], '1mb')}
+            'slow': (M['A500 512K chip + 512K slow'], '1mb'),
+            'fast': (M['A500 + 1.5MB slow + 2MB fast'], '1mb')}
 
 
 def main(frames, seed, machine, level=None, teleport=0, png=None):

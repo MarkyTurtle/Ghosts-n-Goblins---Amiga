@@ -7680,7 +7680,8 @@ FileRelocs:
 ; One program for every machine (enhanced branch)
 ; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
-; (MACHINE_INFO). With 1MB or more of chip RAM: PF_CACHE, PF_MUSIC - the 1MB program's
+; (MACHINE_INFO). With 1MB or more of chip RAM (any chip RAM above $80000: Kickstart 1.3 keeps the
+; top of a 1MB machine's chip RAM for itself and lists it as ending at $FE800): PF_CACHE, PF_MUSIC - the 1MB program's
 ; features (PF_EVERY, drawing every frame, is set for every machine). With less chip RAM but the
 ; program moved to an expansion (EnhRelocate): PF_MUSIC as well. Otherwise (or without a
 ; description: the original bootblock) none, the 512K program. Also the two texts the 1MB program has its own way: the credit line
@@ -7690,8 +7691,8 @@ ReadProfile:
         lea.l   (MACHINE_INFO).l,a0
         cmpi.l  #'GNGM',MI_MAGIC(a0)
         bne.b   rp_done
-        cmpi.l  #$100000,MI_CHIP_UPPER(a0)      ; end of chip RAM: 1MB or more?
-        bcs.b   rp_small
+        cmpi.l  #$80000,MI_CHIP_UPPER(a0)       ; more than 512K of chip RAM: 1MB or more (exec
+        bls.b   rp_small                        ; may keep the top for itself: 1.3 lists $FE800)
         move.b  #(1<<PF_CACHE)|(1<<PF_MUSIC)|(1<<PF_EVERY),(Profile).l
 rp_texts:
         lea.l   (TxtCreditSound).l,a0           ; 'SOUND' -> 'MUSIC'
@@ -7769,8 +7770,8 @@ EnhRelocate:
         lea.l   (MACHINE_INFO).l,a0
         cmpi.l  #'GNGM',MI_MAGIC(a0)
         bne.w   er_out
-        cmpi.l  #$100000,MI_CHIP_UPPER(a0)      ; 1MB of chip RAM: the program stays
-        bcc.w   er_out
+        cmpi.l  #$80000,MI_CHIP_UPPER(a0)       ; 1MB of chip RAM (more than 512K): the program
+        bhi.w   er_out                          ; stays
         movem.l 24(a0),d0-d1                    ; fast RAM: lower, upper
         bsr.w   er_fit
         beq.b   er_go
