@@ -5129,7 +5129,7 @@ Bonus_Walk:
 l_064F6:
         move.b  #$29,g_ArthurFrame(a6)          ; 064F6/06554  arms raised
         clr.b   g_ArthurAnimTimer(a6)           ; 064FC/0655A
-        move.b  #$40,g_StateTimer(a6)           ; 06500/0655E
+        move.b  #150,g_StateTimer(a6)           ; 'BONUS' and the amount: 3 s (the original: 64 frames)
 snd71_go:
         move    sr,-(a7)                        ; sound: the 1MB code with its music package, else the 512K code
         btst    #PF_MUSIC,(Profile).l           
@@ -12364,7 +12364,7 @@ l_0ACB8:
         rts                                     ; 0ACD8/0AD3C
 l_0ACDA:
         st.b    g_KeyState(a6)                  ; 0ACDA/0AD3E
-        move.b  #$24,g_StateTimer(a6)           ; 0ACDE/0AD42
+        move.b  #250,g_StateTimer(a6)           ; 'TAKE A KEY FOR COMING IN !': 5 s (the original: 36 frames)
         clr.b   g_SubState2(a6)                 ; 0ACE4/0AD48
         clr.b   g_SubState3(a6)                 ; 0ACE8/0AD4C
 l_0ACEC:

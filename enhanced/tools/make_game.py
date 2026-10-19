@@ -260,6 +260,12 @@ def fold_scroller(S):
           + I('jsr     BuildLevelMasks', '512K: the one-plane masks of the level\'s images') + '\n')
     S.sub("        bsr.w   RedrawScreen                    ; 0627C/062DA\n",
           I('jsr     EnhRedrawSame', 'the background is unchanged: kept when the pristine buffer holds it') + '\n')
+    # end of a level: the original's drawing slowed right down while it printed these, which
+    # kept them on screen far longer than their frame counts; at 50 fps they flashed by
+    S.sub("        move.b  #$24,g_StateTimer(a6)           ; 0ACDE/0AD42\n",
+          "        move.b  #250,g_StateTimer(a6)           ; 'TAKE A KEY FOR COMING IN !': 5 s (the original: 36 frames)\n")
+    S.sub("        move.b  #$40,g_StateTimer(a6)           ; 06500/0655E\n",
+          "        move.b  #150,g_StateTimer(a6)           ; 'BONUS' and the amount: 3 s (the original: 64 frames)\n")
     S.sub("CheckGameStart:\n        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n",
           "CheckGameStart:\n" + I('jsr     EnhCheatKey', "the title / high scores: 'C' turns the cheat on or off") + '\n'
           "        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n")

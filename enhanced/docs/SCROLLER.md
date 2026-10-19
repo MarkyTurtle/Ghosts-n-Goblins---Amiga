@@ -288,6 +288,12 @@ the scroller's storage), and each frame it is one `ScrDrawBob` call - one blit, 
 entry - instead of 26 characters drawn by the CPU. The strip is made again only when the line
 changes (length, colours, characters) or a level loads.
 
+**End-of-level timings.** The original's drawing slowed right down while it printed 'TAKE A KEY
+FOR COMING IN !' and 'BONUS', which kept them on screen far longer than their frame counts; at
+50 fps they flashed by. The one program shows the key message for 250 frames (5 s; the original
+counts 36) and the bonus for 150 (3 s; the original counts 64). Everything else about the end of
+a level is unchanged.
+
 CPU work (instruction bytes executed, emulator): the key message ('TAKE A KEY FOR COMING IN !')
 adds about 18 K a frame instead of 203 K (play alone is 13 K) drawn character by character,
 and next to nothing as a strip; drawing the title screen 0.57 M
