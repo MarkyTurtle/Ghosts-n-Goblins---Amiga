@@ -264,17 +264,27 @@ display. Those need WinUAE or a real Amiga.
 
 ### Playfield text
 
-`PrintChar` on the playfield writes into the buffer being drawn, through the ring (8 lines
-copied to a scratch area laid out like the original buffer, printed there by the original code,
-copied back). Each character is also remembered for the frame; after the restore of that buffer
-(`TextReplay`, from `EnhRestoreBackground`) it is printed again - the restore may have cut through
-it, or the buffer been copied afresh - and gets a restore entry, so text the game stops printing
-goes away two frames later, like a BOB. The in-play messages ('TAKE A KEY FOR COMING IN !') are
-printed every frame, so they stay while shown. The original kept such text until its next full
-redraw: the side-by-side runs show it a frame longer, or with a piece cut out where a BOB's
-restore went through it, where the enhanced build shows it whole. Screens that are not redrawn
-(title, high scores, game over, name entry) have no restore, so their text stays as before (201
-game-over / name-entry frames compared identical in both builds).
+`PrintChar` on the playfield does not draw: the character goes into the frame's text queue
+(`TextQ`) and is drawn once - by `TextReplay` after the restore of the buffer being drawn (in
+play; the restore may cut through text, so it has always been drawn again there, and drawing it
+when printed as well was wasted: the game prints its in-play messages every frame, before the
+restore), or by `TextFlush` just before the buffer is shown (text printed after that, and the
+screens with no restore: title, high scores, name entry). A character is drawn at once only
+when the queue (64) is full. Each character drawn in play gets a restore entry, so text the game
+stops printing goes away two frames later, like a BOB.
+
+Drawing (`PrFast`) goes straight into the ring (no copy of the 8 lines in and out of a scratch
+area, no update check of both buffers per character), from a glyph cache in the scroller's
+storage: 29 slots (character code mod 29) of a tag (character, colours) and 8 lines of a mask
+byte and the 5 plane bytes, worked out as the original `PrintBody` does. NameEntry's background
+redraw at every cursor move (`EnhRedrawSame`) keeps the pristine buffer when it already shows the
+camera (it was 255 tile blits a move).
+
+CPU work (instruction bytes executed, emulator): the key message ('TAKE A KEY FOR COMING IN !')
+adds about 18 K a frame instead of 203 K (play alone is 13 K); drawing the title screen 0.57 M
+instead of 1.74 M; a name-entry cursor move about 130 K instead of 365 K plus the full redraw.
+The pictures are the same as the original's (title, high scores, the key message for 60 frames,
+201 name-entry frames with moves and letters, and the usual runs on every stage).
 
 ### The machine description (bootblock)
 

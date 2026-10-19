@@ -65,7 +65,7 @@ def build(extra_defs=()):
               ("the scroller's storage ends before the HUD area", syms['ScrollStoreEnd'] <= syms['CLEAR_AREA'])]
     top = level_data_top(prog, syms)
     checks.append((f'the level data (file, BOB sets, masks; worst ${top:X}) ends below $7F4DE, as the original\'s',
-                   top <= 0x7F4DE))
+                   top <= syms['LEVEL_GFX_LIMIT']))
     for what, ok in checks:
         if not ok: sys.exit('layout: ' + what + ' - no')
     print(f'level data up to ${top:X} with no image pre-masked')

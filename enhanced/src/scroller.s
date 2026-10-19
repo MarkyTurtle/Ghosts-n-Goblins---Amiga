@@ -21,7 +21,6 @@ RLIST_ENTRIES   equ     256             ; restore entries per display buffer
 TEXTQ_MAX       equ     64              ; playfield characters remembered per frame (TextReplay)
 TEXTQ_ENTRY     equ     14              ; font.l, ring.w, offset.l, shadow, ink, paper, pad
 COPPER_BYTES    equ     128
-PrintBody       equ     l_0B0E2         ; PrintChar after its playfield set-up
 
 ; the timing build (RASTER_BUILD): COLOR00 shows which part of the frame is running
 RASTER          macro
@@ -41,6 +40,11 @@ EnhInit:
                 move.w  #(ScrollStoreEnd-SCROLL_STORE)/2-1,d0
 .clr:           clr.w   (a0)+
                 dbra    d0,.clr
+                lea     (GLYPH_CACHE).l,a0      ; no glyphs yet
+                moveq   #GLYPH_SLOTS-1,d0
+.gl:            move.l  #-1,(a0)
+                lea     GLYPH_SIZE(a0),a0
+                dbra    d0,.gl
                 lea     MACHINE_INFO,a0         ; the bootblock's machine description, if it
                 cmpi.l  #'GNGM',(a0)            ; left one (boot_patches.s): kept here, as its
                 bne.b   .nomachine              ; address is only safe until the game starts
@@ -110,6 +114,39 @@ EnhRedrawScreen:
                 rts
 
 ;------------------------------------------------------------------------------
+; EnhRedrawSame - NameEntry's redraw, at every cursor move: the camera has not moved, so the
+; pristine buffer is kept when it already holds this window (the full draw was 255 tile
+; blits a move; the buffers being drawn are still copied afresh from it, SwapScreens)
+;------------------------------------------------------------------------------
+EnhRedrawSame:
+                movem.l d0-d5/a0,-(a7)
+                lea     (RecP).l,a0
+                tst.w   buf_Valid(a0)
+                beq.b   .full
+                move.w  g_NewTileX(a6),d0       ; the camera, as EnhRedrawScreen
+                lsl.w   #4,d0
+                add.w   g_ScrollFineX(a6),d0
+                move.w  g_NewTileY(a6),d1
+                lsl.w   #4,d1
+                add.w   g_ScrollFineY(a6),d1
+                cmp.w   buf_CamX(a0),d0
+                bne.b   .full
+                bsr.w   Window
+                cmp.w   buf_ColL(a0),d2
+                bne.b   .full
+                cmp.w   buf_ColR(a0),d3
+                bne.b   .full
+                cmp.w   buf_RowB(a0),d4
+                bne.b   .full
+                cmp.w   buf_RowT(a0),d5
+                bne.b   .full
+                movem.l (a7)+,d0-d5/a0
+                st.b    g_RedrawDone(a6)
+                rts
+.full:          movem.l (a7)+,d0-d5/a0
+                bra.w   EnhRedrawScreen
+
+;------------------------------------------------------------------------------
 ; EnhRedrawBackground - the background redraw RedrawEntry runs (in user mode) when the
 ; game asks for one: the camera code asks at almost every camera step, and the attract
 ; screens ask to clear their text. Neither needs drawing now: the pristine buffer is
@@ -161,6 +198,7 @@ EnhSwapScreens:
                 clr.w   buf_Valid(a1)
                 lea     (TextQ).l,a1
                 clr.w   (a1)
+                clr.w   (TextDone).l
                 rts
 
 ;------------------------------------------------------------------------------
@@ -176,6 +214,7 @@ EnhSetBitplanePtrs:
 
 ;------------------------------------------------------------------------------
 EnhShowBackBuffer:
+                bsr.w   TextFlush               ; text not drawn yet goes in before it is shown
                 RASTER  $0F0                    ; green: waiting for the copper interrupt
                 lea     CUSTOM,a0
                 movea.l DrawRec(pc),a1
@@ -204,6 +243,7 @@ EnhShowBackBuffer:
                 move.l  a1,g_SaveBufB(a6)
                 lea     (TextQ).l,a1            ; this frame's text is on screen now
                 clr.w   (a1)
+                clr.w   (TextDone).l
                 RASTER  $888
                 rts
 
@@ -244,20 +284,34 @@ EnhDrawBobs:
                 rts
 
 ;------------------------------------------------------------------------------
-; EnhPrintField - PrintChar on the playfield. Jumped to from PrintChar ($B0D6) with
-; a0 = the character's font data, d1 = byte column, d2 = line (32 = top of the
-; playfield when the fine scroll is 0), d7 = $FF (transparent); on the stack, as
+; Playfield text. PrintChar on the playfield ($B0D6) jumps to EnhPrintField with a0 = the
+; character's font data (MASK_BUF + 16 x character: 8 lines of 2 bytes), d1 = byte column,
+; d2 = line (32 = top of the playfield when the fine scroll is 0); on the stack, as
 ; PrintChar pushed them: d1-d7, a0-a5, the return address.
-; The 8 lines can cross the ring's wrap, so they are copied to a scratch area laid
-; out like the original buffer, the original code prints there (from $B0E2), and
-; they are copied back. The original buffer line is d2 - 16 + fine Y; it shows world
-; line 16*tileY + 255 - that, which is ring line (d2 - 16 + fineY - 16*tileY) & 255;
-; byte b of an original line is byte 2*tileX + b in the corkscrew.
+;
+; The character is not drawn there: it goes into the frame's text queue (TextQ), and is
+; drawn once, either by TextReplay after the restore of the buffer being drawn (in play:
+; the restore may cut through text, so text has always been drawn again there - the game
+; prints its in-play messages every frame, before the restore, so drawing it when printed
+; as well was wasted) or, for text printed after that or on screens with no restore (title,
+; high scores, name entry), by TextFlush just before the buffer is shown. Only when the
+; queue is full is a character drawn at once.
+;
+; Drawing (PrFast) goes straight into the ring buffer, from a glyph cache (GLYPH_CACHE, in the
+; scroller's storage):
+; per character and colours, 8 lines of a mask byte and the 5 plane bytes, worked out once
+; as the original PrintBody does (plane p: shadow bit p where only font plane 0 is set, ink
+; bit p where only plane 1 is, paper bit p where both are; transparent elsewhere).
+;
+; The original buffer line is d2 - 16 + fine Y; it shows world line 16*tileY + 255 - that,
+; which is ring line (d2 - 16 + fineY - 16*tileY) & 255; byte b of an original line is byte
+; 2*tileX + b in the corkscrew.
 ;------------------------------------------------------------------------------
+GLYPH_SLOTS     equ     29              ; slot = character code mod 29 (a prime: 'TAKE A KEY FOR
+                                        ; COMING IN !' takes 15 different slots)
+GLYPH_SIZE      equ     4+8*6           ; tag (char, shadow, ink, paper), 8 x (mask, 5 planes)
+
 EnhPrintField:
-                move.l  52(a7),PrRet            ; come back here after the print
-                move.l  #PrintBack,52(a7)
-                bsr.w   EnsureCurrent
                 move.w  d2,d0
                 sub.w   #16,d0
                 add.w   g_ScrollFineY(a6),d0
@@ -272,65 +326,66 @@ EnhPrintField:
                 addq.w  #2,d3
                 ext.l   d3
                 move.l  d3,PrOff
-                lea     (TextQ).l,a1            ; remember it, to print it again after the
-                move.w  (a1),d0                 ; restore (TextReplay)
+                move.b  g_TextShadow(a6),PrCol
+                move.b  g_TextInk(a6),PrCol+1
+                move.b  g_TextPaper(a6),PrCol+2
+                lea     (TextQ).l,a1
+                move.w  (a1),d0
                 cmp.w   #TEXTQ_MAX,d0
-                bhs.b   PrintCore
-                addq.w  #1,(a1)+
+                bhs.b   .now
+                addq.w  #1,(a1)+                ; queue it
                 mulu.w  #TEXTQ_ENTRY,d0
                 adda.l  d0,a1
                 move.l  a0,(a1)+                ; font data
                 move.w  PrRing(pc),(a1)+
                 move.l  PrOff(pc),(a1)+
-                move.b  g_TextShadow(a6),(a1)+
-                move.b  g_TextInk(a6),(a1)+
-                move.b  g_TextPaper(a6),(a1)+
-; PrRing / PrOff set, a0 = font data, d7 = $FF, PrintChar's frame on the stack with
-; PrintBack as its return address and PrRet the real one
-PrintCore:      moveq   #0,d6                   ; copy in
-                bsr.w   PrCopy
-                lea     (PrScratch).l,a1
-                moveq   #0,d1
-                moveq   #0,d2
-                jmp     PrintBody               ; the original print, into the scratch area
-PrintBack:      movem.l d0-d7/a0-a5,-(a7)       ; (PrintChar's registers, as it returns them)
-                moveq   #1,d6                   ; copy out
-                bsr.w   PrCopy
-                movem.l (a7)+,d0-d7/a0-a5
-                move.l  PrRet(pc),-(a7)
+                move.b  PrCol(pc),(a1)+
+                move.b  PrCol+1(pc),(a1)+
+                move.b  PrCol+2(pc),(a1)+
+                bra.b   .ret
+.now:           bsr.w   EnsureDraw              ; queue full: draw it now
+                bsr.w   PrFast
+.ret:           movem.l (a7)+,d1-d7             ; return as PrintChar does: the next column
+                addq.w  #1,d1                   ; (after column $21, column 2 of the next line)
+                cmp.w   #$22,d1
+                bcs.b   .col
+                moveq   #2,d1
+                addq.w  #8,d2
+.col:           movem.l (a7)+,a0-a5
+                move.w  #$B4,d0                 ; (PrintBody leaves the line length in d0)
+                rts
+
+; EnsureDraw - the buffer being drawn brought to the camera, unless it is there already
+; (EnsureCurrent costs a window check per buffer; text comes a character at a time)
+EnsureDraw:     movem.l d0-d1/a0,-(a7)
+                bsr.w   GetCam
+                movea.l DrawRec(pc),a0
+                tst.w   buf_Valid(a0)
+                beq.b   .update
+                cmp.w   buf_CamX(a0),d0
+                bne.b   .update
+                add.w   #16,d1
+                cmp.w   buf_ClipY0(a0),d1
+                beq.b   .ok
+.update:        bsr.w   EnsureCurrent
+.ok:            movem.l (a7)+,d0-d1/a0
                 rts
 
 ;------------------------------------------------------------------------------
-; TextReplay - after the restore of the buffer being drawn: print the characters printed
-; on the playfield since the last frame was shown again (the restore may have cut
-; through them, or the buffer been copied afresh), and add a restore entry for each, so
-; that text the game stops printing goes away like a BOB. (The original kept such text
-; until its next full redraw; the game prints its in-play messages every frame.) Text
-; printed on screens that are not redrawn (title, high scores, game over) is not
-; affected: they have no restore.
+; TextReplay - after the restore of the buffer being drawn: draw the frame's queued
+; characters, each with a restore entry, so that text the game stops printing goes away
+; like a BOB. TextDone: how many of the queue are drawn.
 ;------------------------------------------------------------------------------
 TextReplay:
                 movem.l d0-d7/a0-a5,-(a7)
                 lea     (TextQ).l,a4
                 move.w  (a4)+,d5
-                beq.w   .out
+                move.w  d5,(TextDone).l
                 subq.w  #1,d5
-.char:          movea.l (a4)+,a0
-                move.w  (a4)+,PrRing
-                move.l  (a4)+,PrOff
-                move.b  (a4)+,g_TextShadow(a6)
-                move.b  (a4)+,g_TextInk(a6)
-                move.b  (a4)+,g_TextPaper(a6)
-                addq.l  #1,a4                   ; (pad: entries stay word aligned)
-                movem.l d5/a4,-(a7)
-                move.l  #.printed,PrRet
-                move.l  #PrintBack,-(a7)        ; a PrintChar frame: return, a0-a5, d1-d7
-                movem.l a0-a5,-(a7)
-                movem.l d1-d7,-(a7)
-                moveq   #-1,d7                  ; transparent
-                bra.w   PrintCore
-.printed:       movem.l (a7)+,d5/a4
-                bsr.b   .restore
+                bmi.b   .out
+.char:          bsr.w   TextEntry
+                bsr.w   PrFast
+                bsr.w   .restore
                 dbra    d5,.char
 .out:           movem.l (a7)+,d0-d7/a0-a5
                 rts
@@ -372,29 +427,154 @@ TextReplay:
                 move.l  a1,buf_RList(a0)
 .full:          rts
 
-; d6 = 0: ring -> scratch, 1: scratch -> ring. 8 lines x 5 planes x 1 byte.
-PrCopy:         movea.l DrawRec(pc),a3
-                movea.l buf_Base(a3),a3
-                adda.l  PrOff(pc),a3            ; byte column on ring line 0
-                lea     (PrScratch+2).l,a4
-                move.w  PrRing(pc),d4
-                moveq   #7,d5
-.line:          move.w  d4,d0
-                andi.w  #$FF,d0
+; TextEntry - a4 = a queue entry -> a0 = font data, PrRing, PrOff, PrCol; a4 = the next
+TextEntry:      movea.l (a4)+,a0
+                move.w  (a4)+,PrRing
+                move.l  (a4)+,PrOff
+                move.b  (a4)+,PrCol
+                move.b  (a4)+,PrCol+1
+                move.b  (a4)+,PrCol+2
+                addq.l  #1,a4                   ; (pad: entries stay word aligned)
+                rts
+
+;------------------------------------------------------------------------------
+; TextFlush - EnhShowBackBuffer, before the swap: draw the queued characters not drawn yet
+; (printed after this frame's TextReplay, or on a screen with no restore)
+;------------------------------------------------------------------------------
+TextFlush:      movem.l d0-d7/a0-a5,-(a7)
+                lea     (TextQ).l,a4
+                move.w  (a4)+,d5
+                move.w  (TextDone).l,d0
+                sub.w   d0,d5                   ; not drawn yet
+                ble.b   .out
+                mulu.w  #TEXTQ_ENTRY,d0
+                adda.l  d0,a4
+                bsr.w   EnsureDraw
+                subq.w  #1,d5
+.char:          bsr.w   TextEntry
+                bsr.w   PrFast
+                dbra    d5,.char
+.out:           movem.l (a7)+,d0-d7/a0-a5
+                rts
+
+;------------------------------------------------------------------------------
+; PrFast - a0 = font data: the character at PrRing / PrOff in the colours PrCol, drawn into
+; the buffer being drawn, transparent where the font is 0 (as PrintBody on the playfield)
+;------------------------------------------------------------------------------
+PrFast:         movem.l d0-d7/a0-a5,-(a7)
+                move.l  a0,d0                   ; the character code ...
+                sub.l   #MASK_BUF,d0
+                lsr.l   #4,d0
+                move.b  d0,d3                   ; ... and the colours: the glyph's tag
+                lsl.l   #8,d3
+                move.b  PrCol(pc),d3
+                lsl.l   #8,d3
+                move.b  PrCol+1(pc),d3
+                lsl.l   #8,d3
+                move.b  PrCol+2(pc),d3
+                andi.l  #$FF,d0
+                divu.w  #GLYPH_SLOTS,d0
+                swap    d0                      ; code mod GLYPH_SLOTS
+                mulu.w  #GLYPH_SIZE,d0
+                lea     (GLYPH_CACHE).l,a2
+                adda.l  d0,a2                   ; its slot
+                cmp.l   (a2),d3
+                beq.w   .draw
+                move.l  d3,(a2)                 ; not there: work it out
+                lea     -16(a7),a7              ; 5 plane selectors, then 8 unions
+                movea.l a7,a4
+                lea     8(a7),a5
+                move.b  PrCol(pc),d4            ; shadow
+                move.b  PrCol+1(pc),d5          ; ink
+                move.b  PrCol+2(pc),d6          ; paper
+                moveq   #4,d7                   ; plane p: selector = shadow bit p + 2 x ink bit p
+.sel:           moveq   #0,d0                   ; + 4 x paper bit p
+                lsr.b   #1,d6
+                addx.b  d0,d0
+                lsr.b   #1,d5
+                addx.b  d0,d0
+                lsr.b   #1,d4
+                addx.b  d0,d0
+                move.b  d0,(a4)+
+                dbra    d7,.sel
+                subq.l  #5,a4
+                lea     4(a2),a3
+                lea     16(a0),a1               ; end of the font data
+                moveq   #0,d4
+                clr.b   (a5)                    ; union 0: nothing
+.line:          move.b  (a0)+,d0                ; font plane 0
+                move.b  (a0)+,d1                ; font plane 1
+                move.b  d0,d2
+                and.b   d1,d2                   ; C: both (paper)
+                eor.b   d2,d0                   ; A: plane 0 only (shadow)
+                eor.b   d2,d1                   ; B: plane 1 only (ink)
+                move.b  d0,1(a5)                ; unions by selector: A, B, A|B, C, A|C, B|C, all
+                move.b  d1,2(a5)
+                move.b  d0,d3
+                or.b    d1,d3
+                move.b  d3,3(a5)
+                move.b  d2,4(a5)
+                move.b  d0,d3
+                or.b    d2,d3
+                move.b  d3,5(a5)
+                move.b  d1,d3
+                or.b    d2,d3
+                move.b  d3,6(a5)
+                or.b    d0,d3
+                move.b  d3,7(a5)
+                not.b   d3
+                move.b  d3,(a3)+                ; mask: where the background shows
+                move.b  (a4),d4                 ; the 5 planes
+                move.b  (a5,d4.w),(a3)+
+                move.b  1(a4),d4
+                move.b  (a5,d4.w),(a3)+
+                move.b  2(a4),d4
+                move.b  (a5,d4.w),(a3)+
+                move.b  3(a4),d4
+                move.b  (a5,d4.w),(a3)+
+                move.b  4(a4),d4
+                move.b  (a5,d4.w),(a3)+
+                cmpa.l  a1,a0
+                bne.b   .line
+                lea     16(a7),a7
+.draw:          WAITBLIT                        ; (a blit may still be writing this buffer: CopyAll)
+                lea     4(a2),a3                ; the glyph
+                movea.l DrawRec(pc),a0
+                move.l  buf_Base(a0),d0
+                add.l   PrOff(pc),d0
+                movea.l d0,a4                   ; this byte column on ring line 0
+                move.w  PrRing(pc),d1
+                move.w  d1,d0
                 mulu.w  #LINEBYTES,d0
-                lea     (a3,d0.l),a2
-                moveq   #0,d0
-                moveq   #4,d3
-.pl:            tst.w   d6
-                bne.b   .out
-                move.b  (a2,d0.w),(a4,d0.w)
-                bra.b   .nx
-.out:           move.b  (a4,d0.w),(a2,d0.w)
-.nx:            add.w   #ROWBYTES,d0
-                dbra    d3,.pl
-                addq.w  #1,d4
-                lea     LINEBYTES(a4),a4
-                dbra    d5,.line
+                lea     (a4,d0.l),a1            ; the first line
+                moveq   #7,d7
+.dl:            move.b  (a3)+,d2                ; mask
+                move.b  (a1),d3
+                and.b   d2,d3
+                or.b    (a3)+,d3
+                move.b  d3,(a1)
+                move.b  ROWBYTES(a1),d3
+                and.b   d2,d3
+                or.b    (a3)+,d3
+                move.b  d3,ROWBYTES(a1)
+                move.b  2*ROWBYTES(a1),d3
+                and.b   d2,d3
+                or.b    (a3)+,d3
+                move.b  d3,2*ROWBYTES(a1)
+                move.b  3*ROWBYTES(a1),d3
+                and.b   d2,d3
+                or.b    (a3)+,d3
+                move.b  d3,3*ROWBYTES(a1)
+                move.b  4*ROWBYTES(a1),d3
+                and.b   d2,d3
+                or.b    (a3)+,d3
+                move.b  d3,4*ROWBYTES(a1)
+                lea     LINEBYTES(a1),a1
+                addq.b  #1,d1                   ; next ring line: at the wrap, line 0
+                bne.b   .nw
+                movea.l a4,a1
+.nw:            dbra    d7,.dl
+                movem.l (a7)+,d0-d7/a0-a5
                 rts
 
 ;------------------------------------------------------------------------------
@@ -894,9 +1074,9 @@ TxtFast:        dc.b    'FAST ',0
                 cnop    0,4
 DrawRec:        dc.l    0               ; the buffer being drawn (the original's g_ScreenFront)
 ShowRec:        dc.l    0               ; the buffer on screen
-PrRet:          dc.l    0
-PrOff:          dc.l    0
+PrOff:          dc.l    0               ; the character being drawn: byte offset, ring line, colours
 PrRing:         dc.w    0
+PrCol:          dc.b    0,0,0,0         ; shadow, ink, paper (, pad)
                 cnop    0,4
 BobGfx:         dc.l    0               ; the image ScrDrawBob is drawing (BobMaskFind) ...
 BobMask:        dc.l    0               ; ... and its one-plane mask (0: none)
@@ -919,8 +1099,9 @@ CopperA         rs.b    COPPER_BYTES
 CopperB         rs.b    COPPER_BYTES
 RListA          rs.b    8*RLIST_ENTRIES
 RListB          rs.b    8*RLIST_ENTRIES
-PrScratch       rs.b    2+8*LINEBYTES
 TextQ           rs.b    2+TEXTQ_MAX*TEXTQ_ENTRY
+TextDone        rs.w    1               ; how many of TextQ are drawn (TextReplay, TextFlush)
+GLYPH_CACHE     rs.b    GLYPH_SLOTS*GLYPH_SIZE  ; playfield text glyphs (PrFast; tags -1 at start)
 EnhMachine      rs.b    32              ; the bootblock's machine description (or zeros)
 MachText        rs.b    48
 ScrollStoreEnd  rs.b    0               ; (build_game.py checks: buffers < SCROLL_STORE, this <= CLEAR_AREA)

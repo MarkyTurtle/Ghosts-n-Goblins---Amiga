@@ -4904,7 +4904,7 @@ l_0626C:
         subq.w  #$1,g_ArthurY(a6)               ; 06274/062D2
 l_06278:
         clr.b   g_RedrawPending(a6)             ; 06278/062D6  redraw the screen and the grid
-        bsr.w   RedrawScreen                    ; 0627C/062DA
+        jsr     EnhRedrawSame                   ; the background is unchanged: kept when the pristine buffer holds it
         bsr.w   SwapScreens                     ; 06280/062DE
         move.w  g_ArthurY(a6),d5                ; 06284/062E2
         mulu.w  #$d,d5                          ; 06288/062E6

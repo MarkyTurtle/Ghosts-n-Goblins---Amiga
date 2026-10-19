@@ -34,6 +34,8 @@ Each line points to the item below with the details and measurements.
       `enhanced/docs/SCROLLER.md`
 - [x] Look-ahead column: the next column built a few tiles a frame in the spare column's
       memory, so a crossing no longer draws a whole column in one frame (`ScrPrepare`)
+- [x] Playfield text: queued and drawn once a frame from a glyph cache straight into the ring;
+      name entry keeps the background (key message ~11x less CPU, title 3x, name entry ~3x)
 - [ ] Look-ahead rows (the ring's spare tile row), once the vertical camera speeds are measured
 - [ ] Keep busy scenes at 50 fps on an A500: measured in WinUAE, the stage 6 dragon now fits a
       frame (one-blit images); if busy scenes still drop: a copper-driven blit queue (an interrupt per blit costs about as much as it saves on a 68000)

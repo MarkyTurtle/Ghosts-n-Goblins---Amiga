@@ -258,6 +258,8 @@ def fold_scroller(S):
     S.sub("        bsr.w   BuildFrameTable                 ; 0689C/068FA\n",
           "        bsr.w   BuildFrameTable                 ; 0689C/068FA\n"
           + I('jsr     BuildLevelMasks', '512K: the one-plane masks of the level\'s images') + '\n')
+    S.sub("        bsr.w   RedrawScreen                    ; 0627C/062DA\n",
+          I('jsr     EnhRedrawSame', 'the background is unchanged: kept when the pristine buffer holds it') + '\n')
     S.sub("CheckGameStart:\n        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n",
           "CheckGameStart:\n" + I('jsr     EnhCheatKey', "the title / high scores: 'C' turns the cheat on or off") + '\n'
           "        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n")
