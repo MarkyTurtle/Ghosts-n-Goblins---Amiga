@@ -442,6 +442,12 @@ on stage 1 21.6 -> 18.1, stage 3 36.5 -> 19.4, stage 6 (the dragon present) 35.2
 blitter words are unchanged, and so are the pictures on all seven stages (512K and 1MB runs in
 step with the originals). The time saved has to be measured in WinUAE (timing build).
 
+**Cheat key (testing).** On the title and high-score screens, **C** turns the game's own cheat
+(`g_CheatOn`, the one entering `)!(` on the high-score table sets: lives never decrease, no harm
+once the armour is gone) on or off, and shows the title again with `CHEAT ON` under the key
+lines while it is on (`EnhCheatKey`, `EnhShowCheat`). It stays set until switched off or the
+machine is reset; a high-score entry other than `)!(` clears it, as in the original.
+
 **Look-ahead column (`ScrPrepare`).** A frame that crossed a tile column drew the whole new
 column at once: about 15 tile blits into the pristine buffer and 15 tile copies into the display
 buffer, and the other display buffer's 15 the next frame - a spike on top of a busy frame. A

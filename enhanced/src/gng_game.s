@@ -4622,6 +4622,7 @@ l_05F5C:
 ; (level 0, weapon 1 = lance, 7 lives, intro cut-scene pending).
 ;---------------------------------------------------------------------------
 CheckGameStart:
+        jsr     EnhCheatKey                     ; the title / high scores: 'C' turns the cheat on or off
         btst    #$7,$bfe001.l                   ; 05F74/05FCA
         beq.b   l_05F9A                         ; 05F7C/05FD2
         cmpi.b  #$50,g_RawKey(a6)               ; 05F7E/05FD4  F1 pressed?

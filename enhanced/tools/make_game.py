@@ -258,6 +258,9 @@ def fold_scroller(S):
     S.sub("        bsr.w   BuildFrameTable                 ; 0689C/068FA\n",
           "        bsr.w   BuildFrameTable                 ; 0689C/068FA\n"
           + I('jsr     BuildLevelMasks', '512K: the one-plane masks of the level\'s images') + '\n')
+    S.sub("CheckGameStart:\n        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n",
+          "CheckGameStart:\n" + I('jsr     EnhCheatKey', "the title / high scores: 'C' turns the cheat on or off") + '\n'
+          "        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n")
     S.sub("        bsr.w   DrawCreditsScreen               ; 05EF0/05F46\n",
           "        bsr.w   DrawCreditsScreen               ; 05EF0/05F46\n" + I('jsr     EnhShowMachine', 'and the memory the bootblock found') + '\n')
     # the timing build: the logic's start and end colour the background

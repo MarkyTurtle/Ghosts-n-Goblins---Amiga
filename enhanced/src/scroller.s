@@ -786,14 +786,47 @@ MakeMasks:
                 rts
 
 ;------------------------------------------------------------------------------
-; EnhShowMachine - after DrawCreditsScreen (the title screen): one line in the free row
+; EnhShowMachine - after DrawCreditsScreen (the title screen): the cheat line (EnhShowCheat), then one line in the free row
 ; under the credits with the memory the bootblock found, for example
 ;       CHIP 512K SLOW 512K FAST 0K
 ; Nothing is printed when the bootblock left no description (the original bootblock).
 ; Sizes: chip = its upper end; slow / fast = upper end - the 64K boundary below mh_Lower.
 ;------------------------------------------------------------------------------
+;------------------------------------------------------------------------------
+; EnhCheatKey - CheckGameStart (the title and high-score screens), first: the C key turns
+; the game's cheat on or off (g_CheatOn, as entering ')!(' on the high-score table: lives
+; never decrease, no harm once the armour is gone) and shows the title again, which says
+; 'CHEAT ON' while it is on (EnhShowCheat). For testing.
+;------------------------------------------------------------------------------
+EnhCheatKey:
+                cmpi.b  #$33,g_RawKey(a6)       ; raw key code of C
+                bne.b   .out
+                clr.w   g_RawKey(a6)
+                not.b   g_CheatOn(a6)
+                move.b  #GS_TITLE,g_GameState(a6)       ; the title again, with the line
+                clr.b   g_SubState(a6)
+.out:           rts
+
+; EnhShowCheat - with the title: 'CHEAT ON' between the keys and the copyright lines
+EnhShowCheat:
+                tst.b   g_CheatOn(a6)
+                beq.b   .out
+                movem.l d0-d7/a0-a5,-(a7)
+                move.b  #$18,g_TextShadow(a6)   ; the credits' colours
+                move.b  #$0D,g_TextInk(a6)
+                move.b  #$1F,g_TextPaper(a6)
+                lea     TxtCheat(pc),a3
+                moveq   #12,d1                  ; centred on the 32 columns
+                move.w  #$C4,d2                 ; between 'Press Esc ...' ($B8) and the copyright ($D0)
+                jsr     PrintString
+                movem.l (a7)+,d0-d7/a0-a5
+.out:           rts
+TxtCheat:       dc.b    'CHEAT ON',0
+                even
+
 EnhShowMachine:
                 movem.l d0-d7/a0-a5,-(a7)
+                bsr.w   EnhShowCheat
                 lea     (EnhMachine).l,a4
                 cmpi.l  #'GNGM',(a4)
                 bne.b   .out
