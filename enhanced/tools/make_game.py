@@ -351,6 +351,42 @@ def widen_branches(path):
         open(path, 'w').write('\n'.join(L))
 
 
+def drop_dead_code(S):
+    """the original's routines the scroller replaced, and debug left-overs nothing calls: their
+    bodies are removed (tools: enhanced/docs/SCROLLER.md, Dead code). For the ones the scroller
+    took over at the label (a jmp first) only what follows the jmp goes"""
+    L = S.s.split('\n')
+    def label_line(name):
+        return next(i for i, l in enumerate(L) if re.match(re.escape(name) + r':(\s|$)', l))
+    def block_end(i):                 # the next routine (a label not of the l_xxxxx kind): its comment
+        j = i + 1                     # header, or the label itself
+        while j < len(L):
+            m = re.match(r'([A-Za-z]\w*):', L[j])
+            if m and not re.fullmatch(r'l1?m?_[0-9A-F]{5}(_m)?', m.group(1)):
+                k = j
+                while k > i + 1 and (L[k - 1].startswith(';') or not L[k - 1].strip()): k -= 1
+                return k
+            j += 1
+        return j
+    def header_start(i):
+        while i > 0 and L[i - 1].startswith(';'): i -= 1
+        return i
+    cuts = []
+    for name in ('SetBitplanePtrs', 'CameraJump', 'SwapScreens', 'ShowBackBuffer', 'RestoreBackground',
+                 'DrawBobs', 'RedrawScreen'):
+        i = label_line(name); assert L[i + 1].strip().startswith('jmp     Enh'), name
+        cuts.append((i + 2, block_end(i), f'; ({name}: the rest of the original routine removed - the scroller does it)'))
+    for name in ('DrawBob', 'WaitBlitIRQ', 'DrawBobMasked', 'DrawSceneryOnRedraw', 'DrawSceneryMasked',
+                 'PrintHexByte', 'PrintHexWord', 'PrintHexLong'):
+        i = label_line(name)
+        cuts.append((header_start(i), block_end(i), f'; ({name}: the original\'s, unused with the scroller - removed)'))
+    n = 0
+    for a, b, note in sorted(cuts, reverse=True):
+        n += b - a; L[a:b] = [note, '']
+    S.s = '\n'.join(L)
+    return n
+
+
 def main():
     src = open(os.path.join(ROOT, 'gng_main.s')).read()
     V1 = view(src.split('\n'), True)
@@ -397,9 +433,10 @@ def main():
           "        move.l  (MfmBuf).l,$20(a0)              ; 0C54E/0C482  DSKPT = MFM buffer")
     S.sub("        lea.l   (MFM_BUFFER+$2).l,a3            ; 0C580/0C4B4",
           "        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4\n        addq.l  #$2,a3")
+    dead = drop_dead_code(S)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)
-    print(f'{os.path.relpath(OUT, ROOT)}: {S.s.count(chr(10))} lines; {n} references out of reach made longer')
+    print(f'{os.path.relpath(OUT, ROOT)}: {S.s.count(chr(10))} lines ({dead} dead lines removed); {n} references out of reach made longer')
 
 
 if __name__ == '__main__':

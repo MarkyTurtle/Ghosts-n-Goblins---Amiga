@@ -53,9 +53,8 @@ Each line points to the item below with the details and measurements.
 - [x] 512K: the old background save areas: the small BOBs and the progress map load into the
       screens, the MFM buffer is at the top of the level area (the first screen while the
       progress map loads); a trace of every `LoadFile`. The screens come 24 KB lower
-- [ ] Remove the original routines the scroller replaced (`RedrawScreen`, `DrawBob`,
-      `DrawBobMasked`, `DrawSceneryOnRedraw`, `SwapScreens`, `SetBitplanePtrs`... after the `jmp`
-      to the scroller) and a few unused debug routines: about 3.3 KB of the program (5)
+- [x] Remove the original routines the scroller replaced and the debug routines (`drop_dead_code`,
+      make_game.py): 3 KB
 - [ ] Per-level `TileAttr` banks (8 KB resident; a level uses 1-3 of the 4 banks): a few KB (5)
 - [ ] The rest of the per-level data: zones, spawns, placements and the level's enemy graphics
       (no 118 KB load into a screen buffer) (4)
@@ -70,9 +69,9 @@ Each line points to the item below with the details and measurements.
 - [x] Music on 512K machines with an expansion (slow or fast RAM): the whole 1MB package, in the
       chip RAM the program moved out of
 - [ ] Music on a plain 512K A500: needs about 43 KB of chip RAM; the per-level map tables freed
-      17 KB, two joined gaps 3 KB and the old save areas 24 KB (the fullest stage now leaves 47 KB
-      free, 3 KB before): enough for the estimate; next a combined package (the tunes' samples and note data added to
-      the 512K effects package) (4)
+      17 KB, two joined gaps 3 KB, the old save areas 24 KB and dead code 3 KB (the fullest stage now
+      leaves 50 KB free, 3 KB before): enough for the estimate; next a combined package (the
+      tunes' samples and note data added to the 512K effects package) (4)
 - [ ] Music quality tiers chosen by the machine's memory (4)
 - [ ] Resample the music samples (2/3 saves about 11 KB) by scaling the instruments' period
       multipliers; also fixes periods below Paula's minimum of 124 (5)

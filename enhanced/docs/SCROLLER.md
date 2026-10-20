@@ -479,6 +479,17 @@ level start and restart, the progress map) showed where else those buffers can g
 The screens, the scroller's storage, the HUD and the level area all move down `$6000`: the
 fullest stage (2) leaves 47,782 bytes free without pre-masking (23,232 before).
 
+**Dead code (3 KB).** A reachability pass over the listing (from `Start`, every label a table or
+an equate refers to, and the targets of jump tables; a routine ends at an unconditional jump)
+found what nothing reaches. `make_game.py` (`drop_dead_code`) now removes it: the original
+routines the scroller took over at their label (`SetBitplanePtrs`, `CameraJump`, `SwapScreens`,
+`ShowBackBuffer`, `RestoreBackground`, `DrawBobs`, `RedrawScreen`: everything after the `jmp`),
+the original drawing the scroller replaced (`DrawBob`, `DrawBobMasked`, `DrawSceneryOnRedraw`,
+`DrawSceneryMasked`, `WaitBlitIRQ`) and the debug `PrintHex*` routines; `scroll.s` loses
+`DrawColumnAll` and `DrawRowAll`. The program is 74,250 bytes (77,296), the fullest stage leaves
+50,828 bytes free. About 300 bytes of small unreachable pieces of the original are left as they
+are (an unused path routine of the Petite Devil, a few instructions after jumps).
+
 With the smaller program the memory map moved down, and the slow / fast RAM music needed a new
 order: the effects package's area now comes first after the program (`SFX_AREA`), and
 `LoadSound` runs right after `ReadProfile`, so that the 1MB music package, loaded over the

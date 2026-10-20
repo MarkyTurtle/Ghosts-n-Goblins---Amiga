@@ -372,18 +372,6 @@ SetClip:        move.w  d0,buf_CamX(a0)
                 move.w  d7,buf_ClipY1(a0)
                 rts
 
-; d0 = column: draw it over the buffer's rows
-DrawColumnAll:
-                movem.l d0-d6,-(a7)
-                move.w  d0,d1                   ; column
-                move.w  buf_RowB(a0),d0         ; row
-.r:             bsr.w   DrawTile
-                addq.w  #1,d0
-                cmp.w   buf_RowT(a0),d0
-                ble.b   .r
-                movem.l (a7)+,d0-d6
-                rts
-
 ; d0 = column entering the window: drawn over the buffer's rows, or only the rows the
 ; look-ahead has not done if it is the column built in the spare memory. The spare memory is
 ; taken either way, so the look-ahead starts again (ScrPrepare)
@@ -541,15 +529,6 @@ ScrPrepareRow:
 .scen:          bsr.w   ScrDrawScenery
                 move.l  (a7)+,buf_ClipY0(a0)
 .out:           movem.l (a7)+,d0-d7/a1
-                rts
-
-; d0 = row: draw it over the buffer's columns
-DrawRowAll:
-                movem.l d0-d6,-(a7)
-                move.w  buf_ColL(a0),d1
-                move.w  buf_ColR(a0),d6
-                bsr.b   DrawRow
-                movem.l (a7)+,d0-d6
                 rts
 
 ; d0 = row, d1 = first column, d6 = last column

@@ -3460,14 +3460,14 @@ l_05CBC:
         move.l  (a1)+,(a5)+                     ; 05CC2/05C60
         dbra    d7,l_05CBC                      ; 05CC4/05C62
         lea.l   FileItemGfx2(pc),a1             ; 05CC8/05CAA
-        jsr     (LoadFile).l                        ; 05CCC/05CAE  load file tracks 57    -> $1CF8E
+        bsr.w   LoadFile                        ; 05CCC/05CAE  load file tracks 57    -> $1CF8E
         lea.l   FileEnemyShotGfx(pc),a1         ; 05CD0/05CC8
-        jsr     (LoadFile).l                        ; 05CD4/05CCC  load file tracks 58    -> $1A298
+        bsr.w   LoadFile                        ; 05CD4/05CCC  load file tracks 58    -> $1A298
         lea.l   FileItemGfx(pc),a1              ; 05CD8/05CE6
-        jsr     (LoadFile).l                        ; 05CDC/05CEA  load file tracks 59-60 -> $1B4CC
+        bsr.w   LoadFile                        ; 05CDC/05CEA  load file tracks 59-60 -> $1B4CC
         bsr.w   CacheGraphics                   ; 1MB+ chip: cache the graphics with masks, the progress map
         lea.l   FileFont(pc),a1                 ; 05CE0/05D04
-        jsr     (LoadFile).l                        ; 05CE4/05D08  load file tracks 61    -> $37468 (font/mask source)
+        bsr.w   LoadFile                        ; 05CE4/05D08  load file tracks 61    -> $37468 (font/mask source)
         lea.l   FileFont(pc),a1                 ; 05CE8/05D0C  the font: every other byte of the file (one plane pair) into MASK_BUF
         movea.l (a1),a1                         ; 05CEC/05D10
         lea.l   (MASK_BUF).l,a2                 ; 05CEE/05D12
@@ -3493,13 +3493,13 @@ l_05D24:
         dbra    d0,l_05D24                      ; 05D26/05D4E
         jsr     EnhInit                         ; the scroller's records (and the machine description)
         lea.l   FileCopyrightScreen(pc),a1      ; 05D32/05D88
-        jsr     (LoadFile).l                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68
+        bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68
         btst    #PF_CACHE,(Profile).l           ; the 1MB program loads level 0 here, so the title
         beq.b   st_lv0late                      ; shows the level behind it; the 512K one after InitHardware
         moveq   #0,d0                           ; level 0's map tables (the title shows level 0)
         jsr     LoadLevelTables
         lea.l   FileLevel0(pc),a1               
-        jsr     (LoadFile).l                        
+        bsr.w   LoadFile                        
 st_lv0late:
         lea.l   CopperTemplate(pc),a0           ; 05D3A/05D98
         lea.l   (COPPER_INIT).l,a1              ; 05D3E/05D9C
@@ -3574,7 +3574,7 @@ l_05E08:
         moveq   #0,d0                           ; level 0's map tables (the title shows level 0)
         jsr     LoadLevelTables
         lea.l   FileLevel0(pc),a1               ; 05E2E/     
-        jsr     (LoadFile).l                        ; 05E32/       load level-0 enemy graphics while the copyright screen shows
+        bsr.w   LoadFile                        ; 05E32/       load level-0 enemy graphics while the copyright screen shows
 l_05E36:
         cmpi.w  #$1f4,g_VblCount(a6)            ; 05E36/05E8C  show the copyright warning for 500 VBLs (10 s)
         bcs.b   l_05E36                         ; 05E3C/05E92
@@ -3584,7 +3584,7 @@ l_05E36:
         clr.b   g_Checkpoint(a6)                ; 05E4A/05EA0
         clr.b   g_CheatOn(a6)                   ; 05E4E/05EA4
         move.l  #LEVEL_FILE,g_LevelFileAddr(a6) ; 05E52/05EA8
-        jsr     (RedrawScreen).l                    ; 05E5A/05EB0
+        bsr.w   RedrawScreen                    ; 05E5A/05EB0
         bsr.w   SwapScreens                     ; 05E5E/05EB4
         bsr.w   SetBitplanePtrs                 ; 05E62/05EB8
         bsr.w   ShowBackBuffer                  ; 05E66/05EBC
@@ -3594,7 +3594,7 @@ l_05E36:
         movem.l d0-d7,COLOR00(a0)               ; 05E78/05ECE
         movem.l (a1)+,d0-d7                     ; 05E7E/05ED4
         movem.l d0-d7,COLOR16(a0)               ; 05E82/05ED8
-        jsr     (RedrawScreen).l                    ; 05E88/05EDE
+        bsr.w   RedrawScreen                    ; 05E88/05EDE
         bsr.w   SwapScreens                     ; 05E8C/05EE2
         move.b  #GS_TITLE,g_GameState(a6)       ; 05E90/05EE6
         clr.b   g_SubState(a6)                  ; 05E96/05EEC
@@ -6141,69 +6141,8 @@ ProgressMap_Wait:
 ;---------------------------------------------------------------------------
 SetBitplanePtrs:
         jmp     EnhSetBitplanePtrs              ; the scroller
-        move.l  g_ScreenFront(a6),d2            ; 0789A/078FA  front screen
-        move.w  g_ScrollFineX(a6),d0            ; 0789E/078FE  + the scroll in words
-        subq.w  #$1,d0                          ; 078A2/07902
-        asr.w   #$4,d0                          ; 078A4/07904
-        add.w   d0,d0                           ; 078A6/07906
-        addq.w  #$2,d0                          ; 078A8/07908
-        ext.l   d0                              ; 078AA/0790A
-        add.l   d0,d2                           ; 078AC/0790C
-        moveq   #$10,d0                         ; 078AE/0790E  + (16 - fine Y) lines of 180 bytes
-        sub.w   g_ScrollFineY(a6),d0            ; 078B0/07910
-        mulu.w  #$b4,d0                         ; 078B4/07914
-        add.l   d0,d2                           ; 078B8/07918
-        movea.l g_CopperBack(a6),a1             ; 078BA/0791A
-        moveq   #$24,d0                         ; 078BE/0791E  5 planes, 36 bytes apart (line-interleaved)
-        addq.l  #$2,a1                          ; 078C0/07920
-        swap    d2                              ; 078C2/07922
-        move.w  d2,(a1)+                        ; 078C4/07924
-        addq.l  #$2,a1                          ; 078C6/07926
-        swap    d2                              ; 078C8/07928
-        move.w  d2,(a1)+                        ; 078CA/0792A
-        add.l   d0,d2                           ; 078CC/0792C
-        addq.l  #$2,a1                          ; 078CE/0792E
-        swap    d2                              ; 078D0/07930
-        move.w  d2,(a1)+                        ; 078D2/07932
-        addq.l  #$2,a1                          ; 078D4/07934
-        swap    d2                              ; 078D6/07936
-        move.w  d2,(a1)+                        ; 078D8/07938
-        add.l   d0,d2                           ; 078DA/0793A
-        addq.l  #$2,a1                          ; 078DC/0793C
-        swap    d2                              ; 078DE/0793E
-        move.w  d2,(a1)+                        ; 078E0/07940
-        addq.l  #$2,a1                          ; 078E2/07942
-        swap    d2                              ; 078E4/07944
-        move.w  d2,(a1)+                        ; 078E6/07946
-        add.l   d0,d2                           ; 078E8/07948
-        addq.l  #$2,a1                          ; 078EA/0794A
-        swap    d2                              ; 078EC/0794C
-        move.w  d2,(a1)+                        ; 078EE/0794E
-        addq.l  #$2,a1                          ; 078F0/07950
-        swap    d2                              ; 078F2/07952
-        move.w  d2,(a1)+                        ; 078F4/07954
-        add.l   d0,d2                           ; 078F6/07956
-        addq.l  #$2,a1                          ; 078F8/07958
-        swap    d2                              ; 078FA/0795A
-        move.w  d2,(a1)+                        ; 078FC/0795C
-        addq.l  #$2,a1                          ; 078FE/0795E
-        swap    d2                              ; 07900/07960
-        move.w  d2,(a1)+                        ; 07902/07962
-        moveq   #$f,d1                          ; 07904/07964
-        and.w   g_ScrollFineX(a6),d1            ; 07906/07966
-        beq.b   l_07918                         ; 0790A/0796A
-        moveq   #$10,d0                         ; 0790C/0796C
-        sub.w   d1,d0                           ; 0790E/0796E
-        move.w  d0,d1                           ; 07910/07970
-        lsl.w   #$4,d1                          ; 07912/07972
-        or.w    d1,d0                           ; 07914/07974
-        bra.b   l_0791A                         ; 07916/07976
-l_07918:
-        clr.w   d0                              ; 07918/07978
-l_0791A:
-        addq.l  #$2,a1                          ; 0791A/0797A
-        move.w  d0,(a1)+                        ; 0791C/0797C
-        rts                                     ; 0791E/0797E
+; (SetBitplanePtrs: the rest of the original routine removed - the scroller does it)
+
 
 ;---------------------------------------------------------------------------
 ; Same for the progress-map copper list
@@ -7045,30 +6984,8 @@ cg_longs:
 ;---------------------------------------------------------------------------
 CameraJump:
         jmp     EnhCameraJump                   ; the scroller: the same fine-scroll rules, no buffers to rotate
-        move.w  g_PendFineX(a6),d0              ; 08046/0809C
-        move.w  d0,g_CamDeltaX(a6)              ; 0804A/080A0
-        cmp.w   #$f,d0                          ; 0804E/080A4
-        ble.b   l_08058                         ; 08052/080A8
-        moveq   #$f,d0                          ; 08054/080AA
-        bra.b   l_08060                         ; 08056/080AC
-l_08058:
-        cmp.w   #$fff0,d0                       ; 08058/080AE
-        bge.b   l_08060                         ; 0805C/080B2
-        moveq   #-16,d0                         ; 0805E/080B4
-l_08060:
-        move.w  d0,g_ScrollFineX(a6)            ; 08060/080B6
-        move.w  g_PendFineY(a6),d0              ; 08064/080BA
-        move.w  d0,g_CamDeltaY(a6)              ; 08068/080BE
-        cmp.w   #$f,d0                          ; 0806C/080C2
-        ble.b   l_08076                         ; 08070/080C6
-        moveq   #$f,d0                          ; 08072/080C8
-        bra.b   l_0807E                         ; 08074/080CA
-l_08076:
-        cmp.w   #$fff0,d0                       ; 08076/080CC
-        bge.b   l_0807E                         ; 0807A/080D0
-        moveq   #-16,d0                         ; 0807C/080D2
-l_0807E:
-        move.w  d0,g_ScrollFineY(a6)            ; 0807E/080D4
+; (CameraJump: the rest of the original routine removed - the scroller does it)
+
 
 ;---------------------------------------------------------------------------
 ; SwapScreens - adopt the new tile origin (g_NewTileX/Y) and rotate the four screen
@@ -7077,27 +6994,8 @@ l_0807E:
 ;---------------------------------------------------------------------------
 SwapScreens:
         jmp     EnhSwapScreens                  ; the scroller
-        move.w  g_NewTileX(a6),g_ScrollTileX(a6); 08082/080D8
-        move.w  g_NewTileY(a6),g_ScrollTileY(a6); 08088/080DE
-        movea.l g_ScreenBack(a6),a1             ; 0808E/080E4
-        movea.l g_ScreenFront(a6),a2            ; 08092/080E8
-        move.l  g_ScreenSpare1(a6),g_ScreenBack(a6); 08096/080EC
-        move.l  g_ScreenSpare2(a6),g_ScreenFront(a6); 0809C/080F2
-        move.l  a1,g_ScreenSpare1(a6)           ; 080A2/080F8
-        move.l  a2,g_ScreenSpare2(a6)           ; 080A6/080FC
-        movea.l g_CopperFront(a6),a1            ; 080AA/08100
-        movea.l g_CopperBack(a6),a2             ; 080AE/08104
-        move.l  g_CopperSpare1(a6),g_CopperFront(a6); 080B2/08108
-        move.l  g_CopperSpare2(a6),g_CopperBack(a6); 080B8/0810E
-        move.l  a1,g_CopperSpare1(a6)           ; 080BE/08114
-        move.l  a2,g_CopperSpare2(a6)           ; 080C2/08118
-        lea.l   g_RestoreBufB(a6),a1            ; 080C6/0811C
-        clr.w   -(a1)                           ; 080CA/08120
-        move.l  a1,g_RestoreListA(a6)           ; 080CC/08122
-        lea.l   g_SpawnQuota(a6),a1             ; 080D0/08126
-        clr.w   -(a1)                           ; 080D4/0812A
-        move.l  a1,g_RestoreListB(a6)           ; 080D6/0812C
-        rts                                     ; 080DA/08130
+; (SwapScreens: the rest of the original routine removed - the scroller does it)
+
 
 ;---------------------------------------------------------------------------
 ; ShowBackBuffer - wait for the copper interrupt (INTREQ bit 4, raised by the copper
@@ -7106,29 +7004,8 @@ SwapScreens:
 ;---------------------------------------------------------------------------
 ShowBackBuffer:
         jmp     EnhShowBackBuffer               ; the scroller
-        lea.l   CUSTOM,a0                       ; 080DC/08132
-        movea.l g_CopperBack(a6),a1             ; 080E2/08138
-        move.l  g_CopperFront(a6),g_CopperBack(a6); 080E6/0813C
-        move.l  a1,g_CopperFront(a6)            ; 080EC/08142
-l_080F0:
-        moveq   #$10,d0                         ; 080F0/08146  wait for the copper interrupt
-        and.w   INTREQR(a0),d0                  ; 080F2/08148
-        beq.b   l_080F0                         ; 080F6/0814C
-        move.l  a1,COP2LCH(a0)                  ; 080F8/0814E
-        move.w  #INTF_COPER,INTREQ(a0)          ; 080FC/08152
-        movea.l g_ScreenFront(a6),a1            ; 08102/08158
-        move.l  g_ScreenBack(a6),g_ScreenFront(a6); 08106/0815C
-        move.l  a1,g_ScreenBack(a6)             ; 0810C/08162
-        movea.l g_SavePtr(a6),a1                ; 08110/08166  swap the save-area pointers, restore lists and save areas
-        move.l  g_SavePtrB(a6),g_SavePtr(a6)    ; 08114/0816A
-        move.l  a1,g_SavePtrB(a6)               ; 0811A/08170
-        movea.l g_RestoreListA(a6),a1           ; 0811E/08174
-        move.l  g_RestoreListB(a6),g_RestoreListA(a6); 08122/08178
-        move.l  a1,g_RestoreListB(a6)           ; 08128/0817E
-        movea.l g_SaveBufA(a6),a1               ; 0812C/08182
-        move.l  g_SaveBufB(a6),g_SaveBufA(a6)   ; 08130/08186
-        move.l  a1,g_SaveBufB(a6)               ; 08136/0818C
-        rts                                     ; 0813A/08190
+; (ShowBackBuffer: the rest of the original routine removed - the scroller does it)
+
 
 ;---------------------------------------------------------------------------
 ; Compute SPRxPOS/CTL for Arthur's two attached sprite pairs (hidden while flashing)
@@ -11954,80 +11831,12 @@ PrintString:
 l_0B024:
         rts                                     ; 0B024/0B08C
 
-;---------------------------------------------------------------------------
-; Unreferenced: print d0 as two hex digits (left-over debug helper)
-;---------------------------------------------------------------------------
-PrintHexByte:	; (no references found - unused/debug code)
-        move.w  d4,-(a7)                        ; 0B026/0B08E
-        move.b  d0,d4                           ; 0B028/0B090
-        lsr.b   #$4,d0                          ; 0B02A/0B092
-        bsr.w   PrintChar                       ; 0B02C/0B094
-        moveq   #$f,d0                          ; 0B030/0B098
-        and.b   d4,d0                           ; 0B032/0B09A
-        bsr.b   PrintChar                       ; 0B034/0B09C
-        move.b  d4,d0                           ; 0B036/0B09E
-        move.w  (a7)+,d4                        ; 0B038/0B0A0
-        rts                                     ; 0B03A/0B0A2
-PrintHexWord:	; (no references found - unused/debug code): d0.w as four hex digits
-        move.w  d4,-(a7)                        ; 0B03C/0B0A4
-        move.w  d0,d4                           ; 0B03E/0B0A6
-        moveq   #$f,d0                          ; 0B040/0B0A8
-        rol.w   #$4,d4                          ; 0B042/0B0AA
-        and.b   d4,d0                           ; 0B044/0B0AC
-        bsr.b   PrintChar                       ; 0B046/0B0AE
-        moveq   #$f,d0                          ; 0B048/0B0B0
-        rol.w   #$4,d4                          ; 0B04A/0B0B2
-        and.b   d4,d0                           ; 0B04C/0B0B4
-        bsr.b   PrintChar                       ; 0B04E/0B0B6
-        moveq   #$f,d0                          ; 0B050/0B0B8
-        rol.w   #$4,d4                          ; 0B052/0B0BA
-        and.b   d4,d0                           ; 0B054/0B0BC
-        bsr.b   PrintChar                       ; 0B056/0B0BE
-        moveq   #$f,d0                          ; 0B058/0B0C0
-        rol.w   #$4,d4                          ; 0B05A/0B0C2
-        and.b   d4,d0                           ; 0B05C/0B0C4
-        bsr.b   PrintChar                       ; 0B05E/0B0C6
-        move.w  d4,d0                           ; 0B060/0B0C8
-        move.w  (a7)+,d4                        ; 0B062/0B0CA
-        rts                                     ; 0B064/0B0CC
-PrintHexLong:	; (no references found - unused/debug code): d0.l as eight hex digits
-        move.l  d4,-(a7)                        ; 0B066/0B0CE
-        move.l  d0,d4                           ; 0B068/0B0D0
-        moveq   #$f,d0                          ; 0B06A/0B0D2
-        rol.l   #$4,d4                          ; 0B06C/0B0D4
-        and.b   d4,d0                           ; 0B06E/0B0D6
-        bsr.b   PrintChar                       ; 0B070/0B0D8
-        moveq   #$f,d0                          ; 0B072/0B0DA
-        rol.l   #$4,d4                          ; 0B074/0B0DC
-        and.b   d4,d0                           ; 0B076/0B0DE
-        bsr.b   PrintChar                       ; 0B078/0B0E0
-        moveq   #$f,d0                          ; 0B07A/0B0E2
-        rol.l   #$4,d4                          ; 0B07C/0B0E4
-        and.b   d4,d0                           ; 0B07E/0B0E6
-        bsr.b   PrintChar                       ; 0B080/0B0E8
-        moveq   #$f,d0                          ; 0B082/0B0EA
-        rol.l   #$4,d4                          ; 0B084/0B0EC
-        and.b   d4,d0                           ; 0B086/0B0EE
-        bsr.b   PrintChar                       ; 0B088/0B0F0
-        moveq   #$f,d0                          ; 0B08A/0B0F2
-        rol.l   #$4,d4                          ; 0B08C/0B0F4
-        and.b   d4,d0                           ; 0B08E/0B0F6
-        bsr.b   PrintChar                       ; 0B090/0B0F8
-        moveq   #$f,d0                          ; 0B092/0B0FA
-        rol.l   #$4,d4                          ; 0B094/0B0FC
-        and.b   d4,d0                           ; 0B096/0B0FE
-        bsr.b   PrintChar                       ; 0B098/0B100
-        moveq   #$f,d0                          ; 0B09A/0B102
-        rol.l   #$4,d4                          ; 0B09C/0B104
-        and.b   d4,d0                           ; 0B09E/0B106
-        bsr.b   PrintChar                       ; 0B0A0/0B108
-        moveq   #$f,d0                          ; 0B0A2/0B10A
-        rol.l   #$4,d4                          ; 0B0A4/0B10C
-        and.b   d4,d0                           ; 0B0A6/0B10E
-        bsr.b   PrintChar                       ; 0B0A8/0B110
-        move.l  d4,d0                           ; 0B0AA/0B112
-        move.l  (a7)+,d4                        ; 0B0AC/0B114
-        rts                                     ; 0B0AE/0B116
+; (PrintHexByte: the original's, unused with the scroller - removed)
+
+; (PrintHexWord: the original's, unused with the scroller - removed)
+
+; (PrintHexLong: the original's, unused with the scroller - removed)
+
 
 ;---------------------------------------------------------------------------
 ; PrintChar - draw character d0 at byte column d1, line d2 (line < 32: the HUD
@@ -12899,36 +12708,8 @@ TxtInitial:
 ;---------------------------------------------------------------------------
 RestoreBackground:
         jmp     EnhRestoreBackground            ; the scroller
-        movea.l g_RestoreListA(a6),a5           ; 0B9EC/0BA58
-        tst.w   (a5)                            ; 0B9F0/0BA5C
-        beq.b   l_0BA3C                         ; 0B9F2/0BA5E
-        lea.l   CUSTOM,a2                       ; 0B9F4/0BA60
-l_0B9FA:
-        btst    #$6,DMACONR(a2)                 ; 0B9FA/0BA66  A->D copy, no masking
-        bne.b   l_0B9FA                         ; 0BA00/0BA6C
-        move.l  #$9f00000,BLTCON0(a2)           ; 0BA02/0BA6E
-        moveq   #-1,d0                          ; 0BA0A/0BA76
-        move.l  d0,BLTAFWM(a2)                  ; 0BA0C/0BA78
-        moveq   #$0,d0                          ; 0BA10/0BA7C
-l_0BA12:
-        move.w  (a5)+,d4                        ; 0BA12/0BA7E  entry: BLTSIZE (0 = end), modulo, screen address, save address
-        beq.b   l_0BA36                         ; 0BA14/0BA80
-        move.w  (a5)+,d0                        ; 0BA16/0BA82
-        movea.l (a5)+,a0                        ; 0BA18/0BA84
-        movea.l (a5)+,a1                        ; 0BA1A/0BA86
-l_0BA1C:
-        btst    #$6,DMACONR(a2)                 ; 0BA1C/0BA88
-        bne.b   l_0BA1C                         ; 0BA22/0BA8E
-        move.l  d0,BLTAMOD(a2)                  ; 0BA24/0BA90
-        move.l  a1,BLTAPTH(a2)                  ; 0BA28/0BA94
-        move.l  a0,BLTDPTH(a2)                  ; 0BA2C/0BA98
-        move.w  d4,BLTSIZE(a2)                  ; 0BA30/0BA9C
-        bra.b   l_0BA12                         ; 0BA34/0BAA0
-l_0BA36:
-        subq.l  #$2,a5                          ; 0BA36/0BAA2
-        move.l  a5,g_RestoreListA(a6)           ; 0BA38/0BAA4
-l_0BA3C:
-        rts                                     ; 0BA3C/0BAA8
+; (RestoreBackground: the rest of the original routine removed - the scroller does it)
+
 
 ;---------------------------------------------------------------------------
 ; DrawBobs - draw this frame's BOB list. The Queue*Draw routines push 12-byte entries
@@ -12938,272 +12719,14 @@ l_0BA3C:
 ;---------------------------------------------------------------------------
 DrawBobs:
         jmp     EnhDrawBobs                     ; the scroller
-        move.l  g_SaveBufA(a6),g_SavePtr(a6)    ; 0BA3E/0BAAA  rewind the save area
-        movea.l g_BlitListPtr(a6),a3            ; 0BA44/0BAB0  walk the draw list up to its top
-        lea.l   g_SaveBufA(a6),a5               ; 0BA48/0BAB4
-l_0BA4C:
-        cmpa.l  a5,a3                           ; 0BA4C/0BAB8
-        beq.b   l_0BA5A                         ; 0BA4E/0BABA
-        movem.w (a3)+,d1-d4                     ; 0BA50/0BABC
-        movea.l (a3)+,a1                        ; 0BA54/0BAC0
-        bsr.b   DrawBob                         ; 0BA56/0BAC2
-        bra.b   l_0BA4C                         ; 0BA58/0BAC4
-l_0BA5A:
-        rts                                     ; 0BA5A/0BAC6
+; (DrawBobs: the rest of the original routine removed - the scroller does it)
 
-;---------------------------------------------------------------------------
-; DrawBob - masked blit of one BOB into the back buffer.
-; [1MB] DrawBob - masked blit of one BOB (1MB build).
-; In: a1 = frame graphics, d1,d2 = level x,y (y up), d3 = width, d4 = height.
-; The screen buffer is 288 x 256 (18 x 16 tiles) plus a 16-px margin on the left,
-; line-interleaved: each 180-byte line holds the 5 planes of 36 bytes. Y is measured up
-; from the bottom of the buffer.
-;  - clip left, right (288 px) and top/bottom (256 lines), adjusting the graphics
-;    pointer and the first/last-word masks
-;  - if the background save area would pass $3000 bytes this frame, the BOB is
-;    not drawn at all (so a very busy screen loses BOBs rather than corrupting)
-;  - save the background under it (A->D) and add a restore-list entry
-;  - mask = OR of the 5 planes (colour 0 transparent), built in two blits at $371E8
-;    (A|B|C, then mask|B|C), minterm $FE
-;  - 5 cookie-cut blits (minterm $CA: D = A ? B : C) with the X shift in BLTCON0/1.
-;  BUG: a BOB clipped at the top of the buffer skips twice the graphics lines it should
-;  ($BAF4: the line count is multiplied by twice the words per line, then by 10), so the
-;  part still on screen is drawn from the wrong lines of the image (or the next frame's
-;  data). The same code is right in the 1MB build, whose masked graphics have twice the
-;  bytes a line; the 512K build kept it. DrawSceneryOnRedraw has it too ($C2EA).
-; [1MB] Same clipping, background save and $3000-byte save limit as the 512K build, but the
-; [1MB] graphics were converted at start-up (BuildMaskedGfx) so that every plane line is
-; [1MB] followed by its mask line. One cookie-cut blit (A = mask, B = BOB, C/D = screen) then
-; [1MB] draws all 5 planes: 5 x height blitter lines, with the A/B modulo skipping the other
-; [1MB] line and the C/D modulo stepping through the interleaved screen. The 512K build needs
-; [1MB] two mask-building blits and five plane blits.
-;---------------------------------------------------------------------------
-DrawBob:
-        btst    #PF_CACHE,(Profile).l           ; cached graphics carry their masks: one blit
-        bne.w   DrawBobMasked                   
-        move.w  g_ScrollTileX(a6),d0            ; 0BA5C/0BAC8  level -> buffer coordinates (16-px left margin)
-        lsl.w   #$4,d0                          ; 0BA60/0BACC
-        sub.w   d0,d1                           ; 0BA62/0BACE
-        addi.w  #$10,d1                         ; 0BA64/0BAD0
-        move.w  g_ScrollTileY(a6),d0            ; 0BA68/0BAD4
-        lsl.w   #$4,d0                          ; 0BA6C/0BAD8
-        sub.w   d0,d2                           ; 0BA6E/0BADA
-        moveq   #$f,d7                          ; 0BA70/0BADC  d6 = width in words; d0 = words touched at this X
-        add.w   d3,d7                           ; 0BA72/0BADE
-        lsr.w   #$4,d7                          ; 0BA74/0BAE0
-        move.l  d7,d6                           ; 0BA76/0BAE2
-        moveq   #$f,d0                          ; 0BA78/0BAE4
-        and.w   d1,d0                           ; 0BA7A/0BAE6
-        add.w   d3,d0                           ; 0BA7C/0BAE8
-        addi.w  #$f,d0                          ; 0BA7E/0BAEA
-        lsr.w   #$4,d0                          ; 0BA82/0BAEE
-        moveq   #-1,d5                          ; 0BA84/0BAF0  last-word mask: all ones unless the shift needs an extra word
-        cmp.w   d6,d0                           ; 0BA86/0BAF2
-        seq.b   d5                              ; 0BA88/0BAF4
-        ext.w   d5                              ; 0BA8A/0BAF6
-        move.w  d1,d7                           ; 0BA8C/0BAF8  off the left edge: skip whole words of graphics, mask the first
-        bpl.b   l_0BAAC                         ; 0BA8E/0BAFA
-        neg.w   d7                              ; 0BA90/0BAFC
-        moveq   #$f,d3                          ; 0BA92/0BAFE
-        and.w   d7,d3                           ; 0BA94/0BB00
-        lsr.w   #$4,d7                          ; 0BA96/0BB02
-        sub.w   d7,d0                           ; 0BA98/0BB04
-        ble.w   l_0BCB8                         ; 0BA9A/0BB06
-        adda.w  d7,a1                           ; 0BA9E/0BB0A
-        adda.w  d7,a1                           ; 0BAA0/0BB0C
-        swap    d5                              ; 0BAA2/0BB0E
-        lsr.w   d3,d5                           ; 0BAA4/0BB10
-        swap    d5                              ; 0BAA6/0BB12
-        move.w  d3,d1                           ; 0BAA8/0BB14
-        neg.w   d1                              ; 0BAAA/0BB16
-l_0BAAC:
-        add.w   d3,d7                           ; 0BAAC/0BB18  off the right edge (288 px)?
-        subi.w  #$120,d7                        ; 0BAAE/0BB1A
-        bls.b   l_0BACC                         ; 0BAB2/0BB1E
-        addi.w  #$f,d7                          ; 0BAB4/0BB20
-        lsr.w   #$4,d7                          ; 0BAB8/0BB24
-        sub.w   d7,d0                           ; 0BABA/0BB26
-        bls.w   l_0BCB8                         ; 0BABC/0BB28
-        move.w  #$ffff,d5                       ; 0BAC0/0BB2C
-        moveq   #$f,d3                          ; 0BAC4/0BB30
-        and.w   d1,d3                           ; 0BAC6/0BB32
-        beq.b   l_0BACC                         ; 0BAC8/0BB34
-        lsl.w   d3,d5                           ; 0BACA/0BB36
-l_0BACC:
-        neg.w   d2                              ; 0BACC/0BB38  Y: line = 256 - y - height; clip at the top ...
-        ble.b   l_0BAE0                         ; 0BACE/0BB3A
-        move.b  d4,d3                           ; 0BAD0/0BB3C
-        sub.w   d2,d4                           ; 0BAD2/0BB3E
-        bls.w   l_0BCB8                         ; 0BAD4/0BB40
-        addi.w  #$100,d2                        ; 0BAD8/0BB44
-        sub.w   d3,d2                           ; 0BADC/0BB48
-        bra.b   l_0BAFE                         ; 0BADE/0BB4A
-l_0BAE0:
-        addi.w  #$100,d2                        ; 0BAE0/0BB4C  ... and at the bottom (skip graphics lines)
-        sub.w   d4,d2                           ; 0BAE4/0BB50
-        bpl.b   l_0BAFE                         ; 0BAE6/0BB52
-        add.w   d2,d4                           ; 0BAE8/0BB54
-        ble.w   l_0BCB8                         ; 0BAEA/0BB56
-        neg.w   d2                              ; 0BAEE/0BB5A
-        move.w  d6,d7                           ; 0BAF0/0BB5C
-        add.w   d7,d7                           ; 0BAF2/0BB5E
-        mulu.w  d7,d2                           ; 0BAF4/0BB60  BUG: d7 = 2 x words per line, so 2 x the lines are skipped
-        mulu.w  #$a,d2                          ; 0BAF6/0BB62
-        adda.w  d2,a1                           ; 0BAFA/0BB66
-        clr.w   d2                              ; 0BAFC/0BB68
-l_0BAFE:
-        moveq   #$f,d3                          ; 0BAFE/0BB6A  X shift for BLTCON0/1
-        and.w   d1,d3                           ; 0BB00/0BB6C
-        ror.w   #$4,d3                          ; 0BB02/0BB6E
-        movea.l g_ScreenFront(a6),a0            ; 0BB04/0BB70  screen address of the top-left word
-        asr.w   #$4,d1                          ; 0BB08/0BB74
-        add.w   d1,d1                           ; 0BB0A/0BB76
-        adda.w  d1,a0                           ; 0BB0C/0BB78
-        mulu.w  #$b4,d2                         ; 0BB0E/0BB7A
-        adda.l  d2,a0                           ; 0BB12/0BB7E
-        add.w   d6,d6                           ; 0BB14/0BB80
-        move.w  d4,d2                           ; 0BB16/       BLTSIZE for one plane, and for the 5-plane save (5 x the lines)
-        lsl.w   #$6,d2                          ; 0BB18/     
-        or.w    d0,d2                           ; 0BB1A/     
-        move.w  d2,-(a7)                        ; 0BB1C/     
-        mulu.w  #$5,d4                          ; 0BB1E/0BB86
-        move.w  d4,d7                           ; 0BB22/0BB8A
-        lsl.w   #$6,d4                          ; 0BB24/0BB8C
-        or.w    d0,d4                           ; 0BB26/0BB8E
-        add.w   d0,d0                           ; 0BB28/0BB90
-        moveq   #$24,d1                         ; 0BB2A/0BB92  screen modulo = 36 - width
-        sub.w   d0,d1                           ; 0BB2C/0BB94
-        mulu.w  d0,d7                           ; 0BB2E/0BB9E
-        move.l  g_SavePtr(a6),d2                ; 0BB30/0BBA0  room in the save area ($3000 bytes)?
-        add.l   d7,d2                           ; 0BB34/0BBA4
-        sub.l   g_SaveBufA(a6),d2               ; 0BB36/0BBA6
-        cmp.l   #$3000,d2                       ; 0BB3A/0BBAA
-        bls.b   l_0BB48                         ; 0BB40/     
-        move.w  (a7)+,d2                        ; 0BB42/       no: the BOB is skipped
-        bra.w   l_0BCB8                         ; 0BB44/     
-l_0BB48:
-        move.l  g_SavePtr(a6),d2                ; 0BB48/0BBB4  restore-list entry: save address, screen address, modulo, BLTSIZE
-        movea.l g_RestoreListA(a6),a2           ; 0BB4C/     
-        move.l  d2,-(a2)                        ; 0BB50/0BBB8
-        move.l  a0,-(a2)                        ; 0BB52/0BBBA
-        move.w  d1,-(a2)                        ; 0BB54/0BBBC
-        move.w  d4,-(a2)                        ; 0BB56/0BBBE
-        move.l  a2,g_RestoreListA(a6)           ; 0BB58/0BBC0
-        add.l   d7,g_SavePtr(a6)                ; 0BB5C/0BBC4
-        swap    d1                              ; 0BB60/0BBC8
-        lea.l   CUSTOM,a2                       ; 0BB62/0BBCA
-l_0BB68:
-        btst    #$6,DMACONR(a2)                 ; 0BB68/0BBD0  save the background (A->D copy)
-        bne.b   l_0BB68                         ; 0BB6E/0BBD6
-        move.w  #$9f0,BLTCON0(a2)               ; 0BB70/0BBD8
-        move.w  d1,BLTCON1(a2)                  ; 0BB76/0BBDE
-        move.l  d1,BLTAMOD(a2)                  ; 0BB7A/0BBE2
-        move.l  #$ffffffff,BLTAFWM(a2)          ; 0BB7E/0BBE6
-        move.l  a0,BLTAPTH(a2)                  ; 0BB86/0BBEE
-        move.l  d2,BLTDPTH(a2)                  ; 0BB8A/0BBF2
-        move.w  d4,BLTSIZE(a2)                  ; 0BB8E/0BBF6
-        move.w  (a7)+,d4                        ; 0BB92/     
-        move.w  d6,d1                           ; 0BB94/     
-        mulu.w  #$5,d6                          ; 0BB96/     
-        sub.w   d0,d6                           ; 0BB9A/     
-        lea.l   (MASK_LINE_BUF).l,a4            ; 0BB9C/       build the mask at $371E8 from planes 0-2 ...
-l_0BBA2:
-        btst    #$6,DMACONR(a2)                 ; 0BBA2/     
-        bne.b   l_0BBA2                         ; 0BBA8/     
-        move.w  #$ffe,BLTCON0(a2)               ; 0BBAA/     
-        move.w  d6,BLTAMOD(a2)                  ; 0BBB0/     
-        move.w  d6,BLTBMOD(a2)                  ; 0BBB4/     
-        move.w  d6,BLTCMOD(a2)                  ; 0BBB8/     
-        move.l  a1,d6                           ; 0BBBC/     
-        move.l  a1,BLTAPTH(a2)                  ; 0BBBE/     
-        adda.w  d1,a1                           ; 0BBC2/     
-        move.l  a1,BLTBPTH(a2)                  ; 0BBC4/     
-        adda.w  d1,a1                           ; 0BBC8/     
-        move.l  a1,BLTCPTH(a2)                  ; 0BBCA/     
-        move.l  a4,BLTDPTH(a2)                  ; 0BBCE/     
-        move.w  d4,BLTSIZE(a2)                  ; 0BBD2/     
-        adda.w  d1,a1                           ; 0BBD6/     
-l_0BBD8:
-        btst    #$6,DMACONR(a2)                 ; 0BBD8/       ... then planes 3-4
-        bne.b   l_0BBD8                         ; 0BBDE/     
-        clr.w   BLTAMOD(a2)                     ; 0BBE0/     
-        move.l  a4,BLTAPTH(a2)                  ; 0BBE4/     
-        move.l  a1,BLTBPTH(a2)                  ; 0BBE8/     
-        adda.w  d1,a1                           ; 0BBEC/     
-        move.l  a1,BLTCPTH(a2)                  ; 0BBEE/     
-        move.l  a4,BLTDPTH(a2)                  ; 0BBF2/     
-        move.w  d4,BLTSIZE(a2)                  ; 0BBF6/     
-        move.w  #$b4,d2                         ; 0BBFA/     
-        sub.w   d0,d2                           ; 0BBFE/     
-        moveq   #$24,d0                         ; 0BC00/     
-        movea.l d6,a1                           ; 0BC02/     
-l_0BC04:
-        btst    #$6,DMACONR(a2)                 ; 0BC04/0BBFC  cookie-cut plane 0: D = mask ? BOB : screen
-        bne.b   l_0BC04                         ; 0BC0A/0BC02
-        move.w  d3,BLTCON1(a2)                  ; 0BC0C/0BC04
-        ori.w   #$fca,d3                        ; 0BC10/0BC08
-        move.w  d3,BLTCON0(a2)                  ; 0BC14/0BC0C
-        move.w  d2,BLTCMOD(a2)                  ; 0BC18/     
-        move.w  d2,BLTDMOD(a2)                  ; 0BC1C/     
-        move.l  d5,BLTAFWM(a2)                  ; 0BC20/0BC20
-        move.l  a4,BLTAPTH(a2)                  ; 0BC24/     
-        move.l  a1,BLTBPTH(a2)                  ; 0BC28/     
-        move.l  a0,BLTCPTH(a2)                  ; 0BC2C/     
-        move.l  a0,BLTDPTH(a2)                  ; 0BC30/     
-        move.w  d4,BLTSIZE(a2)                  ; 0BC34/     
-        adda.w  d0,a0                           ; 0BC38/     
-        adda.w  d1,a1                           ; 0BC3A/     
-l_0BC3C:
-        btst    #$6,DMACONR(a2)                 ; 0BC3C/       plane 1
-        bne.b   l_0BC3C                         ; 0BC42/     
-        move.l  a4,BLTAPTH(a2)                  ; 0BC44/     
-        move.l  a1,BLTBPTH(a2)                  ; 0BC48/     
-        move.l  a0,BLTCPTH(a2)                  ; 0BC4C/     
-        move.l  a0,BLTDPTH(a2)                  ; 0BC50/     
-        move.w  d4,BLTSIZE(a2)                  ; 0BC54/     
-        adda.w  d0,a0                           ; 0BC58/     
-        adda.w  d1,a1                           ; 0BC5A/     
-l_0BC5C:
-        btst    #$6,DMACONR(a2)                 ; 0BC5C/       plane 2
-        bne.b   l_0BC5C                         ; 0BC62/     
-        move.l  a4,BLTAPTH(a2)                  ; 0BC64/     
-        move.l  a1,BLTBPTH(a2)                  ; 0BC68/     
-        move.l  a0,BLTCPTH(a2)                  ; 0BC6C/     
-        move.l  a0,BLTDPTH(a2)                  ; 0BC70/     
-        move.w  d4,BLTSIZE(a2)                  ; 0BC74/     
-        adda.w  d0,a0                           ; 0BC78/     
-        adda.w  d1,a1                           ; 0BC7A/     
-l_0BC7C:
-        btst    #$6,DMACONR(a2)                 ; 0BC7C/       plane 3
-        bne.b   l_0BC7C                         ; 0BC82/     
-        move.l  a4,BLTAPTH(a2)                  ; 0BC84/     
-        move.l  a1,BLTBPTH(a2)                  ; 0BC88/     
-        move.l  a0,BLTCPTH(a2)                  ; 0BC8C/     
-        move.l  a0,BLTDPTH(a2)                  ; 0BC90/     
-        move.w  d4,BLTSIZE(a2)                  ; 0BC94/     
-        adda.w  d0,a0                           ; 0BC98/     
-        adda.w  d1,a1                           ; 0BC9A/     
-l_0BC9C:
-        btst    #$6,DMACONR(a2)                 ; 0BC9C/       plane 4
-        bne.b   l_0BC9C                         ; 0BCA2/     
-        move.l  a4,BLTAPTH(a2)                  ; 0BCA4/0BC24
-        move.l  a1,BLTBPTH(a2)                  ; 0BCA8/0BC28
-        move.l  a0,BLTCPTH(a2)                  ; 0BCAC/0BC2C
-        move.l  a0,BLTDPTH(a2)                  ; 0BCB0/0BC30
-        move.w  d4,BLTSIZE(a2)                  ; 0BCB4/0BC34
-l_0BCB8:
-        rts                                     ; 0BCB8/0BC38
 
-;---------------------------------------------------------------------------
-; Unreferenced
-;---------------------------------------------------------------------------
-WaitBlitIRQ:	; (no references found - unused/debug code)
-        lea.l   CUSTOM+INTREQR,a0               ; 0BCBA/0BC3A
-l_0BCC0:
-        moveq   #$10,d0                         ; 0BCC0/0BC40
-        and.w   (a0),d0                         ; 0BCC2/0BC42
-        beq.b   l_0BCC0                         ; 0BCC4/0BC44
-        rts                                     ; 0BCC6/0BC46
+; (DrawBob: the original's, unused with the scroller - removed)
+
+
+; (WaitBlitIRQ: the original's, unused with the scroller - removed)
+
 
 ;---------------------------------------------------------------------------
 ;---------------------------------------------------------------------------
@@ -13223,147 +12746,8 @@ PlayMusic:
 pmu_none:
         rts                                     
 
-;---------------------------------------------------------------------------
-; DrawBobMasked - DrawBob for graphics that carry their masks (the cache, PF_CACHE):
-; the 1MB program's DrawBob
-;---------------------------------------------------------------------------
-DrawBobMasked:
-        move.w  g_ScrollTileX(a6),d0            ; 0BA5C/0BAC8  level -> buffer coordinates (16-px left margin)
-        lsl.w   #$4,d0                          ; 0BA60/0BACC
-        sub.w   d0,d1                           ; 0BA62/0BACE
-        addi.w  #$10,d1                         ; 0BA64/0BAD0
-        move.w  g_ScrollTileY(a6),d0            ; 0BA68/0BAD4
-        lsl.w   #$4,d0                          ; 0BA6C/0BAD8
-        sub.w   d0,d2                           ; 0BA6E/0BADA
-        moveq   #$f,d7                          ; 0BA70/0BADC  d6 = width in words; d0 = words touched at this X
-        add.w   d3,d7                           ; 0BA72/0BADE
-        lsr.w   #$4,d7                          ; 0BA74/0BAE0
-        move.l  d7,d6                           ; 0BA76/0BAE2
-        moveq   #$f,d0                          ; 0BA78/0BAE4
-        and.w   d1,d0                           ; 0BA7A/0BAE6
-        add.w   d3,d0                           ; 0BA7C/0BAE8
-        addi.w  #$f,d0                          ; 0BA7E/0BAEA
-        lsr.w   #$4,d0                          ; 0BA82/0BAEE
-        moveq   #-1,d5                          ; 0BA84/0BAF0  last-word mask: all ones unless the shift needs an extra word
-        cmp.w   d6,d0                           ; 0BA86/0BAF2
-        seq.b   d5                              ; 0BA88/0BAF4
-        ext.w   d5                              ; 0BA8A/0BAF6
-        move.w  d1,d7                           ; 0BA8C/0BAF8  off the left edge: skip whole words of graphics, mask the first
-        bpl.b   l_0BAAC_m                         ; 0BA8E/0BAFA
-        neg.w   d7                              ; 0BA90/0BAFC
-        moveq   #$f,d3                          ; 0BA92/0BAFE
-        and.w   d7,d3                           ; 0BA94/0BB00
-        lsr.w   #$4,d7                          ; 0BA96/0BB02
-        sub.w   d7,d0                           ; 0BA98/0BB04
-        ble.w   l_0BCB8_m                         ; 0BA9A/0BB06
-        adda.w  d7,a1                           ; 0BA9E/0BB0A
-        adda.w  d7,a1                           ; 0BAA0/0BB0C
-        swap    d5                              ; 0BAA2/0BB0E
-        lsr.w   d3,d5                           ; 0BAA4/0BB10
-        swap    d5                              ; 0BAA6/0BB12
-        move.w  d3,d1                           ; 0BAA8/0BB14
-        neg.w   d1                              ; 0BAAA/0BB16
-l_0BAAC_m:
-        add.w   d3,d7                           ; 0BAAC/0BB18  off the right edge (288 px)?
-        subi.w  #$120,d7                        ; 0BAAE/0BB1A
-        bls.b   l_0BACC_m                         ; 0BAB2/0BB1E
-        addi.w  #$f,d7                          ; 0BAB4/0BB20
-        lsr.w   #$4,d7                          ; 0BAB8/0BB24
-        sub.w   d7,d0                           ; 0BABA/0BB26
-        bls.w   l_0BCB8_m                         ; 0BABC/0BB28
-        move.w  #$ffff,d5                       ; 0BAC0/0BB2C
-        moveq   #$f,d3                          ; 0BAC4/0BB30
-        and.w   d1,d3                           ; 0BAC6/0BB32
-        beq.b   l_0BACC_m                         ; 0BAC8/0BB34
-        lsl.w   d3,d5                           ; 0BACA/0BB36
-l_0BACC_m:
-        neg.w   d2                              ; 0BACC/0BB38  Y: line = 256 - y - height; clip at the top ...
-        ble.b   l_0BAE0_m                         ; 0BACE/0BB3A
-        move.b  d4,d3                           ; 0BAD0/0BB3C
-        sub.w   d2,d4                           ; 0BAD2/0BB3E
-        bls.w   l_0BCB8_m                         ; 0BAD4/0BB40
-        addi.w  #$100,d2                        ; 0BAD8/0BB44
-        sub.w   d3,d2                           ; 0BADC/0BB48
-        bra.b   l_0BAFE_m                         ; 0BADE/0BB4A
-l_0BAE0_m:
-        addi.w  #$100,d2                        ; 0BAE0/0BB4C  ... and at the bottom (skip graphics lines)
-        sub.w   d4,d2                           ; 0BAE4/0BB50
-        bpl.b   l_0BAFE_m                         ; 0BAE6/0BB52
-        add.w   d2,d4                           ; 0BAE8/0BB54
-        ble.w   l_0BCB8_m                         ; 0BAEA/0BB56
-        neg.w   d2                              ; 0BAEE/0BB5A
-        move.w  d6,d7                           ; 0BAF0/0BB5C
-        add.w   d7,d7                           ; 0BAF2/0BB5E
-        mulu.w  d7,d2                           ; 0BAF4/0BB60  BUG: d7 = 2 x words per line, so 2 x the lines are skipped
-        mulu.w  #$a,d2                          ; 0BAF6/0BB62
-        adda.w  d2,a1                           ; 0BAFA/0BB66
-        clr.w   d2                              ; 0BAFC/0BB68
-l_0BAFE_m:
-        moveq   #$f,d3                          ; 0BAFE/0BB6A  X shift for BLTCON0/1
-        and.w   d1,d3                           ; 0BB00/0BB6C
-        ror.w   #$4,d3                          ; 0BB02/0BB6E
-        movea.l g_ScreenFront(a6),a0            ; 0BB04/0BB70  screen address of the top-left word
-        asr.w   #$4,d1                          ; 0BB08/0BB74
-        add.w   d1,d1                           ; 0BB0A/0BB76
-        adda.w  d1,a0                           ; 0BB0C/0BB78
-        mulu.w  #$b4,d2                         ; 0BB0E/0BB7A
-        adda.l  d2,a0                           ; 0BB12/0BB7E
-        add.w   d6,d6                           ; 0BB14/0BB80
-        lea.l   (a1,d6.w),a4                    ;      /0BB82  a4 = mask line: in the 1MB build every plane line is followed by its mask (BuildMaskedGfx)
-        mulu.w  #$5,d4                          ; 0BB1E/0BB86
-        move.w  d4,d7                           ; 0BB22/0BB8A
-        lsl.w   #$6,d4                          ; 0BB24/0BB8C
-        or.w    d0,d4                           ; 0BB26/0BB8E
-        add.w   d0,d0                           ; 0BB28/0BB90
-        moveq   #$24,d1                         ; 0BB2A/0BB92  screen modulo = 36 - width
-        sub.w   d0,d1                           ; 0BB2C/0BB94
-        add.w   d6,d6                           ;      /0BB96  mask lines interleave the plane lines: the A/B modulo skips the other line
-        sub.w   d0,d6                           ;      /0BB98
-        movea.l g_RestoreListA(a6),a2           ;      /0BB9A
-        mulu.w  d0,d7                           ; 0BB2E/0BB9E
-        move.l  g_SavePtr(a6),d2                ; 0BB30/0BBA0  room in the save area ($3000 bytes)?
-        add.l   d7,d2                           ; 0BB34/0BBA4
-        sub.l   g_SaveBufA(a6),d2               ; 0BB36/0BBA6
-        cmp.l   #$3000,d2                       ; 0BB3A/0BBAA
-        bhi.w   l_0BCB8_m                         ;      /0BBB0
-        move.l  g_SavePtr(a6),d2                ; 0BB48/0BBB4  restore-list entry: save address, screen address, modulo, BLTSIZE
-        move.l  d2,-(a2)                        ; 0BB50/0BBB8
-        move.l  a0,-(a2)                        ; 0BB52/0BBBA
-        move.w  d1,-(a2)                        ; 0BB54/0BBBC
-        move.w  d4,-(a2)                        ; 0BB56/0BBBE
-        move.l  a2,g_RestoreListA(a6)           ; 0BB58/0BBC0
-        add.l   d7,g_SavePtr(a6)                ; 0BB5C/0BBC4
-        swap    d1                              ; 0BB60/0BBC8
-        lea.l   CUSTOM,a2                       ; 0BB62/0BBCA
-l_0BB68_m:
-        btst    #$6,DMACONR(a2)                 ; 0BB68/0BBD0  save the background (A->D copy)
-        bne.b   l_0BB68_m                         ; 0BB6E/0BBD6
-        move.w  #$9f0,BLTCON0(a2)               ; 0BB70/0BBD8
-        move.w  d1,BLTCON1(a2)                  ; 0BB76/0BBDE
-        move.l  d1,BLTAMOD(a2)                  ; 0BB7A/0BBE2
-        move.l  #$ffffffff,BLTAFWM(a2)          ; 0BB7E/0BBE6
-        move.l  a0,BLTAPTH(a2)                  ; 0BB86/0BBEE
-        move.l  d2,BLTDPTH(a2)                  ; 0BB8A/0BBF2
-        move.w  d4,BLTSIZE(a2)                  ; 0BB8E/0BBF6
-        swap    d1                              ;      /0BBFA
-l_0BC04_m:
-        btst    #$6,DMACONR(a2)                 ; 0BC04/0BBFC  cookie-cut plane 0: D = mask ? BOB : screen
-        bne.b   l_0BC04_m                         ; 0BC0A/0BC02
-        move.w  d3,BLTCON1(a2)                  ; 0BC0C/0BC04
-        ori.w   #$fca,d3                        ; 0BC10/0BC08
-        move.w  d3,BLTCON0(a2)                  ; 0BC14/0BC0C
-        move.w  d1,BLTCMOD(a2)                  ;      /0BC10  one blit draws all 5 planes: 5 x height lines, one plane line each
-        move.w  d6,BLTBMOD(a2)                  ;      /0BC14
-        move.w  d6,BLTAMOD(a2)                  ;      /0BC18
-        move.w  d1,BLTDMOD(a2)                  ;      /0BC1C
-        move.l  d5,BLTAFWM(a2)                  ; 0BC20/0BC20
-        move.l  a4,BLTAPTH(a2)                  ; 0BCA4/0BC24
-        move.l  a1,BLTBPTH(a2)                  ; 0BCA8/0BC28
-        move.l  a0,BLTCPTH(a2)                  ; 0BCAC/0BC2C
-        move.l  a0,BLTDPTH(a2)                  ; 0BCB0/0BC30
-        move.w  d4,BLTSIZE(a2)                  ; 0BCB4/0BC34
-l_0BCB8_m:
-        rts                                     ; 0BCB8/0BC38
+; (DrawBobMasked: the original's, unused with the scroller - removed)
+
 
 ;---------------------------------------------------------------------------
 ; Unreferenced
@@ -13594,7 +12978,7 @@ l_0BFB4:
         beq.b   l_0BFD8                         ; 0BFC4/0BF58
         clr.b   g_RedrawPending(a6)             ; 0BFC6/0BF5A
         addq.l  #$4,a7                          ; 0BFCA/0BF5E  replace the return address; reset the user stack
-        pea.l   (RedrawEntry).l                 ; 0BFCC/0BF60  redirect user-mode return to RedrawEntry
+        pea.l   RedrawEntry(pc)                 ; 0BFCC/0BF60  redirect user-mode return to RedrawEntry
         andi.w  #$dfff,g_SavedSR(a6)            ; 0BFD0/0BF64
         move    a6,usp                          ; 0BFD6/0BF6A
 l_0BFD8:
@@ -13616,131 +13000,8 @@ l_0BFD8:
 ;---------------------------------------------------------------------------
 RedrawScreen:
         jmp     EnhRedrawScreen                 ; the scroller: draw the pristine buffer
-        movea.l g_ScreenSpare1(a6),a1           ; 0BFDE/0BF72
-        adda.l  #$a8c0,a1                       ; 0BFE2/0BF76  start at the bottom row: 240 lines down
-        lea.l   CUSTOM+INTENA,a2                ; 0BFE8/0BF7C
-        movea.l g_MapPtr(a6),a3                 ; 0BFEE/0BF82
-        lea.l   (CellTiles).l,a4                ; 0BFF2/0BF86
-        movea.l g_LevelFileAddr(a6),a5          ; 0BFF6/0BF8A
-        move.w  g_NewTileX(a6),d1               ; 0BFFA/0BF8E
-        move.w  g_NewTileY(a6),d2               ; 0BFFE/0BF92
-        cmpi.w  #$1,g_Level(a6)                 ; 0C002/0BF96  level 1: second tile bank for some cells
-        seq.b   d5                              ; 0C008/0BF9C
-        moveq   #$f,d7                          ; 0C00A/0BF9E  16 rows
-l_0C00C:
-        moveq   #$11,d6                         ; 0C00C/0BFA0  18 columns
-l_0C00E:
-        moveq   #$10,d0                         ; 0C00E/0BFA2  map cell of this tile; d4 / d3 = column / row within the cell
-        sub.w   d6,d0                           ; 0C010/0BFA4
-        add.w   d1,d0                           ; 0C012/0BFA6
-        moveq   #$f,d4                          ; 0C014/0BFA8
-        and.w   d0,d4                           ; 0C016/0BFAA
-        asr.w   #$4,d0                          ; 0C018/0BFAC
-        lea.l   (a3,d0.w),a0                    ; 0C01A/0BFAE
-        move.w  d7,d0                           ; 0C01E/0BFB2
-        sub.w   d2,d0                           ; 0C020/0BFB4
-        moveq   #$f,d3                          ; 0C022/0BFB6
-        and.w   d0,d3                           ; 0C024/0BFB8
-        andi.w  #$fff0,d0                       ; 0C026/0BFBA
-        add.w   d0,d0                           ; 0C02A/0BFBE
-        suba.w  d0,a0                           ; 0C02C/0BFC0
+; (RedrawScreen: the rest of the original routine removed - the scroller does it)
 
-;---------------------------------------------------------------------------
-; cell $67 -> a0 = LEVEL_FILE (tile 0); otherwise look up the tile number.
-; Note: tile 0 is still blitted - it is the first tile of the level file.
-;---------------------------------------------------------------------------
-        move.b  (a0),d0                         ; 0C02E/0BFC2
-        cmp.b   #$67,d0                         ; 0C030/0BFC4
-        bne.b   l_0C03A                         ; 0C034/0BFC8
-        movea.l a5,a0                           ; 0C036/0BFCA
-        bra.b   l_0C070                         ; 0C038/0BFCC
-l_0C03A:
-        lsl.w   #$4,d0                          ; 0C03A/0BFCE  tile = CellTiles[cell][row][col]
-        add.w   d3,d0                           ; 0C03C/0BFD0
-        lsl.w   #$4,d0                          ; 0C03E/0BFD2
-        add.w   d4,d0                           ; 0C040/0BFD4
-        move.b  (a4,d0.w),d3                    ; 0C042/0BFD6
-        beq.b   l_0C06C                         ; 0C046/0BFDA
-        tst.b   d5                              ; 0C048/0BFDC
-        beq.b   l_0C068                         ; 0C04A/0BFDE
-        move.b  (a0),d0                         ; 0C04C/0BFE0
-        cmp.b   #$1f,d0                         ; 0C04E/0BFE2
-        beq.b   l_0C064                         ; 0C052/0BFE6
-        cmp.b   #$1d,d0                         ; 0C054/0BFE8
-        bne.b   l_0C068                         ; 0C058/0BFEC
-        cmp.b   #$9,d3                          ; 0C05A/0BFEE
-        bhi.b   l_0C068                         ; 0C05E/0BFF2
-        bcs.b   l_0C064                         ; 0C060/0BFF4
-        clr.b   d3                              ; 0C062/0BFF6
-l_0C064:
-        addi.w  #$100,d3                        ; 0C064/0BFF8
-l_0C068:
-        mulu.w  #$a0,d3                         ; 0C068/0BFFC  160 bytes a tile
-l_0C06C:
-        lea.l   (a5,d3.l),a0                    ; 0C06C/0C000
-l_0C070:
-        move.w  #$4000,(a2)                     ; 0C070/0C004  interrupts off for the blit
-l_0C074:
-        btst    #$6,-$98(a2)                    ; 0C074/0C008
-        bne.b   l_0C074                         ; 0C07A/0C00E
-        move.l  #$9f00000,-$5a(a2)              ; 0C07C/0C010  A->D copy, 80 lines x 1 word, D modulo 34
-        moveq   #-1,d0                          ; 0C084/0C018
-        move.l  d0,-$56(a2)                     ; 0C086/0C01A
-        moveq   #$22,d0                         ; 0C08A/0C01E
-        move.l  d0,-$36(a2)                     ; 0C08C/0C020
-        move.l  a0,-$4a(a2)                     ; 0C090/0C024
-        move.l  a1,-$46(a2)                     ; 0C094/0C028
-        move.w  #$1401,-$42(a2)                 ; 0C098/0C02C
-        move.w  #$c000,(a2)                     ; 0C09E/0C032  interrupts back on
-        addq.l  #$2,a1                          ; 0C0A2/0C036
-        dbra    d6,l_0C00E                      ; 0C0A4/0C038
-        lea.l   -$b64(a1),a1                    ; 0C0A8/0C03C  up one tile row
-        dbra    d7,l_0C00C                      ; 0C0AC/0C040
-        move.w  g_Level(a6),d0                  ; 0C0B0/0C044  level 0 (before column $70) or 2 (before $40): draw the scenery items
-        bne.b   l_0C0BE                         ; 0C0B4/0C048
-        cmpi.w  #$70,g_NewTileX(a6)             ; 0C0B6/0C04A
-        blt.b   l_0C0CC                         ; 0C0BC/0C050
-l_0C0BE:
-        cmp.w   #$2,d0                          ; 0C0BE/0C052
-        bne.b   l_0C0D0                         ; 0C0C2/0C056
-        cmpi.w  #$40,g_NewTileX(a6)             ; 0C0C4/0C058
-        bge.b   l_0C0D0                         ; 0C0CA/0C05E
-l_0C0CC:
-        bsr.w   DrawSceneryOnRedraw             ; 0C0CC/0C060
-l_0C0D0:
-        movea.l g_ScreenSpare1(a6),a4           ; 0C0D0/0C064  copy the whole buffer to the second spare (46080 bytes)
-        movea.l g_ScreenSpare2(a6),a5           ; 0C0D4/0C068
-        move.w  #$78,-(a7)                      ; 0C0D8/0C06C
-l_0C0DC:
-        movem.l (a4)+,d0-d7/a0-a3               ; 0C0DC/0C070
-        movem.l d0-d7/a0-a3,(a5)                ; 0C0E0/0C074
-        lea.l   $30(a5),a5                      ; 0C0E4/0C078
-        movem.l (a4)+,d0-d7/a0-a3               ; 0C0E8/0C07C
-        movem.l d0-d7/a0-a3,(a5)                ; 0C0EC/0C080
-        lea.l   $30(a5),a5                      ; 0C0F0/0C084
-        movem.l (a4)+,d0-d7/a0-a3               ; 0C0F4/0C088
-        movem.l d0-d7/a0-a3,(a5)                ; 0C0F8/0C08C
-        lea.l   $30(a5),a5                      ; 0C0FC/0C090
-        movem.l (a4)+,d0-d7/a0-a3               ; 0C100/0C094
-        movem.l d0-d7/a0-a3,(a5)                ; 0C104/0C098
-        lea.l   $30(a5),a5                      ; 0C108/0C09C
-        movem.l (a4)+,d0-d7/a0-a3               ; 0C10C/0C0A0
-        movem.l d0-d7/a0-a3,(a5)                ; 0C110/0C0A4
-        lea.l   $30(a5),a5                      ; 0C114/0C0A8
-        movem.l (a4)+,d0-d7/a0-a3               ; 0C118/0C0AC
-        movem.l d0-d7/a0-a3,(a5)                ; 0C11C/0C0B0
-        lea.l   $30(a5),a5                      ; 0C120/0C0B4
-        movem.l (a4)+,d0-d7/a0-a3               ; 0C124/0C0B8
-        movem.l d0-d7/a0-a3,(a5)                ; 0C128/0C0BC
-        lea.l   $30(a5),a5                      ; 0C12C/0C0C0
-        movem.l (a4)+,d0-d7/a0-a3               ; 0C130/0C0C4
-        movem.l d0-d7/a0-a3,(a5)                ; 0C134/0C0C8
-        lea.l   $30(a5),a5                      ; 0C138/0C0CC
-        subq.w  #$1,(a7)                        ; 0C13C/0C0D0
-        bne.b   l_0C0DC                         ; 0C13E/0C0D2
-        addq.l  #$2,a7                          ; 0C140/0C0D4
-        st.b    g_RedrawDone(a6)                ; 0C142/0C0D6  done
-        rts                                     ; 0C146/0C0DA
 CollisionBoxes:
 	dc.b	16,16	; size class 0: width, height
 	dc.b	16,32	; size class 1: width, height
@@ -13826,376 +13087,10 @@ l_0C1F0:
         moveq   #$0,d0                          ; 0C1F8/0C18C
         rts                                     ; 0C1FA/0C18E
 
-;---------------------------------------------------------------------------
-; DrawSceneryOnRedraw - draw every active item of type 1 (gravestones and other
-; shootable scenery) into the freshly redrawn background, with the same clipping and
-; masked blits as DrawBob but without saving the background, so they cost nothing per
-; frame (levels 0 and 2)
-;---------------------------------------------------------------------------
-DrawSceneryOnRedraw:
-        btst    #PF_CACHE,(Profile).l           
-        bne.w   DrawSceneryMasked               
-        lea.l   g_Items(a6),a5                  ; 0C1FC/0C190  every active item of type 1
-        moveq   #$1d,d7                         ; 0C200/0C194
-l_0C202:
-        move.w  d7,-(a7)                        ; 0C202/0C196
-        tst.b   (a5)                            ; 0C204/0C198
-        beq.w   l_0C442                         ; 0C206/0C19A
-        cmpi.b  #$1,O_Type(a5)                  ; 0C20A/0C19E
-        bne.w   l_0C442                         ; 0C210/0C1A4
-        lea.l   (ItemBoxSizes).l,a1             ; 0C214/0C1A8  image and size from ItemBoxSizes / SmallBobSizes
-        moveq   #-16,d1                         ; 0C218/0C1AC
-        add.w   O_X(a5),d1                      ; 0C21A/0C1AE
-        moveq   #$10,d2                         ; 0C21E/0C1B2
-        add.w   O_Y(a5),d2                      ; 0C220/0C1B4
-        move.b  O_Param(a5),d0                  ; 0C224/0C1B8
-        ext.w   d0                              ; 0C228/0C1BC
-        adda.w  d0,a1                           ; 0C22A/0C1BE
-        move.b  (a1),d0                         ; 0C22C/0C1C0
-        lea.l   SmallBobSizes(pc),a1            ; 0C22E/0C1C2
-        add.w   d0,d0                           ; 0C232/0C1C6
-        adda.w  d0,a1                           ; 0C234/0C1C8
-        move.b  (a1)+,d3                        ; 0C236/0C1CA
-        ext.w   d3                              ; 0C238/0C1CC
-        sub.w   d3,d2                           ; 0C23A/0C1CE
-        moveq   #$20,d3                         ; 0C23C/0C1D0
-        move.b  (a1)+,d4                        ; 0C23E/0C1D2
-        ext.w   d4                              ; 0C240/0C1D4
-        sub.w   d4,d2                           ; 0C242/0C1D6
-        lea.l   g_SmallBobSets(a6),a1           ; 0C244/0C1D8  graphics: g_SmallBobSets[image]
-        add.w   d0,d0                           ; 0C248/0C1DC
-        adda.w  d0,a1                           ; 0C24A/0C1DE
-        movea.l (a1),a1                         ; 0C24C/0C1E0
-        movea.l g_ScreenSpare1(a6),a0           ; 0C24E/0C1E2  into the redrawn buffer, relative to the new origin
-        move.w  g_NewTileX(a6),d0               ; 0C252/0C1E6
-        lsl.w   #$4,d0                          ; 0C256/0C1EA
-        sub.w   d0,d1                           ; 0C258/0C1EC
-        addi.w  #$10,d1                         ; 0C25A/0C1EE
-        move.w  g_NewTileY(a6),d0               ; 0C25E/0C1F2
-        lsl.w   #$4,d0                          ; 0C262/0C1F6
-        sub.w   d0,d2                           ; 0C264/0C1F8
-        moveq   #$f,d7                          ; 0C266/0C1FA  clipping as in DrawBob
-        add.w   d3,d7                           ; 0C268/0C1FC
-        lsr.w   #$4,d7                          ; 0C26A/0C1FE
-        move.l  d7,d6                           ; 0C26C/0C200
-        moveq   #$f,d0                          ; 0C26E/0C202
-        and.w   d1,d0                           ; 0C270/0C204
-        add.w   d3,d0                           ; 0C272/0C206
-        addi.w  #$f,d0                          ; 0C274/0C208
-        lsr.w   #$4,d0                          ; 0C278/0C20C
-        moveq   #-1,d5                          ; 0C27A/0C20E
-        cmp.w   d6,d0                           ; 0C27C/0C210
-        seq.b   d5                              ; 0C27E/0C212
-        ext.w   d5                              ; 0C280/0C214
-        move.w  d1,d7                           ; 0C282/0C216
-        bpl.b   l_0C2A2                         ; 0C284/0C218
-        neg.w   d7                              ; 0C286/0C21A
-        moveq   #$f,d3                          ; 0C288/0C21C
-        and.w   d7,d3                           ; 0C28A/0C21E
-        lsr.w   #$4,d7                          ; 0C28C/0C220
-        sub.w   d7,d0                           ; 0C28E/0C222
-        ble.w   l_0C442                         ; 0C290/0C224
-        adda.w  d7,a1                           ; 0C294/0C228
-        adda.w  d7,a1                           ; 0C296/0C22A
-        swap    d5                              ; 0C298/0C22C
-        lsr.w   d3,d5                           ; 0C29A/0C22E
-        swap    d5                              ; 0C29C/0C230
-        move.w  d3,d1                           ; 0C29E/0C232
-        neg.w   d1                              ; 0C2A0/0C234
-l_0C2A2:
-        add.w   d3,d7                           ; 0C2A2/0C236
-        subi.w  #$120,d7                        ; 0C2A4/0C238
-        bls.b   l_0C2C2                         ; 0C2A8/0C23C
-        addi.w  #$f,d7                          ; 0C2AA/0C23E
-        lsr.w   #$4,d7                          ; 0C2AE/0C242
-        sub.w   d7,d0                           ; 0C2B0/0C244
-        bls.w   l_0C442                         ; 0C2B2/0C246
-        move.w  #$ffff,d5                       ; 0C2B6/0C24A
-        moveq   #$f,d3                          ; 0C2BA/0C24E
-        and.w   d1,d3                           ; 0C2BC/0C250
-        beq.b   l_0C2C2                         ; 0C2BE/0C252
-        lsl.w   d3,d5                           ; 0C2C0/0C254
-l_0C2C2:
-        neg.w   d2                              ; 0C2C2/0C256
-        ble.b   l_0C2D6                         ; 0C2C4/0C258
-        move.b  d4,d3                           ; 0C2C6/0C25A
-        sub.w   d2,d4                           ; 0C2C8/0C25C
-        bls.w   l_0C442                         ; 0C2CA/0C25E
-        addi.w  #$100,d2                        ; 0C2CE/0C262
-        sub.w   d3,d2                           ; 0C2D2/0C266
-        bra.b   l_0C2F4                         ; 0C2D4/0C268
-l_0C2D6:
-        addi.w  #$100,d2                        ; 0C2D6/0C26A
-        sub.w   d4,d2                           ; 0C2DA/0C26E
-        bpl.b   l_0C2F4                         ; 0C2DC/0C270
-        add.w   d2,d4                           ; 0C2DE/0C272
-        ble.w   l_0C442                         ; 0C2E0/0C274
-        neg.w   d2                              ; 0C2E4/0C278
-        move.w  d6,d7                           ; 0C2E6/0C27A
-        add.w   d7,d7                           ; 0C2E8/0C27C
-        mulu.w  d7,d2                           ; 0C2EA/0C27E  BUG: as in DrawBob, 2 x the lines are skipped
-        mulu.w  #$a,d2                          ; 0C2EC/0C280
-        adda.w  d2,a1                           ; 0C2F0/0C284
-        clr.w   d2                              ; 0C2F2/0C286
-l_0C2F4:
-        moveq   #$f,d3                          ; 0C2F4/0C288  screen address and BLTSIZE
-        and.w   d1,d3                           ; 0C2F6/0C28A
-        ror.w   #$4,d3                          ; 0C2F8/0C28C
-        asr.w   #$4,d1                          ; 0C2FA/0C28E
-        add.w   d1,d1                           ; 0C2FC/0C290
-        adda.w  d1,a0                           ; 0C2FE/0C292
-        mulu.w  #$b4,d2                         ; 0C300/0C294
-        adda.l  d2,a0                           ; 0C304/0C298
-        add.w   d6,d6                           ; 0C306/0C29A
-        lsl.w   #$6,d4                          ; 0C308/0C2A6
-        or.w    d0,d4                           ; 0C30A/0C2A8
-        add.w   d0,d0                           ; 0C30C/0C2AA
-        move.w  d6,d1                           ; 0C30E/     
-        mulu.w  #$5,d6                          ; 0C310/     
-        sub.w   d0,d6                           ; 0C314/0C2B2
-        lea.l   (MASK_LINE_BUF).l,a4            ; 0C316/       mask, then 5 cookie-cut blits (no background save)
-        move.w  #$4000,(a2)                     ; 0C31C/0C2B4
-l_0C320:
-        btst    #$6,-$98(a2)                    ; 0C320/     
-        bne.b   l_0C320                         ; 0C326/     
-        move.w  #$ffe,-$5a(a2)                  ; 0C328/     
-        clr.w   -$58(a2)                        ; 0C32E/     
-        clr.w   -$34(a2)                        ; 0C332/     
-        move.l  d5,-$56(a2)                     ; 0C336/     
-        move.w  d6,-$36(a2)                     ; 0C33A/     
-        move.w  d6,-$38(a2)                     ; 0C33E/     
-        move.w  d6,-$3a(a2)                     ; 0C342/     
-        move.l  a1,d6                           ; 0C346/     
-        move.l  a1,-$4a(a2)                     ; 0C348/     
-        adda.w  d1,a1                           ; 0C34C/     
-        move.l  a1,-$4e(a2)                     ; 0C34E/     
-        adda.w  d1,a1                           ; 0C352/     
-        move.l  a1,-$52(a2)                     ; 0C354/     
-        move.l  a4,-$46(a2)                     ; 0C358/     
-        move.w  d4,-$42(a2)                     ; 0C35C/     
-        adda.w  d1,a1                           ; 0C360/     
-l_0C362:
-        btst    #$6,-$98(a2)                    ; 0C362/     
-        bne.b   l_0C362                         ; 0C368/     
-        clr.w   -$36(a2)                        ; 0C36A/     
-        move.l  a4,-$4a(a2)                     ; 0C36E/     
-        move.l  a1,-$4e(a2)                     ; 0C372/     
-        adda.w  d1,a1                           ; 0C376/     
-        move.l  a1,-$52(a2)                     ; 0C378/     
-        move.l  a4,-$46(a2)                     ; 0C37C/     
-        move.w  d4,-$42(a2)                     ; 0C380/     
-        move.w  #$b4,d2                         ; 0C384/     
-        sub.w   d0,d2                           ; 0C388/     
-        moveq   #$24,d0                         ; 0C38A/     
-        movea.l d6,a1                           ; 0C38C/     
-l_0C38E:
-        btst    #$6,-$98(a2)                    ; 0C38E/0C2B8
-        bne.b   l_0C38E                         ; 0C394/0C2BE
-        move.w  d3,-$58(a2)                     ; 0C396/0C2C0
-        ori.w   #$fca,d3                        ; 0C39A/0C2C4
-        move.w  d3,-$5a(a2)                     ; 0C39E/0C2C8
-        move.w  d2,-$3a(a2)                     ; 0C3A2/     
-        move.w  d2,-$34(a2)                     ; 0C3A6/     
-        move.l  a4,-$4a(a2)                     ; 0C3AA/     
-        move.l  a1,-$4e(a2)                     ; 0C3AE/     
-        move.l  a0,-$52(a2)                     ; 0C3B2/     
-        move.l  a0,-$46(a2)                     ; 0C3B6/     
-        move.w  d4,-$42(a2)                     ; 0C3BA/     
-        adda.w  d0,a0                           ; 0C3BE/     
-        adda.w  d1,a1                           ; 0C3C0/     
-l_0C3C2:
-        btst    #$6,-$98(a2)                    ; 0C3C2/     
-        bne.b   l_0C3C2                         ; 0C3C8/     
-        move.l  a4,-$4a(a2)                     ; 0C3CA/     
-        move.l  a1,-$4e(a2)                     ; 0C3CE/     
-        move.l  a0,-$52(a2)                     ; 0C3D2/     
-        move.l  a0,-$46(a2)                     ; 0C3D6/     
-        move.w  d4,-$42(a2)                     ; 0C3DA/     
-        adda.w  d0,a0                           ; 0C3DE/     
-        adda.w  d1,a1                           ; 0C3E0/     
-l_0C3E2:
-        btst    #$6,-$98(a2)                    ; 0C3E2/     
-        bne.b   l_0C3E2                         ; 0C3E8/     
-        move.l  a4,-$4a(a2)                     ; 0C3EA/     
-        move.l  a1,-$4e(a2)                     ; 0C3EE/     
-        move.l  a0,-$52(a2)                     ; 0C3F2/     
-        move.l  a0,-$46(a2)                     ; 0C3F6/     
-        move.w  d4,-$42(a2)                     ; 0C3FA/     
-        adda.w  d0,a0                           ; 0C3FE/     
-        adda.w  d1,a1                           ; 0C400/     
-l_0C402:
-        btst    #$6,-$98(a2)                    ; 0C402/     
-        bne.b   l_0C402                         ; 0C408/     
-        move.l  a4,-$4a(a2)                     ; 0C40A/     
-        move.l  a1,-$4e(a2)                     ; 0C40E/     
-        move.l  a0,-$52(a2)                     ; 0C412/     
-        move.l  a0,-$46(a2)                     ; 0C416/     
-        move.w  d4,-$42(a2)                     ; 0C41A/     
-        adda.w  d0,a0                           ; 0C41E/     
-        adda.w  d1,a1                           ; 0C420/     
-l_0C422:
-        btst    #$6,-$98(a2)                    ; 0C422/     
-        bne.b   l_0C422                         ; 0C428/     
-        move.l  a4,-$4a(a2)                     ; 0C42A/0C2E0
-        move.l  a1,-$4e(a2)                     ; 0C42E/0C2E4
-        move.l  a0,-$52(a2)                     ; 0C432/0C2E8
-        move.l  a0,-$46(a2)                     ; 0C436/0C2EC
-        move.w  d4,-$42(a2)                     ; 0C43A/0C2F0
-        move.w  #$c000,(a2)                     ; 0C43E/0C2F4
-l_0C442:
-        move.w  (a7)+,d7                        ; 0C442/0C2F8
-        lea.l   $1c(a5),a5                      ; 0C444/0C2FA
-        dbra    d7,l_0C202                      ; 0C448/0C2FE
-        rts                                     ; 0C44C/0C302
-;---------------------------------------------------------------------------
-; DrawSceneryMasked - DrawSceneryOnRedraw for masked graphics (the 1MB program's)
-;---------------------------------------------------------------------------
-DrawSceneryMasked:
-        lea.l   g_Items(a6),a5                  ; 0C1FC/0C190  every active item of type 1
-        moveq   #$1d,d7                         ; 0C200/0C194
-l_0C202_m:
-        move.w  d7,-(a7)                        ; 0C202/0C196
-        tst.b   (a5)                            ; 0C204/0C198
-        beq.w   l_0C442_m                         ; 0C206/0C19A
-        cmpi.b  #$1,O_Type(a5)                  ; 0C20A/0C19E
-        bne.w   l_0C442_m                         ; 0C210/0C1A4
-        lea.l   (ItemBoxSizes).l,a1             ; 0C214/0C1A8  image and size from ItemBoxSizes / SmallBobSizes
-        moveq   #-16,d1                         ; 0C218/0C1AC
-        add.w   O_X(a5),d1                      ; 0C21A/0C1AE
-        moveq   #$10,d2                         ; 0C21E/0C1B2
-        add.w   O_Y(a5),d2                      ; 0C220/0C1B4
-        move.b  O_Param(a5),d0                  ; 0C224/0C1B8
-        ext.w   d0                              ; 0C228/0C1BC
-        adda.w  d0,a1                           ; 0C22A/0C1BE
-        move.b  (a1),d0                         ; 0C22C/0C1C0
-        lea.l   SmallBobSizes(pc),a1            ; 0C22E/0C1C2
-        add.w   d0,d0                           ; 0C232/0C1C6
-        adda.w  d0,a1                           ; 0C234/0C1C8
-        move.b  (a1)+,d3                        ; 0C236/0C1CA
-        ext.w   d3                              ; 0C238/0C1CC
-        sub.w   d3,d2                           ; 0C23A/0C1CE
-        moveq   #$20,d3                         ; 0C23C/0C1D0
-        move.b  (a1)+,d4                        ; 0C23E/0C1D2
-        ext.w   d4                              ; 0C240/0C1D4
-        sub.w   d4,d2                           ; 0C242/0C1D6
-        lea.l   g_SmallBobSets(a6),a1           ; 0C244/0C1D8  graphics: g_SmallBobSets[image]
-        add.w   d0,d0                           ; 0C248/0C1DC
-        adda.w  d0,a1                           ; 0C24A/0C1DE
-        movea.l (a1),a1                         ; 0C24C/0C1E0
-        movea.l g_ScreenSpare1(a6),a0           ; 0C24E/0C1E2  into the redrawn buffer, relative to the new origin
-        move.w  g_NewTileX(a6),d0               ; 0C252/0C1E6
-        lsl.w   #$4,d0                          ; 0C256/0C1EA
-        sub.w   d0,d1                           ; 0C258/0C1EC
-        addi.w  #$10,d1                         ; 0C25A/0C1EE
-        move.w  g_NewTileY(a6),d0               ; 0C25E/0C1F2
-        lsl.w   #$4,d0                          ; 0C262/0C1F6
-        sub.w   d0,d2                           ; 0C264/0C1F8
-        moveq   #$f,d7                          ; 0C266/0C1FA  clipping as in DrawBob
-        add.w   d3,d7                           ; 0C268/0C1FC
-        lsr.w   #$4,d7                          ; 0C26A/0C1FE
-        move.l  d7,d6                           ; 0C26C/0C200
-        moveq   #$f,d0                          ; 0C26E/0C202
-        and.w   d1,d0                           ; 0C270/0C204
-        add.w   d3,d0                           ; 0C272/0C206
-        addi.w  #$f,d0                          ; 0C274/0C208
-        lsr.w   #$4,d0                          ; 0C278/0C20C
-        moveq   #-1,d5                          ; 0C27A/0C20E
-        cmp.w   d6,d0                           ; 0C27C/0C210
-        seq.b   d5                              ; 0C27E/0C212
-        ext.w   d5                              ; 0C280/0C214
-        move.w  d1,d7                           ; 0C282/0C216
-        bpl.b   l_0C2A2_m                         ; 0C284/0C218
-        neg.w   d7                              ; 0C286/0C21A
-        moveq   #$f,d3                          ; 0C288/0C21C
-        and.w   d7,d3                           ; 0C28A/0C21E
-        lsr.w   #$4,d7                          ; 0C28C/0C220
-        sub.w   d7,d0                           ; 0C28E/0C222
-        ble.w   l_0C442_m                         ; 0C290/0C224
-        adda.w  d7,a1                           ; 0C294/0C228
-        adda.w  d7,a1                           ; 0C296/0C22A
-        swap    d5                              ; 0C298/0C22C
-        lsr.w   d3,d5                           ; 0C29A/0C22E
-        swap    d5                              ; 0C29C/0C230
-        move.w  d3,d1                           ; 0C29E/0C232
-        neg.w   d1                              ; 0C2A0/0C234
-l_0C2A2_m:
-        add.w   d3,d7                           ; 0C2A2/0C236
-        subi.w  #$120,d7                        ; 0C2A4/0C238
-        bls.b   l_0C2C2_m                         ; 0C2A8/0C23C
-        addi.w  #$f,d7                          ; 0C2AA/0C23E
-        lsr.w   #$4,d7                          ; 0C2AE/0C242
-        sub.w   d7,d0                           ; 0C2B0/0C244
-        bls.w   l_0C442_m                         ; 0C2B2/0C246
-        move.w  #$ffff,d5                       ; 0C2B6/0C24A
-        moveq   #$f,d3                          ; 0C2BA/0C24E
-        and.w   d1,d3                           ; 0C2BC/0C250
-        beq.b   l_0C2C2_m                         ; 0C2BE/0C252
-        lsl.w   d3,d5                           ; 0C2C0/0C254
-l_0C2C2_m:
-        neg.w   d2                              ; 0C2C2/0C256
-        ble.b   l_0C2D6_m                         ; 0C2C4/0C258
-        move.b  d4,d3                           ; 0C2C6/0C25A
-        sub.w   d2,d4                           ; 0C2C8/0C25C
-        bls.w   l_0C442_m                         ; 0C2CA/0C25E
-        addi.w  #$100,d2                        ; 0C2CE/0C262
-        sub.w   d3,d2                           ; 0C2D2/0C266
-        bra.b   l_0C2F4_m                         ; 0C2D4/0C268
-l_0C2D6_m:
-        addi.w  #$100,d2                        ; 0C2D6/0C26A
-        sub.w   d4,d2                           ; 0C2DA/0C26E
-        bpl.b   l_0C2F4_m                         ; 0C2DC/0C270
-        add.w   d2,d4                           ; 0C2DE/0C272
-        ble.w   l_0C442_m                         ; 0C2E0/0C274
-        neg.w   d2                              ; 0C2E4/0C278
-        move.w  d6,d7                           ; 0C2E6/0C27A
-        add.w   d7,d7                           ; 0C2E8/0C27C
-        mulu.w  d7,d2                           ; 0C2EA/0C27E  BUG: as in DrawBob, 2 x the lines are skipped
-        mulu.w  #$a,d2                          ; 0C2EC/0C280
-        adda.w  d2,a1                           ; 0C2F0/0C284
-        clr.w   d2                              ; 0C2F2/0C286
-l_0C2F4_m:
-        moveq   #$f,d3                          ; 0C2F4/0C288  screen address and BLTSIZE
-        and.w   d1,d3                           ; 0C2F6/0C28A
-        ror.w   #$4,d3                          ; 0C2F8/0C28C
-        asr.w   #$4,d1                          ; 0C2FA/0C28E
-        add.w   d1,d1                           ; 0C2FC/0C290
-        adda.w  d1,a0                           ; 0C2FE/0C292
-        mulu.w  #$b4,d2                         ; 0C300/0C294
-        adda.l  d2,a0                           ; 0C304/0C298
-        add.w   d6,d6                           ; 0C306/0C29A
-        lea.l   (a1,d6.w),a4                    ;      /0C29C
-        mulu.w  #$5,d4                          ;      /0C2A0
-        move.w  d4,d7                           ;      /0C2A4
-        lsl.w   #$6,d4                          ; 0C308/0C2A6
-        or.w    d0,d4                           ; 0C30A/0C2A8
-        add.w   d0,d0                           ; 0C30C/0C2AA
-        moveq   #$24,d1                         ;      /0C2AC
-        sub.w   d0,d1                           ;      /0C2AE
-        add.w   d6,d6                           ;      /0C2B0
-        sub.w   d0,d6                           ; 0C314/0C2B2
-        move.w  #$4000,(a2)                     ; 0C31C/0C2B4
-l_0C38E_m:
-        btst    #$6,-$98(a2)                    ; 0C38E/0C2B8
-        bne.b   l_0C38E_m                         ; 0C394/0C2BE
-        move.w  d3,-$58(a2)                     ; 0C396/0C2C0
-        ori.w   #$fca,d3                        ; 0C39A/0C2C4
-        move.w  d3,-$5a(a2)                     ; 0C39E/0C2C8
-        move.w  d1,-$3a(a2)                     ;      /0C2CC
-        move.w  d6,-$38(a2)                     ;      /0C2D0
-        move.w  d6,-$36(a2)                     ;      /0C2D4
-        move.w  d1,-$34(a2)                     ;      /0C2D8
-        move.l  d5,-$56(a2)                     ;      /0C2DC
-        move.l  a4,-$4a(a2)                     ; 0C42A/0C2E0
-        move.l  a1,-$4e(a2)                     ; 0C42E/0C2E4
-        move.l  a0,-$52(a2)                     ; 0C432/0C2E8
-        move.l  a0,-$46(a2)                     ; 0C436/0C2EC
-        move.w  d4,-$42(a2)                     ; 0C43A/0C2F0
-        move.w  #$c000,(a2)                     ; 0C43E/0C2F4
-l_0C442_m:
-        move.w  (a7)+,d7                        ; 0C442/0C2F8
-        lea.l   $1c(a5),a5                      ; 0C444/0C2FA
-        dbra    d7,l_0C202_m                      ; 0C448/0C2FE
-        rts                                     ; 0C44C/0C302
+; (DrawSceneryOnRedraw: the original's, unused with the scroller - removed)
+
+; (DrawSceneryMasked: the original's, unused with the scroller - removed)
+
 
 ;---------------------------------------------------------------------------
 ; BuildMaskedGfx - 1MB build only. Convert d7+1 graphics blocks from a1 (5 planes,
