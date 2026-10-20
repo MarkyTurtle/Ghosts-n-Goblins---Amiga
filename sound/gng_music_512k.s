@@ -1,6 +1,6 @@
 ;==============================================================================
 ; gng_music_512k.s - made by sound/tools/make_music_512k.py from gng_music_1mb.s and
-; gng_sfx_512k.s: the 512K effects package with the 1MB tunes (see that script). Do not edit.
+; gng_sfx_512k.s: the 512K effects package with the 1MB tunes (see that script). Do not edit. Tunes' samples 5-9 at 3/4 of their rate (--rate).
 ;==============================================================================
 ; =========================================================================
 ; Ghosts'n Goblins (Elite, 1990) - sound driver + data: gng_music_1mb
@@ -1208,8 +1208,8 @@ Ins05:
         dc.l    Smp08-SampleBase            ; 009BE  loop sample (offset from SampleBase)
         dc.l    0                           ; 009C2  volume envelope (self-relative)
         dc.l    0                           ; 009C6  pitch envelope (self-relative)
-        dc.w    $1A73,$1A73                 ; 009CA  attack / loop length (words) = 13542 / 13542 bytes
-        dc.w    $7E40,$7E40                 ; 009CE  period multipliers (PitchTable * mul >> 16)
+        dc.w    $13D6,$13D6                 ; attack / loop length (words) = 10156 / 10156 bytes
+        dc.w    $A855,$A855                 ; period multipliers (PitchTable * mul >> 16): / 3/4
         dc.b    0,0                         ; 009D2  volume / pitch envelope speed (ticks per step)
         dc.w    255                         ; 009D4  instrument volume (x channel volume >> 8; /4 -> AUDxVOL)
 Ins06:
@@ -1217,8 +1217,8 @@ Ins06:
         dc.l    Smp07-SampleBase            ; 009DA  loop sample (offset from SampleBase)
         dc.l    0                           ; 009DE  volume envelope (self-relative)
         dc.l    0                           ; 009E2  pitch envelope (self-relative)
-        dc.w    $1128,$07C1                 ; 009E6  attack / loop length (words) = 8784 / 3970 bytes
-        dc.w    $8000,$8000                 ; 009EA  period multipliers (PitchTable * mul >> 16)
+        dc.w    $0CDE,$05D1                 ; attack / loop length (words) = 6588 / 2978 bytes
+        dc.w    $AAAB,$AAAB                 ; period multipliers (PitchTable * mul >> 16): / 3/4
         dc.b    0,0                         ; 009EE  volume / pitch envelope speed (ticks per step)
         dc.w    255                         ; 009F0  instrument volume (x channel volume >> 8; /4 -> AUDxVOL)
 Ins07:
@@ -1226,8 +1226,8 @@ Ins07:
         dc.l    Smp09-SampleBase            ; 009F6  loop sample (offset from SampleBase)
         dc.l    0                           ; 009FA  volume envelope (self-relative)
         dc.l    0                           ; 009FE  pitch envelope (self-relative)
-        dc.w    $0E9F,$0B9D                 ; 00A02  attack / loop length (words) = 7486 / 5946 bytes
-        dc.w    $8000,$8000                 ; 00A06  period multipliers (PitchTable * mul >> 16)
+        dc.w    $04CB,$04A0                 ; attack / loop length (words) = 2454 / 2368 bytes
+        dc.w    $AAAB,$AAAB                 ; period multipliers (PitchTable * mul >> 16): / 3/4
         dc.b    0,0                         ; 00A0A  volume / pitch envelope speed (ticks per step)
         dc.w    255                         ; 00A0C  instrument volume (x channel volume >> 8; /4 -> AUDxVOL)
 Ins08:
@@ -1235,8 +1235,8 @@ Ins08:
         dc.l    Smp09-SampleBase            ; 00A12  loop sample (offset from SampleBase)
         dc.l    VolEnv_2E48-*               ; 00A16  volume envelope (self-relative)
         dc.l    0                           ; 00A1A  pitch envelope (self-relative)
-        dc.w    $0664,$062B                 ; 00A1E  attack / loop length (words) = 3272 / 3158 bytes
-        dc.w    $8000,$8000                 ; 00A22  period multipliers (PitchTable * mul >> 16)
+        dc.w    $04CB,$04A0                 ; attack / loop length (words) = 2454 / 2368 bytes
+        dc.w    $AAAB,$AAAB                 ; period multipliers (PitchTable * mul >> 16): / 3/4
         dc.b    1,0                         ; 00A26  volume / pitch envelope speed (ticks per step)
         dc.w    255                         ; 00A28  instrument volume (x channel volume >> 8; /4 -> AUDxVOL)
 Ins09:	; instrument 9 is an effect's (the 512K file's Ins00, which its dummies 0-9 share)
@@ -3908,25 +3908,25 @@ SmpHdr04:
 Smp04:
         incbin  "samples/gng_music_1mb_smp04.raw",0,116; 03C16  116 bytes
 SmpHdr05:
-        dc.b    $00,$00,$22,$50,$37,$14     ; 03C8A  sample 5 header: length 8784 bytes, 14100 Hz (not used by the driver)
+        dc.b    $00,$00,$19,$BC,$29,$4F     ; sample 5 header: length 6588 bytes, 10575 Hz (resampled to 3/4 of the rate)
 Smp05:
-        incbin  "samples/gng_music_1mb_smp05.raw",0,8784; 03C90  8784 bytes
+        incbin  "samples/r3_4/gng_music_1mb_smp05.raw",0,6588; 6588 bytes
 SmpHdr06:
-        dc.b    $00,$00,$0C,$C8,$37,$14     ; 05EE0  sample 6 header: length 3272 bytes, 14100 Hz (not used by the driver)
+        dc.b    $00,$00,$09,$96,$29,$4F     ; sample 6 header: length 2454 bytes, 10575 Hz (resampled to 3/4 of the rate)
 Smp06:
-        incbin  "samples/gng_music_1mb_smp06.raw",0,3272; 05EE6  3272 bytes
+        incbin  "samples/r3_4/gng_music_1mb_smp06.raw",0,2454; 2454 bytes
 SmpHdr07:
-        dc.b    $00,$00,$0F,$82,$37,$14     ; 06BAE  sample 7 header: length 3970 bytes, 14100 Hz (not used by the driver)
+        dc.b    $00,$00,$0B,$A2,$29,$4F     ; sample 7 header: length 2978 bytes, 10575 Hz (resampled to 3/4 of the rate)
 Smp07:
-        incbin  "samples/gng_music_1mb_smp07.raw",0,3970; 06BB4  3970 bytes
+        incbin  "samples/r3_4/gng_music_1mb_smp07.raw",0,2978; 2978 bytes
 SmpHdr08:
-        dc.b    $00,$00,$34,$E6,$37,$14     ; 07B36  sample 8 header: length 13542 bytes, 14100 Hz (not used by the driver)
+        dc.b    $00,$00,$27,$AC,$29,$4F     ; sample 8 header: length 10156 bytes, 10575 Hz (resampled to 3/4 of the rate)
 Smp08:
-        incbin  "samples/gng_music_1mb_smp08.raw",0,13542; 07B3C  13542 bytes
+        incbin  "samples/r3_4/gng_music_1mb_smp08.raw",0,10156; 10156 bytes
 SmpHdr09:
-        dc.b    $00,$00,$0C,$56,$37,$14     ; 0B022  sample 9 header: length 3158 bytes, 14100 Hz (not used by the driver)
+        dc.b    $00,$00,$09,$40,$29,$4F     ; sample 9 header: length 2368 bytes, 10575 Hz (resampled to 3/4 of the rate)
 Smp09:
-        incbin  "samples/gng_music_1mb_smp09.raw",0,3158; 0B028  3158 bytes
+        incbin  "samples/r3_4/gng_music_1mb_smp09.raw",0,2368; 2368 bytes
 ; ---- the effects' samples (the 512K package's, in its order)
 EffSmpHdr00:
         dc.b    $00,$00,$08,$E4,$27,$10     ; 012E8  sample 0 header: length 2276 bytes, 10000 Hz (not used by the driver)

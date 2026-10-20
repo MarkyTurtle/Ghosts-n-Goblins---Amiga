@@ -601,6 +601,40 @@ samples (1MB samples 5-9 in the opening tune) alongside the effects' samples.
 A1200): it works on all of them. On the plain A500 the slow-down is small and brief, mostly at
 the end of a level with the dragon and on the dragon's level itself, and hardly noticeable.
 
+**Music quality on 512K** (made on branch `enhanced/musicquality`). The tunes' sampled
+instruments (samples 5-9: 32,726 of the package's bytes) are now at **3/4 of their rate** in the
+512K package: `make_music_512k.py` resamples them (scipy's polyphase filter; the loop samples 7-9
+as loops) and divides their instruments' period multipliers by 3/4, so every note keeps its
+pitch (within 7 cents, about one period step; the multipliers stay below `$FFFF`). The
+single-cycle waveforms (samples 0-4) stay, as their length is their pitch. The resampled samples
+are kept in `sound/samples/r3_4/`. The package is 67,332 bytes (8,182 less), and `SFX_AREA`
+now follows its length (`MUSIC512_LEN` rounded up to 16 bytes, at least the effects package's
+`$7D64`), so the level area gets the difference: with no image pre-masked the fullest stage's
+data ends at `$7C160` (14.4 KB free instead of 6.4 KB), and pre-masking takes it:
+
+| Stage | Data ends | Still 5 blits (3/4 music) | At full quality |
+|---|---|---|---|
+| 1 | $7EE1A | items / weapons, 5 enemy sets | items / weapons, 8 enemy sets |
+| 2 | $7F6AA | items / weapons, 6 enemy sets | enemy shots, items / weapons, 6 enemy sets |
+| 3 (dragon) | $7EB1E | 1 enemy set | 2 enemy sets |
+| 4 (dragon) | $794C6 | nothing | nothing |
+| 5 | $7E682 | 1 enemy set | 2 enemy sets |
+| 6 (dragon) | $7E18E | 4 enemy sets | 5 enemy sets |
+| 7 | $73652 | nothing | nothing |
+
+The quality was chosen from listening to 3/4, 2/3 and 1/2 (8.2, 10.9 and 16.4 KB saved; renders
+and test disks): 3/4 was the best compromise. `build_game.py --music-rate N/D` still builds the others
+(`--music-rate 1`: full quality). The 1MB package (1MB of chip RAM, or slow / fast RAM) keeps
+full quality. A menu choice could not give memory back: the package is at the bottom of the map
+and the level area at the top, fixed when the program is built.
+
+*Testing*: `check_music_512k.py` now makes the package at full quality too and checks that it
+writes the same Paula registers as the 1MB package for every tune, and that the 3/4 package
+writes the same registers as full quality except the periods on resampled samples (full
+quality's / 3/4, to within one period step) and their lengths; the effects as the 512K
+package. (Checked to fail when told the wrong rate.) The comparisons with the originals stay in
+step (game logic is unchanged).
+
 **Where the originals differ** both versions are in the source, chosen at run time. In the
 sound code the choice keeps the condition codes (`move sr,-(a7)` ... `move (a7)+,ccr`; game
 logic runs in supervisor mode), so each profile sees exactly the flags and `d0` its original

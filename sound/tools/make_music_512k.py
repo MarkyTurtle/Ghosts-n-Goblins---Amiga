@@ -20,12 +20,13 @@ instruments, and its samples in the same order: the instruments that run past th
 into the next one find the same neighbours; the last one runs past the end of the package, as
 the 512K one did).
 
-Quality (--rate N/D, default 1): the tunes' sampled instruments (samples 5-9: 32,726 bytes)
+Quality (--rate N/D; the game's package: 3/4, the default): the tunes' sampled instruments (samples 5-9: 32,726 bytes)
 resampled to N/D of their rate (scipy's polyphase filter; the loop samples 7-9 as loops), their
 instruments' lengths set to the new sizes and their period multipliers divided by N/D (capped
 at $FFFF: $8000 x 2 is 1 in 65,536 short), so every note keeps its pitch. Samples 0-4 (the
 single-cycle waveforms, 1,650 bytes) stay: their length is their pitch. The new samples go to
-sound/samples/r<N>_<D>/ (made again each time).
+sound/samples/r<N>_<D>/ (made again each time; r3_4/ is kept in the repository, so the
+committed gng_music_512k.s assembles as it is). --rate 1: full quality, as the 1MB package.
 
   python3 sound/tools/make_music_512k.py [--rate N/D] [--out FILE]   (default sound/gng_music_512k.s)"""
 import os, re, sys
@@ -133,7 +134,7 @@ def quality(lines, f):
 
 
 args = sys.argv[1:]
-rate = Fraction(args[args.index('--rate') + 1]) if '--rate' in args else Fraction(1)
+rate = Fraction(args[args.index('--rate') + 1]) if '--rate' in args else Fraction(3, 4)
 dest = args[args.index('--out') + 1] if '--out' in args else os.path.join(SND, 'gng_music_512k.s')
 if rate != 1:
     assert 0 < rate < 1, rate

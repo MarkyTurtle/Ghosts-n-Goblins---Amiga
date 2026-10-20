@@ -12,3 +12,4 @@ enhanced/build/
 /tools/build1mb/gen1m.py
 enhanced/tools/_srcedit.bin
 /sound/samples/r*_*/
+!/sound/samples/r3_4/

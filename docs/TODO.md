@@ -83,7 +83,7 @@ decided against, kept for the record with the reason.
       too much frame time
 - [x] **Closed:** mirror Arthur's current frame on demand instead of keeping 40 mirrored frames:
       about 20 KB (5); not needed
-- [ ] (Not worth it, measured: metatile recoding of the map tables, flip flags for level tiles,
+- [x] **Closed** (not worth it, measured: metatile recoding of the map tables, flip flags for level tiles,
       trimming sample tails) (5)
 
 **Sound**
@@ -93,9 +93,15 @@ decided against, kept for the record with the reason.
       (`sound/gng_music_512k.s`: the 512K effects with the 1MB tunes, 75.5 KB) in the room freed
       by the per-level map tables, joined gaps, old save areas and dead code; stages 1, 2, 3, 5
       and 6 pre-mask fewer BOB sets, and about 7 KB is left on the fullest stage
-- [ ] Music quality tiers chosen by the machine's memory (4)
-- [ ] Resample the music samples (2/3 saves about 11 KB) by scaling the instruments' period
-      multipliers; also fixes periods below Paula's minimum of 124 (5)
+- [x] Music quality tiers chosen by the machine's memory (4): the 512K package (plain 512K
+      A500) has the tunes' samples at 3/4 of their rate, chosen from listening to 3/4, 2/3
+      and 1/2; machines with 1MB of chip RAM or an expansion keep full quality. A menu choice
+      cannot free memory (the layout is fixed at build time). The 8.2 KB saved goes to
+      pre-masking (made on branch `enhanced/musicquality`)
+- [x] Resample the music samples by scaling the instruments' period multipliers (5): done at
+      3/4 for 512K (`make_music_512k.py --rate`). The resampled samples' lowest periods rise from
+      114 to about 152, within Paula's minimum of 124; the waveform samples 0-1 (not resampled)
+      still go down to about 120
 - [x] **Closed:** effects: at most a modest cut (they already play at their recorded 8-10 kHz) (5)
 
 **Controls and extras**
