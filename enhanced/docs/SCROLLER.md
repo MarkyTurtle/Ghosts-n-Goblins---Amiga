@@ -738,6 +738,34 @@ the program from tracks 134-150 (it is 17 tracks now); effects package at 126 (a
 the program's `MUSIC_FILE`), music package at 64; the original programs' tracks are empty.
 `tools/disk/mkdisk.py --one` builds it.
 
+### Two-button joysticks
+
+The joystick's second button (port 2, pin 9: a Sega-style pad or a two-button stick) can make
+Arthur jump, as on the arcade machine. **J on the title screen** switches between jump on up
+(the original, and the default) and jump on button 2; the title says which, in the line where
+CHEAT ON shows (`J  jump on UP` / `J  jump on BUTTON 2`, then `CHEAT ON` while the cheat is on;
+C still turns the cheat on or off). The setting is `JumpButton` (`scroller.s`), kept until the
+machine is reset; an options menu is to come (`docs/TODO.md`, 8).
+
+*Reading it* (`make_game.py`, `two_buttons`): the vertical blank, which reads the joystick into
+`g_Joy` (right, down, left, up as decoded from `JOY1DAT`; fire bit 15), now also sets bit 14 when
+`POTINP` bit 14 (DATRY) is low, and writes `POTGO` = `$C000` (pin 9 an output driven high, so a
+pressed button pulls it low; the mouse port's pins are left as inputs). Nothing else reads bit 14,
+so with jump on up the game is the same as before.
+
+*Jump on button 2* (`ArthurReadUpDown`): the button counts when held for two samples, as up
+does, and jumps unless Arthur is on a ladder (taking the original's jump path, so the frog jumps
+too and nothing jumps while climbing). Up then only climbs: at a ladder as before (and stepping
+off at the top), elsewhere it does nothing (the original's jump entry returns as if nothing were
+held), also for the frog. Down is unchanged.
+
+*Testing*: `tools/test_jump.py` saves one state of a game on level 1 and runs each setting with
+up, button 2 and both, on open ground, at the foot of a ladder and on it (15 cases): up jumps or
+climbs and the button does nothing with jump on up; the button jumps (not from the ladder) and up
+only climbs with jump on button 2. The emulator harness's `frame()` takes the second button
+(`fire2`; `POTINP` reads as not pressed otherwise). The comparisons with the originals (jump on
+up) stay in step as before.
+
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
@@ -755,6 +783,7 @@ the program's `MUSIC_FILE`), music package at 64; the original programs' tracks 
 * `tools/check_harness.py`: checks the harness against the level pictures in `render/out/`.
 * `tools/test_scroll.py`: the scroller against the original, frame by frame.
 * `src/boot_patches.s`: the bootblock's memory survey; `tools/test_bootinfo.py` tests it.
+* `tools/test_jump.py`: the two-button joystick settings (jump on up or on button 2).
 * `tools/test_bobs.py`: BOBs, restores and scenery against the original's `DrawBobs` and
   `DrawSceneryOnRedraw`.
 

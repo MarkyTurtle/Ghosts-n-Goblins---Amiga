@@ -730,3 +730,7 @@ MITEM_GFX_END       	equ	MITEM_GFX2_BUF+2*$EA6	; end of the upper chip RAM used
 	ifgt	MITEM_GFX_END-$100000
 	fail	"the upper chip RAM caches do not fit below $100000"
 	endc
+
+; the joystick's second button (port 2, pin 9: POTGO's OUTRY / DATRY, POTINP's DATRY)
+POTGO_B2            	equ	$C000	; POTGO: pin 9 an output, driven high (a pressed button pulls it low)
+POTGOR_B2           	equ	6	; POTINP (POTGOR) bit 14, as a bit of its high byte: 0 = pressed

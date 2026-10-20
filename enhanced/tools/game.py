@@ -191,9 +191,10 @@ class GameRun(Amiga):
             pc = self.redraw_idle
         self.user_pc = pc
 
-    def frame(self, joy='', fire=False):
+    def frame(self, joy='', fire=False, fire2=False):
         self.w16(CUSTOM+0x0C, JOY[joy])
         self.w8(0xBFE001, 0x7F if fire else 0xFF)
+        self.w16(CUSTOM+0x16, 0xBF00 if fire2 else 0xFF00)    # POTINP: the second buttons (bit 14: port 2)
         self.softint = False
         self._interrupt(self.vbl, 3)
         if self.softint:

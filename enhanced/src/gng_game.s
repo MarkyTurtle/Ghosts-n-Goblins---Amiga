@@ -3583,7 +3583,7 @@ l_05E36:
         clr.b   g_Checkpoint(a6)                ; 05E4A/05EA0
         clr.b   g_CheatOn(a6)                   ; 05E4E/05EA4
         move.l  #LEVEL_FILE,g_LevelFileAddr(a6) ; 05E52/05EA8
-        bsr.w   RedrawScreen                    ; 05E5A/05EB0
+        jsr     (RedrawScreen).l                    ; 05E5A/05EB0
         bsr.w   SwapScreens                     ; 05E5E/05EB4
         bsr.w   SetBitplanePtrs                 ; 05E62/05EB8
         bsr.w   ShowBackBuffer                  ; 05E66/05EBC
@@ -7839,10 +7839,18 @@ ArthurReadUpDown:
         clr.b   g_Crouching(a6)                 ; 087E6/08840  up / down only count when held for two VBL samples
         move.w  g_Joy(a6),d0                    ; 087EA/08844
         and.w   g_JoyPrev(a6),d0                ; 087EE/08848
+        tst.b   (JumpButton).l                  ; jump on button 2: held for two samples, as up, and
+        beq.b   l_udup                          ; not from a ladder (as up: a ladder is climbed)
+        btst    #$e,d0
+        beq.b   l_udup
+        tst.b   g_OnLadder(a6)
+        beq.w   l_08884
+l_udup:
         btst    #$8,d0                          ; 087F2/0884C  up held (bit 8)
         bne.b   l_08808                         ; 087F6/08850
         btst    #$0,d0                          ; 087F8/08852  down held (bit 0)
         bne.w   l_088E6                         ; 087FC/08856
+l_udnone:
         clr.b   g_LadderDir(a6)                 ; 08800/0885A  neither: not on a ladder move
         st.b    d0                              ; 08804/0885E
         rts                                     ; 08806/08860
@@ -7894,6 +7902,13 @@ l_08870:
         clr.b   d0                              ; 08880/088DA
         rts                                     ; 08882/088DC
 l_08884:
+        tst.b   (JumpButton).l                  ; jump on button 2: up alone (no ladder, or a frog)
+        beq.b   l_jumpok                        ; does nothing
+        move.w  g_Joy(a6),d0
+        and.w   g_JoyPrev(a6),d0
+        btst    #$e,d0
+        beq.w   l_udnone
+l_jumpok:
         tst.b   g_LadderDir(a6)                 ; 08884/088DE  up and not on a ladder: jump (not while climbing)
         bhi.b   l_0883C                         ; 08888/088E2
         st.b    g_Jumping(a6)                   ; 0888A/088E4  jump
@@ -13049,6 +13064,11 @@ l_0BF5A:
         bne.b   l_0BF84                         ; 0BF7E/0BF12
         bset    #$f,d0                          ; 0BF80/0BF14
 l_0BF84:
+        btst    #POTGOR_B2,POTGOR(a0)           ; second button (port 2, pin 9) -> bit 14: low = pressed
+        bne.b   l_joyb2
+        bset    #$e,d0
+l_joyb2:
+        move.w  #POTGO_B2,POTGO(a0)             ; (pin 9 an output, driven high: the button pulls it low)
         move.w  d0,g_Joy(a6)                    ; 0BF84/0BF18
         moveq   #$0,d0                          ; 0BF88/0BF1C  command 0 = tick
         movea.l (VEC_SPURIOUS).w,a1             ; 0BF8A/0BF1E

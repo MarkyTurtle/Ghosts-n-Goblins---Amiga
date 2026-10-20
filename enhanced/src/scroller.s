@@ -1128,36 +1128,64 @@ MakeMasks:
 ; Sizes: chip = its upper end; slow / fast = upper end - the 64K boundary below mh_Lower.
 ;------------------------------------------------------------------------------
 ;------------------------------------------------------------------------------
-; EnhCheatKey - CheckGameStart (the title and high-score screens), first: the C key turns
-; the game's cheat on or off (g_CheatOn, as entering ')!(' on the high-score table: lives
-; never decrease, no harm once the armour is gone) and shows the title again, which says
-; 'CHEAT ON' while it is on (EnhShowCheat). For testing.
+; EnhCheatKey - CheckGameStart (the title and high-score screens), first: the J key switches
+; jump between up (the original) and the joystick's second button (JumpButton; with it, up
+; only climbs ladders); the C key turns the game's cheat on or off (g_CheatOn, as entering
+; ')!(' on the high-score table: lives never decrease, no harm once the armour is gone; for
+; testing). Either shows the title again, with the line that says which (EnhShowCheat).
 ;------------------------------------------------------------------------------
 EnhCheatKey:
-                cmpi.b  #$33,g_RawKey(a6)       ; raw key code of C
+                cmpi.b  #$26,g_RawKey(a6)       ; raw key code of J
+                bne.b   .cheat
+                not.b   (JumpButton).l
+                bra.b   .title
+.cheat:         cmpi.b  #$33,g_RawKey(a6)       ; raw key code of C
                 bne.b   .out
-                clr.w   g_RawKey(a6)
                 not.b   g_CheatOn(a6)
+.title:         clr.w   g_RawKey(a6)
                 move.b  #GS_TITLE,g_GameState(a6)       ; the title again, with the line
                 clr.b   g_SubState(a6)
 .out:           rts
 
-; EnhShowCheat - with the title: 'CHEAT ON' between the keys and the copyright lines
+; EnhShowCheat - with the title, between the keys and the copyright lines: how Arthur jumps
+; and the key that changes it, then 'CHEAT ON' while the cheat is on, centred:
+;       J  jump on UP              J  jump on BUTTON 2  CHEAT ON
 EnhShowCheat:
-                tst.b   g_CheatOn(a6)
-                beq.b   .out
                 movem.l d0-d7/a0-a5,-(a7)
+                lea     (OptText).l,a3
+                lea     TxtJumpUp(pc),a1
+                tst.b   (JumpButton).l
+                beq.b   .jump
+                lea     TxtJumpB2(pc),a1
+.jump:          bsr.b   .copy
+                tst.b   g_CheatOn(a6)
+                beq.b   .show
+                lea     TxtCheat(pc),a1
+                bsr.b   .copy
+.show:          clr.b   (a3)
+                lea     (OptText).l,a0
+                suba.l  a0,a3                   ; length
+                moveq   #32,d1                  ; centred on the 32 columns
+                sub.w   a3,d1
+                lsr.w   #1,d1
                 move.b  #$18,g_TextShadow(a6)   ; the credits' colours
                 move.b  #$0D,g_TextInk(a6)
                 move.b  #$1F,g_TextPaper(a6)
-                lea     TxtCheat(pc),a3
-                moveq   #12,d1                  ; centred on the 32 columns
+                movea.l a0,a3
                 move.w  #$C4,d2                 ; between 'Press Esc ...' ($B8) and the copyright ($D0)
                 jsr     PrintString
                 movem.l (a7)+,d0-d7/a0-a5
-.out:           rts
-TxtCheat:       dc.b    'CHEAT ON',0
+                rts
+.copy:          move.b  (a1)+,(a3)+
+                bne.b   .copy
+                subq.l  #1,a3
+                rts
+TxtJumpUp:      dc.b    'J  jump on UP',0
+TxtJumpB2:      dc.b    'J  jump on BUTTON 2',0
+TxtCheat:       dc.b    '  CHEAT ON',0
+JumpButton:     dc.b    0                       ; nonzero: jump on the joystick's second button
                 even
+OptText:        dcb.b   32,0                    ; the line, made up
 
 EnhShowMachine:
                 movem.l d0-d7/a0-a5,-(a7)

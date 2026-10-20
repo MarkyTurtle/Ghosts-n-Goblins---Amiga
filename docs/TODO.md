@@ -99,7 +99,9 @@ decided against, kept for the record with the reason.
 - [x] **Closed:** effects: at most a modest cut (they already play at their recorded 8-10 kHz) (5)
 
 **Controls and extras**
-- [ ] Two-button joysticks: one button fires, the other jumps; up-to-jump kept as an option (8)
+- [x] Two-button joysticks: one button fires, the other jumps; up-to-jump kept as an option (8):
+      J on the title switches it (`JumpButton`), until the options menu; see
+      `enhanced/docs/SCROLLER.md`, *Two-button joysticks*
 - [ ] An options menu (controls and the other settings) (8)
 - [ ] A sound test: play each tune and effect (8)
 - [ ] A sprite test: show the BOB and sprite frames (8), if there is room
@@ -620,12 +622,11 @@ on `main` now assembles both programs: 21,580 lines of code shared, about 640 51
 
 ## 8. Controls, options menu, sound and sprite tests
 
-**Two-button joysticks.** The second button of a CD32 / Sega-style pad or a two-button stick is
-read from the port's POT lines (`POTGO` / `POTINP`: bit 14 for port 2's second button, with the
-pin set as an output driven high, then read back). Fire stays on the first button; jump on the
-second. Up-to-jump stays as an option (the default, as the original), switched in the options
-menu, so a one-button stick still plays as before. Joystick up then only climbs ladders when
-jump is on the button.
+**Two-button joysticks** (done; `enhanced/docs/SCROLLER.md`, *Two-button joysticks*). The
+second button is read from `POTINP` bit 14 (port 2's pin 9, set as an output driven high by
+`POTGO`). Fire stays on the first button; jump on the second, or on up (the default, as the
+original), switched with J on the title for now and in the options menu later. With jump on the
+button, up only climbs ladders. (A CD32 pad's extra buttons need its serial read-out: not done.)
 
 **Options menu.** From the title screen: controls (up or button 2 to jump), and room for the
 other settings the one program already has (music on or off where it plays, the cheat now on

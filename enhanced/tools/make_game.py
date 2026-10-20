@@ -388,6 +388,48 @@ def byteloader(S):
               f"        jmp     {to}                        ; {addr}  (rte, with the interrupted a6)")
 
 
+def two_buttons(S):
+    """two-button joysticks: the second button (port 2's pin 9, read on POTINP) is bit 14 of
+    g_Joy. With JumpButton set (the title's J key) it jumps and up only climbs ladders, as on
+    the arcade machine; otherwise up jumps, as the original (scroller.s: EnhCheatKey)"""
+    S.sub("""l_0BF84:
+        move.w  d0,g_Joy(a6)                    ; 0BF84/0BF18
+""", """l_0BF84:
+        btst    #POTGOR_B2,POTGOR(a0)           ; second button (port 2, pin 9) -> bit 14: low = pressed
+        bne.b   l_joyb2
+        bset    #$e,d0
+l_joyb2:
+        move.w  #POTGO_B2,POTGO(a0)             ; (pin 9 an output, driven high: the button pulls it low)
+        move.w  d0,g_Joy(a6)                    ; 0BF84/0BF18
+""")
+    S.sub("""        and.w   g_JoyPrev(a6),d0                ; 087EE/08848
+""", """        and.w   g_JoyPrev(a6),d0                ; 087EE/08848
+        tst.b   (JumpButton).l                  ; jump on button 2: held for two samples, as up, and
+        beq.b   l_udup                          ; not from a ladder (as up: a ladder is climbed)
+        btst    #$e,d0
+        beq.b   l_udup
+        tst.b   g_OnLadder(a6)
+        beq.w   l_08884
+l_udup:
+""")
+    S.sub("""        clr.b   g_LadderDir(a6)                 ; 08800/0885A  neither: not on a ladder move
+""", """l_udnone:
+        clr.b   g_LadderDir(a6)                 ; 08800/0885A  neither: not on a ladder move
+""")
+    S.sub("""l_08884:
+        tst.b   g_LadderDir(a6)                 ; 08884/088DE  up and not on a ladder: jump (not while climbing)
+""", """l_08884:
+        tst.b   (JumpButton).l                  ; jump on button 2: up alone (no ladder, or a frog)
+        beq.b   l_jumpok                        ; does nothing
+        move.w  g_Joy(a6),d0
+        and.w   g_JoyPrev(a6),d0
+        btst    #$e,d0
+        beq.w   l_udnone
+l_jumpok:
+        tst.b   g_LadderDir(a6)                 ; 08884/088DE  up and not on a ladder: jump (not while climbing)
+""")
+
+
 def drop_dead_code(S):
     """the original's routines the scroller replaced, and debug left-overs nothing calls: their
     bodies are removed (tools: enhanced/docs/SCROLLER.md, Dead code). For the ones the scroller
@@ -471,6 +513,7 @@ def main():
     S.sub("        lea.l   (MFM_BUFFER+$2).l,a3            ; 0C580/0C4B4",
           "        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4\n        addq.l  #$2,a3")
     byteloader(S)
+    two_buttons(S)
     dead = drop_dead_code(S)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)
