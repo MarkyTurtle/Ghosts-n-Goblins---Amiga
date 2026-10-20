@@ -194,10 +194,13 @@ l_06E80:
           + I('lea.l   (ENEMY_GFX_CACHE).l,a5', 'the masked enemy sets') + '\nll_sets:\n')
     S.rep(78, I('btst    #PF_CACHE,(Profile).l') + '\n' + I('beq.b   ll_small') + '\n' + I('lea.l   (SMALLBOB_CACHE).l,a5', 'the masked small sets') + '\nll_small:\n')
     # --- ProgressMap, Astaroth_Dying --------------------------------------------------------
-    S.rep(91, I('btst    #PF_MUSIC,(Profile).l') + '\n' + I('beq.b   pm_nomus') + '\n'
-          + I('moveq   #TUNE_START,d0', 'with music: the start tune') + '\n' + I('bsr.w   PlayMusic') + '\npm_nomus:\n'
-          + I('btst    #PF_CACHE,(Profile).l') + '\n' + I('beq.b   pm_load') + '\n'
+    S.rep(91, I('btst    #PF_CACHE,(Profile).l') + '\n' + I('beq.b   pm_load') + '\n'
           + I('lea.l   (PROGRESS_MAP_CACHE).l,a0', '1MB: the map from the cache') + '\n' + I('bra.b   pm_have') + '\npm_load:\n{5K}pm_have:\n')
+    # the start tune once the map is unpacked and about to show (not while it loads from disk)
+    S.sub("        addq.b  #$1,g_SubState3(a6)             ; 07808/07870",
+          I('btst    #PF_MUSIC,(Profile).l', 'with music: the start tune, as the map appears') + '\n' + I('beq.b   pm_nomus') + '\n'
+          + I('moveq   #TUNE_START,d0') + '\n' + I('bsr.w   PlayMusic') + '\npm_nomus:\n'
+          + "        addq.b  #$1,g_SubState3(a6)             ; 07808/07870")
     S.rep(154, I('btst    #PF_MUSIC,(Profile).l') + '\n' + I('beq.b   ad_explode') + '\n'
           + I('moveq   #TUNE_ASTAROTH_BEATEN,d0', 'with music: the final tune (the explosion starts next frame)') + '\n'
           + I('bra.w   PlayMusic') + '\nad_explode:\n{5K}')

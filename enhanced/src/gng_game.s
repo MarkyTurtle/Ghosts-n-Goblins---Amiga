@@ -6015,11 +6015,6 @@ ProgressMap:
         cmpi.b  #$1,g_SubState3(a6)             ; 07736/0779E
         beq.w   ProgressMap_Scroll              ; 0773C/077A4
         bhi.w   ProgressMap_Wait                ; 07740/077A8
-        btst    #PF_MUSIC,(Profile).l           
-        beq.b   pm_nomus                        
-        moveq   #TUNE_START,d0                  ; with music: the start tune
-        bsr.w   PlayMusic                       
-pm_nomus:
         btst    #PF_CACHE,(Profile).l           
         beq.b   pm_load                         
         lea.l   (PROGRESS_MAP_CACHE).l,a0       ; 1MB: the map from the cache
@@ -6101,6 +6096,11 @@ l_077D4:
         clr.w   g_ScrollTileX(a6)               ; 077FC/07864
         clr.w   g_ScrollTileY(a6)               ; 07800/07868
         st.b    g_ArthurFlash(a6)               ; 07804/0786C  marker flashes while the map scrolls
+        btst    #PF_MUSIC,(Profile).l           ; with music: the start tune, as the map appears
+        beq.b   pm_nomus                        
+        moveq   #TUNE_START,d0                  
+        bsr.w   PlayMusic                       
+pm_nomus:
         addq.b  #$1,g_SubState3(a6)             ; 07808/07870
         bra.w   LogicExit                       ; 0780C/07874
 
