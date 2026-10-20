@@ -73,10 +73,10 @@ Each line points to the item below with the details and measurements.
 **Sound**
 - [x] Music on 512K machines with an expansion (slow or fast RAM): the whole 1MB package, in the
       chip RAM the program moved out of
-- [ ] Music on a plain 512K A500: needs about 43 KB of chip RAM; the per-level map tables freed
-      17 KB, two joined gaps 3 KB, the old save areas 24 KB and dead code 3 KB (the fullest stage now
-      leaves 50 KB free, 3 KB before): enough for the estimate; next a combined package (the
-      tunes' samples and note data added to the 512K effects package) (4)
+- [x] Music on a plain 512K A500 (branch `enhanced/music512`): a combined package
+      (`sound/gng_music_512k.s`: the 512K effects with the 1MB tunes, 75.5 KB) in the room freed
+      by the per-level map tables, joined gaps, old save areas and dead code; stages 1, 2, 3, 5
+      and 6 pre-mask fewer BOB sets, and about 7 KB is left on the fullest stage
 - [ ] Music quality tiers chosen by the machine's memory (4)
 - [ ] Resample the music samples (2/3 saves about 11 KB) by scaling the instruments' period
       multipliers; also fixes periods below Paula's minimum of 124 (5)

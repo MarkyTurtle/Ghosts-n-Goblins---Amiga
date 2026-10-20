@@ -133,6 +133,13 @@ def build(extra_defs=()):
         path = os.path.join(OUT, f'tables{l}.bin')
         open(path, 'wb').write(data)
         tdefs += [(f'TBLLEN{l}', len(data))]
+    # the 512K music package (sound/tools/make_music_512k.py): its length for the program's file
+    # record (the same wherever it is assembled; it is assembled again for MUSIC_FILE below)
+    subprocess.run([sys.executable, os.path.join(ROOT, 'sound', 'tools', 'make_music_512k.py')], check=True,
+                   capture_output=True)
+    music512 = os.path.join(OUT, 'music512.bin')
+    vasm(os.path.join(ROOT, 'sound', 'gng_music_512k.s'), music512)
+    tdefs += [('MUSIC512_LEN', os.path.getsize(music512))]
     extra_defs = tuple(extra_defs) + tuple(tdefs)
     print(f'level tables: {slots} cells at most, {", ".join(f"{len(t):,}" for t in tables)} bytes')
     vasm(src, prog, lst, extra_defs)
@@ -142,6 +149,7 @@ def build(extra_defs=()):
     sfx, music = os.path.join(OUT, 'sfx.bin'), os.path.join(OUT, 'music.bin')
     vasm(os.path.join(ROOT, 'sound', 'gng_sfx_512k.s'), sfx, defs=(('SND_ORG', syms['MUSIC_FILE']),))
     vasm(os.path.join(ROOT, 'sound', 'gng_music_1mb.s'), music, defs=(('SND_ORG', syms['MUSIC1M_FILE']),))
+    vasm(os.path.join(ROOT, 'sound', 'gng_music_512k.s'), music512, defs=(('SND_ORG', syms['MUSIC_FILE']),))
     # the relocation file (EnhRelocate): the program assembled 2MB on with the memory map where
     # it is, and the music package likewise; then the program again with the file's length
     moved, music2 = os.path.join(OUT, 'moved.bin'), os.path.join(OUT, 'music_moved.bin')
@@ -164,6 +172,7 @@ def build(extra_defs=()):
               ("the music package fits where the program was and the effects package's area (MUSICB_FILE)",
                syms['MUSICB_FILE'] + os.path.getsize(music) <= syms['MAP_LOW'] + syms['SFX_AREA']),
               ("the 512K effects package fits its area", os.path.getsize(sfx) <= syms['SFX_AREA']),
+              ("the 512K music package fits its area", os.path.getsize(music512) <= syms['SFX_AREA']),
               ("the text strip is after the buffers and holds 28 characters",
                syms['TEXT_STRIP'] >= syms['SCREEN_0'] + 3 * 47120 and syms['STRIP_MAX'] >= 28)]
     import struct as _st
@@ -187,6 +196,7 @@ def build(extra_defs=()):
           f'memory map from ${syms["MAP_LOW"]:X} (screens ${syms["SCREEN_0"]:X}, level file ${syms["LEVEL_FILE"]:X}); '
           f'effects package for ${syms["MUSIC_FILE"]:X}, music package for ${syms["MUSIC1M_FILE"]:X}')
     files = disk_files(prog, sfx, music, relocs)
+    print(f'512K music package {os.path.getsize(music512):,} bytes (effects alone {os.path.getsize(sfx):,})')
     check_records(src, syms, files)
     return prog, lst, files, syms
 
@@ -206,7 +216,8 @@ def disk_files(prog, sfx, music, relocs, out=None):
                  't101-103_level3_tiles.bin', 't104-105_level4_tiles.bin', 't106-107_level5_tiles.bin',
                  't108-109_level6_tiles.bin'])]
             + [('effects (512K package)', sfx), ('relocations', relocs)]
-            + [(f'level {l} map tables', os.path.join(out, f'tables{l}.bin')) for l in range(7)])
+            + [(f'level {l} map tables', os.path.join(out, f'tables{l}.bin')) for l in range(7)]
+            + [('music (512K package)', os.path.join(out, 'music512.bin'))])
 
 
 def check_records(src, syms, files):

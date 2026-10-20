@@ -386,7 +386,7 @@ machine description (`MACHINE_INFO`) and sets `Profile`:
 | Bit | When | What it turns on |
 |---|---|---|
 | `PF_CACHE` | 1MB or more of chip RAM (any chip RAM above `$80000`: Kickstart 1.3 on a 1MB A500 keeps the top for itself and lists chip RAM as ending at `$FE800`) | graphics cached with masks in upper chip RAM (`CacheGraphics`, `BuildMaskedGfx`); one-blit BOBs (`DrawBobMasked`, `DrawSceneryMasked`); no graphics loads per level, the frame tables point into the cache; frame offsets doubled in place; progress map kept |
-| `PF_MUSIC` | with `PF_CACHE`, or the program moved to slow / fast RAM (below) | the 1MB music package (assembled for `$80000`; at `$80` when the program moved), its tunes and the extra effects |
+| `PF_MUSIC` | every machine with a machine description: with `PF_CACHE`, or the program moved to slow / fast RAM (below), the 1MB package; otherwise (a plain 512K A500) the 512K music package (*Music on 512K*) | the tunes: the 1MB music package (assembled for `$80000`; at `$80` when the program moved) with its extra effects, or on 512K the 512K effects with the 1MB tunes |
 | `PF_EVERY` | (with `PF_CACHE`) | draw every frame |
 
 Without them (512K of chip RAM and no expansion with room, or no machine description) it is
@@ -547,6 +547,55 @@ With the smaller program the memory map moved down, and the slow / fast RAM musi
 order: the effects package's area now comes first after the program (`SFX_AREA`), and
 `LoadSound` runs right after `ReadProfile`, so that the 1MB music package, loaded over the
 program's old place, can run on into buffers that are only filled later.
+
+### Music on 512K (branch `enhanced/music512`)
+
+A plain 512K A500 now plays the music. The memory came from the work above: the per-level map
+tables (17 KB), two joined gaps (3 KB), the old background save areas (24 KB) and the dead code
+(3 KB).
+
+*The package* (`sound/gng_music_512k.s`, 75,514 bytes, made by `sound/tools/make_music_512k.py`
+from the two symbolic sources; do not edit it). The 512K and 1MB packages are the same driver
+with the same instrument numbers (0-9 the music's, 10-37 the effects'), so the new one is the
+1MB driver, tune table and tune instruments, the 512K effects' instruments, sequences and
+samples, and the 1MB tunes' voice data, patterns and samples (0-9). Instrument 9 is an effect's
+(the 512K file's Ins00); the unused instrument 7 loops on sample 9 instead of the 1MB effect
+sample 10, which is not included. Every tune plays as in the 1MB package and every effect as in
+the 512K one: `sound/tools/check_music_512k.py` runs the driver in `sndemu` and compares the
+Paula writes over 600 frames for all 15 tunes (against the 1MB package) and all 30 effects
+(against the 512K package). The effects on 512K stay the 512K set (the 1MB package's extra
+effects need its samples).
+
+*In the game*: the package is file `FID_MUSIC512` on the disk, loaded by `LoadSound`
+(`FileMusic512`) at `MUSIC_FILE` when the profile has `PF_MUSIC` without `PF_CACHE` and the
+program did not move. `ReadProfile` now sets `PF_MUSIC` (and `PF_EVERY`) on every machine with a
+machine description, so the tune calls and the title's MUSIC text work as on 1MB. `SFX_AREA`
+grows from `$7D64` to `$12700` (43,420 bytes more), and everything after it in the map moves up
+(the sprite data and `MASK_LINE_BUF` are now relative to `SFX_AREA` as the rest already were).
+The level area loses the same amount, so `BuildLevelMasks` pre-masks less:
+
+| Stage | Data ends (music) | Still 5 blits with music | Without music (`enhanced/byteloader`) |
+|---|---|---|---|
+| 1 | $7F9D4 | items / weapons, 7 enemy sets | 2 enemy sets |
+| 2 | $7F9BC | enemy shots, items / weapons, 5 enemy sets | 3 enemy sets |
+| 3 (dragon) | $7F888 | 2 enemy sets | nothing |
+| 4 (dragon) | $7B320 | nothing | nothing |
+| 5 | $7DF14 | 2 enemy sets | nothing |
+| 6 (dragon) | $7F268 | 5 enemy sets | nothing |
+| 7 | $754AC | nothing | nothing |
+
+With no image pre-masked the fullest stage's data ends at `$7DFBA`, about 7 KB below the MFM
+buffer: that is the room left for anything else on 512K. The sets left with 5 blits are drawn
+with their one-plane masks, as all of them were before pre-masking.
+
+*Testing*: `compare_game.py --machine 512k` now compares the 512K machine with the **1MB**
+original (the tunes are the 1MB program's). The games stay in step on every stage (512K: level
+0 3,000 frames, levels 1-6 2,500 frames with teleporting; the same on 512K + slow RAM, a 1MB
+A500+ and an A1200 with fast RAM), and with `--disk` (the byteloader reading the disk image) on
+512K levels 1 and 7, slow RAM level 3 and 1MB. The pictures differ only where they did before:
+the title's machine line, the loading frames and, on stage 6, the one progress-map frame the
+slow-RAM comparison already showed against the 1MB original. On 512K the channels play the tunes'
+samples (1MB samples 5-9 in the opening tune) alongside the effects' samples.
 
 **Where the originals differ** both versions are in the source, chosen at run time. In the
 sound code the choice keeps the condition codes (`move sr,-(a7)` ... `move (a7)+,ccr`; game

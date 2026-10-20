@@ -251,8 +251,10 @@ MAP_LOW             	equ	MAP_FIX	; somewhere else, the memory map where it is at
 MAP_LOW             	equ	GLOBALS+GLOBALS_SIZE	; ($1A118) the memory map below starts here, right after
                     			; the globals, so it moves with the program
 	endc
-SFX_AREA            	equ	$7D64	; the 512K effects package (at MUSIC_FILE), then the rest of the map: offsets as
-                    			; the original's with the package moved to the front
+SFX_AREA            	equ	$12700	; the sound package at MUSIC_FILE: on 512K the music package (the
+                    			; 512K effects and the 1MB tunes, sound/gng_music_512k.s: 75,514 bytes; was
+                    			; $7D64 for the effects alone), then the rest of the map: offsets as the
+                    			; original's with the package moved to the front
 COPPER_INIT         	equ	MAP_LOW+SFX_AREA+$00000	; $1A118: copper list template ($180 bytes copied from CopperTemplate)
 COPPER_A1           	equ	MAP_LOW+SFX_AREA+$00078	; $1A190
 COPPER_A2           	equ	MAP_LOW+SFX_AREA+$000A8	; $1A1C0
@@ -270,19 +272,19 @@ SPR_GFX_B3          	equ	MAP_LOW+SFX_AREA+$0CD1C	; $26E34
 MASK_BUF            	equ	MAP_LOW+SFX_AREA+$0E11C	; $28234: byte-plane extracted from file at tracks 61
 MUSIC_FILE          	equ	MAP_LOW	; first in the map (LoadSound runs first); sound driver + 30 effects (file FID_SFX) - source: sound/gng_sfx_512k.s
 MUSIC_PLAYER        	equ	MAP_LOW+$00020	; $28E74: driver entry: d0.l = arg<<16 | cmd (0 tick, 1 tune, 2 sfx, 3 user value)
-SPRITE0_DATA        	equ	MAP_LOW+$16AA0	; $30BB8
-SPRITE4_DATA        	equ	MAP_LOW+$16B24	; $30C3C
-SPRITE1_DATA        	equ	MAP_LOW+$16B60	; $30C78
-SPRITE5_DATA        	equ	MAP_LOW+$16BE4	; $30CFC
-SPRITE2_DATA        	equ	MAP_LOW+$16C20	; $30D38
-SPRITE6_DATA        	equ	MAP_LOW+$16CA4	; $30DBC
-SPRITE3_DATA        	equ	MAP_LOW+$16CE0	; $30DF8
-SPRITE7_DATA        	equ	MAP_LOW+$16D64	; $30E7C
-SPRITE4B_DATA       	equ	MAP_LOW+$16DA0	; $30EB8: second HUD sprite block (sprite reused lower down)
-SPRITE5B_DATA       	equ	MAP_LOW+$16E6C	; $30F84
-SPRITE6B_DATA       	equ	MAP_LOW+$16F38	; $31050
-SPRITE7B_DATA       	equ	MAP_LOW+$17004	; $3111C
-MASK_LINE_BUF       	equ	MAP_LOW+$170D0	; DrawBob: the mask built for one BOB (640 bytes; only for an image with
+SPRITE0_DATA        	equ	MAP_LOW+SFX_AREA+$0ED3C	; $30BB8
+SPRITE4_DATA        	equ	MAP_LOW+SFX_AREA+$0EDC0	; $30C3C
+SPRITE1_DATA        	equ	MAP_LOW+SFX_AREA+$0EDFC	; $30C78
+SPRITE5_DATA        	equ	MAP_LOW+SFX_AREA+$0EE80	; $30CFC
+SPRITE2_DATA        	equ	MAP_LOW+SFX_AREA+$0EEBC	; $30D38
+SPRITE6_DATA        	equ	MAP_LOW+SFX_AREA+$0EF40	; $30DBC
+SPRITE3_DATA        	equ	MAP_LOW+SFX_AREA+$0EF7C	; $30DF8
+SPRITE7_DATA        	equ	MAP_LOW+SFX_AREA+$0F000	; $30E7C
+SPRITE4B_DATA       	equ	MAP_LOW+SFX_AREA+$0F03C	; $30EB8: second HUD sprite block (sprite reused lower down)
+SPRITE5B_DATA       	equ	MAP_LOW+SFX_AREA+$0F108	; $30F84
+SPRITE6B_DATA       	equ	MAP_LOW+SFX_AREA+$0F1D4	; $31050
+SPRITE7B_DATA       	equ	MAP_LOW+SFX_AREA+$0F2A0	; $3111C
+MASK_LINE_BUF       	equ	MAP_LOW+SFX_AREA+$0F36C	; DrawBob: the mask built for one BOB (640 bytes; only for an image with
                     			; no mask, which the runs never found)
 SCREEN_0            	equ	MASK_LINE_BUF+$280	; (the original: $37468) also load address of the big graphics file
                     			; (tracks 38-56) before unpacking. Before it the original had the small BOBs'
@@ -355,7 +357,11 @@ FID_LEVEL0          	equ	12	; 12-18: the levels' tile files
 FID_SFX             	equ	19
 FID_RELOCS          	equ	20
 FID_TABLES0         	equ	21	; 21-27: the levels' map tables
-FID_COUNT           	equ	28
+FID_MUSIC512        	equ	28	; the music for 512K (sound/gng_music_512k.s)
+	ifnd	MUSIC512_LEN		; (its length: build_game.py)
+MUSIC512_LEN        	equ	0
+	endc
+FID_COUNT           	equ	29
 SMALLBOB_LOAD       	equ	SCREEN_0+$1D478	; the small BOBs' file (track 37): in the screens, after the enemy sets'
                     			; file; both stay there until LoadLevel has built the level's
                     			; sets from them (BuildFrameTable, BuildLevelMasks), the screens drawn after

@@ -5,9 +5,10 @@
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
 ; (MACHINE_INFO). With 1MB or more of chip RAM (any chip RAM above $80000: Kickstart 1.3 keeps the
 ; top of a 1MB machine's chip RAM for itself and lists it as ending at $FE800): PF_CACHE, PF_MUSIC - the 1MB program's
-; features (PF_EVERY, drawing every frame, is set for every machine). With less chip RAM but the
-; program moved to an expansion (EnhRelocate): PF_MUSIC as well. Otherwise (or without a
-; description: the original bootblock) none, the 512K program. Also the two texts the 1MB program has its own way: the credit line
+; features (PF_EVERY, drawing every frame, is set for every machine). With less chip RAM:
+; PF_MUSIC as well (the 1MB package where the program was, if it moved to an expansion; else
+; the 512K music package, LoadSound). Without a description (the original bootblock): the
+; 512K program, effects only. Also the two texts the 1MB program has its own way: the credit line
 ; ('MUSIC' for 'SOUND') and the initials stored for a blank name ('501' for '504').
 ;---------------------------------------------------------------------------
 ReadProfile:
@@ -28,9 +29,7 @@ rp_text:
 rp_done:
         rts
 rp_small:
-        tst.b   (RelocDone).l                   ; moved out of chip RAM (EnhRelocate): the music,
-        beq.b   rp_done                         ; in the chip RAM the program left
-        move.b  #(1<<PF_MUSIC)|(1<<PF_EVERY),(Profile).l
+        move.b  #(1<<PF_MUSIC)|(1<<PF_EVERY),(Profile).l   ; music on every machine
         bra.b   rp_texts
 TxtMusic:
         dc.b    'MUSIC'
@@ -46,13 +45,20 @@ EShotGfxPtr:
         dc.l    ESHOT_GFX_BUF                   ; enemy shot graphics
 
 ;---------------------------------------------------------------------------
-; LoadSound - the sound package: with PF_MUSIC the 1MB one (music and effects, assembled
-; for MUSIC1M_FILE in upper chip RAM), otherwise the 512K effects package.
+; LoadSound - the sound package: with 1MB of chip RAM (PF_CACHE) the 1MB one (music and
+; effects, for MUSIC1M_FILE in upper chip RAM); with the program moved to an expansion the 1MB
+; one where the program was (MUSICB_FILE); otherwise, with PF_MUSIC, the 512K music package
+; (the 512K effects and the tunes) and without it the 512K effects package, at MUSIC_FILE.
 ;---------------------------------------------------------------------------
 LoadSound:
-        btst    #PF_MUSIC,(Profile).l
-        bne.b   ls_music
         lea.l   (FileMusic).l,a1
+        btst    #PF_MUSIC,(Profile).l
+        beq.w   LoadFile
+        btst    #PF_CACHE,(Profile).l
+        bne.b   ls_music
+        tst.b   (RelocDone).l
+        bne.b   ls_music
+        lea.l   (FileMusic512).l,a1             ; 512K: the music package at MUSIC_FILE
         bra.w   LoadFile
 ls_music:
         lea.l   (FileMusic1M).l,a1
@@ -86,6 +92,8 @@ LoadLevelTables:
         jsr     (LoadFile).l
         movem.l (a7)+,d0-d7/a0-a6
         rts
+FileMusic512:
+	FENTRY	MUSIC_FILE,MUSIC512_LEN,FID_MUSIC512    ; the music for 512K (sound/gng_music_512k.s)
 MfmBuf:
         dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
 

@@ -18,7 +18,10 @@ import compare_runs, test_bootinfo
 from game import GameRun, game
 
 M = {m[0]: m for m in test_bootinfo.MACHINES}
-MACHINES = {'512k': (M['A500 512K chip'], '512k'), '1mb': (M['A500+ 1MB chip'], '1mb'),
+MACHINES = {# 512K chip: the music too (the 512K music package), so the 1MB program's sound and
+            # profile logic: compared with that, as the expanded 512K machines (the pictures are the
+            # 512K program's either way)
+            '512k': (M['A500 512K chip'], '1mb'), '1mb': (M['A500+ 1MB chip'], '1mb'),
             # Kickstart 1.3 lists a 1MB machine's chip RAM as ending at $FE800
             'ks13': (M['A500 1MB chip, Kickstart 1.3'], '1mb'),
             # 512K chip + 512K slow: the program moves to slow RAM and loads the music where it was
