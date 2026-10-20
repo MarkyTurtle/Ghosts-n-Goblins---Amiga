@@ -68,15 +68,19 @@ decided against, kept for the record with the reason.
       progress map loads); a trace of every `LoadFile`. The screens come 24 KB lower
 - [x] Remove the original routines the scroller replaced and the debug routines (`drop_dead_code`,
       make_game.py): 3 KB
-- [ ] Per-level `TileAttr` banks (8 KB resident; a level uses 1-3 of the 4 banks): a few KB (5)
+- [ ] Per-level `TileAttr` banks (8 KB resident; a level uses 1-3 of the 4 banks): a few KB (5).
+      No extra work in play: the level's banks would load with its map tables, and the bank
+      numbers (`MapBlockIndex`) would be renumbered at build time or once at level load; the
+      collision lookup stays the same
 - [ ] The rest of the per-level data (4). Already per level: the tiles (`FID_LEVEL0`+n) and
       the map tables (`FID_TABLES0`+n). Still not: the enemy graphics (the whole 118 KB file,
       every set, loads into the screens at each level start and the level's sets are copied
       out: a per-level file would read less from disk) and the zone, spawn and placement
       tables (a few KB resident in the program)
 - [ ] File cache in expansion memory on 1MB machines: the disk is read once (4)
-- [ ] Drop mirrored enemy frames (39% of the enemy graphics) and flip them when the frame cache
-      builds them: about 24 KB less on level 5 (5)
+- [x] **Closed:** drop mirrored enemy frames (39% of the enemy graphics) and flip them when the
+      frame cache builds them: about 24 KB less on level 5 (5). Flipping at run time would cost
+      too much frame time
 - [x] **Closed:** mirror Arthur's current frame on demand instead of keeping 40 mirrored frames:
       about 20 KB (5); not needed
 - [ ] (Not worth it, measured: metatile recoding of the map tables, flip flags for level tiles,
@@ -92,13 +96,15 @@ decided against, kept for the record with the reason.
 - [ ] Music quality tiers chosen by the machine's memory (4)
 - [ ] Resample the music samples (2/3 saves about 11 KB) by scaling the instruments' period
       multipliers; also fixes periods below Paula's minimum of 124 (5)
-- [ ] Effects: at most a modest cut (they already play at their recorded 8-10 kHz) (5)
+- [x] **Closed:** effects: at most a modest cut (they already play at their recorded 8-10 kHz) (5)
 
 **Controls and extras**
 - [ ] Two-button joysticks: one button fires, the other jumps; up-to-jump kept as an option (8)
 - [ ] An options menu (controls and the other settings) (8)
 - [ ] A sound test: play each tune and effect (8)
 - [ ] A sprite test: show the BOB and sprite frames (8), if there is room
+- [ ] An input test, as on an arcade machine: the joystick directions and both buttons shown on
+      screen as they are pressed (8), if there is room
 
 **Testing**
 - [x] Boot and timing tests of the disk image and the enhanced builds in a full emulator (6):
@@ -633,3 +639,8 @@ the 1MB package's extra effects too.
 **Sprite test.** Show Arthur's frames and the BOB sets one by one. The enemy sets are only
 in memory for the current level (512K), so it would load the enemy graphics file into a screen
 buffer as a level start does; only if the room allows.
+
+**Input test.** As an arcade machine's switch test: the four joystick directions and both
+buttons (fire on the CIA, the second button on `POTINP`) for each port, shown on screen and
+lit while held, with the keyboard keys the game uses. Small (text drawn with the existing
+font), so it should fit with the options menu.
