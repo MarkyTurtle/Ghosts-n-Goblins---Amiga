@@ -407,6 +407,22 @@ def title_menu(S):
           "        addq.b  #GS_TITLE,g_GameState(a6)       ; 05F24/05F7A\n")
 
 
+def enemy_sets(S):
+    """LoadLevel reads only the level's BOB sets from the enemy graphics file (LoadEnemySets,
+    make_game_support.s); BobSetFileOrder lists the sets by their offset in the file"""
+    S.sub("""        lea.l   FileEnemyBobs(pc),a1            ; 0683A/     
+        bsr.w   LoadFile                        ; 0683E/     
+""", I('jsr     LoadEnemySets', 'only the level\'s sets of the enemy graphics file (0683A: all of it)') + '\n')
+    def table(label, n, size):
+        m = re.search(label + r':\n((?:\tdc\.b\t[^\n]*\n)+)', S.s)
+        b = bytes(int(x, 16) for x in re.findall(r'\$([0-9A-F]{2})', m.group(1)))
+        return [int.from_bytes(b[size*i:size*i+size], 'big') for i in range(n)]
+    offs, sizes = table('BobSetOffsets', 21, 4), table('BobSetSizes', 21, 2)
+    order = sorted((i for i in range(21) if sizes[i]), key=lambda i: offs[i])
+    for a, b in zip(order, order[1:]): assert offs[a] + sizes[a] <= offs[b], (a, b)    # no overlaps
+    S.sub(";<<BOBSET_ORDER>>\n", '\tdc.b\t' + ','.join(f'{i}' for i in order) + ',$FF\t; the sets by their offset in the file\n')
+
+
 def two_buttons(S):
     """two-button joysticks: the second button (port 2's pin 9, read on POTINP) is bit 14 of
     g_Joy. With JumpButton set (the title's J key) it jumps and up only climbs ladders, as on
@@ -533,6 +549,10 @@ def main():
           "        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4\n        addq.l  #$2,a3")
     byteloader(S)
     two_buttons(S)
+    enemy_sets(S)
+    S.sub("        bsr.w   ReadProfile                     ; what machine this is (Profile)\n",
+          "        bsr.w   ReadProfile                     ; what machine this is (Profile)\n"
+          + I('jsr     CacheInit', "the file cache's memory, if any (make_game_support.s)") + '\n')
     dead = drop_dead_code(S)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)

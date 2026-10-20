@@ -68,16 +68,22 @@ decided against, kept for the record with the reason.
       progress map loads); a trace of every `LoadFile`. The screens come 24 KB lower
 - [x] Remove the original routines the scroller replaced and the debug routines (`drop_dead_code`,
       make_game.py): 3 KB
-- [ ] Per-level `TileAttr` banks (8 KB resident; a level uses 1-3 of the 4 banks): a few KB (5).
-      No extra work in play: the level's banks would load with its map tables, and the bank
-      numbers (`MapBlockIndex`) would be renumbered at build time or once at level load; the
-      collision lookup stays the same
-- [ ] The rest of the per-level data (4). Already per level: the tiles (`FID_LEVEL0`+n) and
-      the map tables (`FID_TABLES0`+n). Still not: the enemy graphics (the whole 118 KB file,
-      every set, loads into the screens at each level start and the level's sets are copied
-      out: a per-level file would read less from disk) and the zone, spawn and placement
-      tables (a few KB resident in the program)
-- [ ] File cache in expansion memory on 1MB machines: the disk is read once (4)
+- [x] **Closed:** per-level `TileAttr` banks (5). Measured with the cells round each level's
+      edges (what `MapTileAt` can read): levels 0, 1, 3 and 4 use all four banks, and level 1
+      (stage 2, the fullest) 680 different records, too many for a byte index, so the stages
+      that need memory would gain nothing
+- [x] **Closed:** the zone, spawn and placement tables per level (4): 3,170 bytes for all
+      levels, so stage 2 would gain at most about 2 KB, for moving tables full of pointers
+- [x] The level's enemy graphics only (4): `LoadEnemySets` reads just the level's BOB sets
+      from the enemy graphics file (22-65 KB of its 118 KB), each to its place, sets less than a
+      track apart as one piece; per-level files would not fit on the disk (about 330 KB). A
+      level start reads 8-16 fewer tracks (25-59%). See `enhanced/docs/SCROLLER.md`, *Loading
+      less, and the file cache*
+- [x] File cache in spare memory (4): with the program moved to slow / fast RAM, the enemy
+      graphics, small BOBs, progress map and the levels' tile and table files are kept after
+      their first load (a level loaded again reads no track); with 1MB of chip RAM or more, the
+      levels' tile and table files, in the chip RAM above the graphics caches or in slow / fast
+      RAM (`CacheInit`, `LoadFile`)
 - [x] **Closed:** drop mirrored enemy frames (39% of the enemy graphics) and flip them when the
       frame cache builds them: about 24 KB less on level 5 (5). Flipping at run time would cost
       too much frame time
