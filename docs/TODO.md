@@ -97,7 +97,7 @@ decided against, kept for the record with the reason.
       A500) has the tunes' samples at 3/4 of their rate, chosen from listening to 3/4, 2/3
       and 1/2; machines with 1MB of chip RAM or an expansion keep full quality. A menu choice
       cannot free memory (the layout is fixed at build time). The 8.2 KB saved goes to
-      pre-masking (made on branch `enhanced/musicquality`)
+      pre-masking (made on branch `enhanced/musicquality`, merged; tried in WinUAE)
 - [x] Resample the music samples by scaling the instruments' period multipliers (5): done at
       3/4 for 512K (`make_music_512k.py --rate`). The resampled samples' lowest periods rise from
       114 to about 152, within Paula's minimum of 124; the waveform samples 0-1 (not resampled)

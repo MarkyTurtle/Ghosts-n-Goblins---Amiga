@@ -601,7 +601,7 @@ samples (1MB samples 5-9 in the opening tune) alongside the effects' samples.
 A1200): it works on all of them. On the plain A500 the slow-down is small and brief, mostly at
 the end of a level with the dragon and on the dragon's level itself, and hardly noticeable.
 
-**Music quality on 512K** (made on branch `enhanced/musicquality`). The tunes' sampled
+**Music quality on 512K** (made on branch `enhanced/musicquality`, merged; tried in WinUAE). The tunes' sampled
 instruments (samples 5-9: 32,726 of the package's bytes) are now at **3/4 of their rate** in the
 512K package: `make_music_512k.py` resamples them (scipy's polyphase filter; the loop samples 7-9
 as loops) and divides their instruments' period multipliers by 3/4, so every note keeps its
