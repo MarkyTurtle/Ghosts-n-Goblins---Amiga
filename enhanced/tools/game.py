@@ -55,7 +55,7 @@ OVERRUN = os.environ.get('GNG_OVERRUN') == '1'
 class GameRun(Amiga):
     """build: '512k' or '1mb'; binfile: the main program (default: the original); extra_files:
     {track: path} for files LoadFile reads that are not in disk/files (the modules)"""
-    def __init__(self, binfile=None, extra_files=None, build='512k', machine=None, listing=None):
+    def __init__(self, binfile=None, extra_files=None, build='512k', machine=None, listing=None, by_id=False, disk=None):
         cfg = self.cfg = BUILDS[build]
         super().__init__(os.path.join(ROOT, BUILDS['512k']['orig']))
         big = machine and any(end > 0x80000 and attr & 2 for attr, start, end in machine[0])
@@ -92,7 +92,9 @@ class GameRun(Amiga):
         self.redraw_entry = L['RedrawEntry']           # ... and its idle loop (bra.b *): the first $60FE
         o = self.redraw_entry - self.reloc - cfg['load']
         self.redraw_idle = self.redraw_entry + next(i for i in range(0, 32, 2) if prog[o+i:o+i+2] == b'\x60\xfe')
-        self.vbl, self.level1 = L['VblIRQ'], L['Level1Logic']
+        self.vbl, self.level1 = L.get('IrqLevel3', L['VblIRQ']), L.get('IrqLevel1', L['Level1Logic'])
+        self.by_id = by_id                     # file records name a file (the one program's disk) and
+                                               # load exactly its bytes; else a track (whole tracks)
         self.palette_addr = L['GamePalette']
         eq = equates(os.path.join(ROOT, cfg['equates']), build != '512k')
         # the globals: where the listing puts them (a program that has moved), else the build's
@@ -108,8 +110,14 @@ class GameRun(Amiga):
                                                # is ROM. Here it reads zeros.
         self.w16(CUSTOM+0x1E, 0x0790)          # INTREQR: copper and audio interrupts always pending
                                                # (ShowBackBuffer and the sound driver wait for them)
-        self._stub_loadfile(L['LoadFile'])
-        if self.reloc:                         # EnhRelocate loads from the first copy, which the music
+        if disk:                               # disk: an ADF the program's own LoadFile reads (the
+            import floppy                       # byteloader, through tools/floppy.py)
+            span = lambda Ls: (Ls['ByteLoader'], Ls['ByteLoader'] + 0x186)
+            self.floppy = floppy.Floppy(self, open(disk, 'rb').read(),
+                                        timing_ranges=[span(L)] + ([span(self.L0)] if self.reloc else []))
+        else:
+            self._stub_loadfile(L['LoadFile'])
+        if self.reloc and not disk:            # EnhRelocate loads from the first copy, which the music
             first = self._stub_loadfile(self.L0['LoadFile'])    # package then overwrites
             def moved(uc, a, sz, ud):
                 uc.hook_del(first); uc.hook_del(self._moved)
@@ -131,9 +139,9 @@ class GameRun(Amiga):
             dest, length, track = self.r32(a1), self.r32(a1+4), self.r16(a1+8)
             data = open(names[track], 'rb').read()[:length]
             if OVERRUN and 'MfmBuf' in self.L:          # the MFM buffer the disk DMA fills ($1900 words)
-                self.u.mem_write(self.r32(self.L['MfmBuf']), b'\xEE' * 0x3200)
+                self.u.mem_write(self.r32(self.L['MfmBuf']), b'\xEE' * (0x2EC0 if self.by_id else 0x3200))
             self.u.mem_write(dest, data)
-            pad = (-len(data)) % 0x18A8 if OVERRUN else 0   # LoadFile writes whole tracks: what follows
+            pad = (-len(data)) % 0x18A8 if OVERRUN and not self.by_id else 0   # LoadFile writes whole tracks: what follows
             if pad:                                  # a file on its last track lands after it (GNG_OVERRUN=1
                                                      # fills that with $EE bytes, to check nothing needed
                                                      # is in the way; off by default, because the originals
@@ -222,19 +230,17 @@ def relocation(machine, listing):
     return 0
 
 
-def game(machine=None):
+def game(machine=None, disk=False):
     """the one program for every machine (build_game.py), on a machine as in
-    test_bootinfo.MACHINES (regions, vblank, attnflags); None: no machine description"""
+    test_bootinfo.MACHINES (regions, vblank, attnflags); None: no machine description.
+    disk: its loads read the disk image through the byteloader (tools/floppy.py), not stubbed"""
     import build_game
     d = build_game.OUT
-    files = {build_game.TRACK_SFX: os.path.join(d, 'sfx.bin'), build_game.TRACK_MUSIC: os.path.join(d, 'music.bin'),
-             build_game.TRACK_RELOC: os.path.join(d, 'relocs.bin')}
-    track = build_game.TRACK_TABLES                  # the per-level map tables
-    for l in range(7):
-        path = os.path.join(d, f'tables{l}.bin')
-        files[track] = path
-        track += -(-os.path.getsize(path) // 0x18A8)
-    return GameRun(os.path.join(d, 'game.bin'), files, '512k', machine, listing=os.path.join(d, 'game.lst'))
+    files = build_game.disk_files(os.path.join(d, 'game.bin'), os.path.join(d, 'sfx.bin'),
+                                  os.path.join(d, 'music.bin'), os.path.join(d, 'relocs.bin'), d)
+    return GameRun(os.path.join(d, 'game.bin'), {fid: path for fid, (name, path) in enumerate(files)}, '512k',
+                   machine, listing=os.path.join(d, 'game.lst'), by_id=True,
+                   disk=os.path.join(d, '..', 'gng_game.adf') if disk else None)
 
 
 def enhanced(build='512k', machine=None):

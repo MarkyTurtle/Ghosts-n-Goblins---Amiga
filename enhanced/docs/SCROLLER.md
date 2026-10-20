@@ -490,6 +490,59 @@ the original drawing the scroller replaced (`DrawBob`, `DrawBobMasked`, `DrawSce
 50,828 bytes free. About 300 bytes of small unreachable pieces of the original are left as they
 are (an unused path routine of the Petite Devil, a few instructions after jumps).
 
+**The disk: an AmigaDOS-format disk and the 4489_byteloader** (branch `enhanced/byteloader`).
+The one program's disk (`build_game.py`: `gng_game.adf`, 901,120 bytes) is now an ordinary
+880K disk, 11 sectors of 512 bytes a track with the `$4489` sync, with no filesystem (Workbench
+shows it as NDOS). Every file is read with the [4489_byteloader](https://github.com/MarkyTurtle/4489_byteloader)
+(`src/byteloader.i`, included as published: 390 bytes, any number of bytes from any offset; it
+reads a whole track by DMA into an MFM buffer of `$1760` words, decodes it there, checks the
+sectors and copies out the bytes asked for; it times itself on VHPOSR and leaves the
+interrupts, CIA timers, blitter and copper alone).
+
+| Disk offset | |
+|---|---|
+| `$000` | the bootblock (`src/boot_4489.s`) |
+| `$400` | the file table (`FT_OFFSET`): `'GNGF'`, version, count, 8 bytes, then the offset and length (longs) of each file, by file id |
+| `$600` | the files, one after another (720 KB; 175 KB free) |
+
+The file ids are the `FID_` equates of `gng_game.i`, in the order of `disk_files()` in
+`build_game.py` (the program 0, the loading picture 1, then the graphics, levels, sound and
+table files). A file record (`FENTRY`) is now load address, length, file id; `build_game.py`
+checks each record's length against its file.
+
+*Bootblock* (`boot_4489.s`): the memory survey as before (`MemDetect`), the take-over, the
+fade and the loading picture of the original bootblock; its loader runs at `$7FB20` (after the
+machine description), with the MFM buffer at `$7C000` and the file table at `$7F000`. It reads
+the file table, the picture (file 1, to `$60000`) and the program (file 0, to `$80`), sets
+`$4.w` to `$80` and enters the program at `$A0`, as the original did on 512K. A failed load is
+read again; after 8 failures COLOR00 turns red while it keeps trying.
+
+*The game's loader*: the original's track loader (`LoadFile` to `SeekTrack0`) is gone; the
+new `LoadFile` (`make_game_support.s`) keeps its interface (a1 = file record; out a5 = end of
+the data, a0 = `CUSTOM`; the other registers are kept), reads the file table once into
+`FileDir` and loads each file from its offset into its MFM buffer (`MfmBuf`: `MFM_BUFFER` at
+the top of the level area, `PM_MFM` while the progress map loads). Two things follow from the
+byteloader:
+* it loads exactly the file's bytes: nothing is written past a file any more (the whole-track
+  rounding of the relocation room and the progress map's buffer are gone);
+* it uses a6, and files load with the interrupts running. The level 1 and level 3 handlers
+  assume a6 = `GLOBALS`, so their vectors now point at `IrqLevel1` / `IrqLevel3`, which save
+  the interrupted a6, set `GLOBALS` and enter `Level1Logic` / `VblIRQ`; their `rte`s became
+  jumps to `IrqExit1` / `IrqExit3`, which put the interrupted a6 back.
+
+*Testing*: `tools/floppy.py` emulates DF0 with the disk image in the harness (the drive lines
+on the CIAs, disk DMA writing the track's MFM words from a sync, DSKBLK, and VHPOSR moving
+while the byteloader waits). `test_boot4489.py` boots the disk from Kickstart's call to the
+program's entry and checks the program, the picture, `$4.w`, the machine description and the
+display (also with `--random-start`: the DMA starting at any sector, which the byteloader
+handles by reading the track again). `compare_game.py --disk` runs the one program with its
+own loader reading the disk image, against the original. With it the games stay in step on 512K (levels 1, 2
+and 7, with teleporting), on a 1MB A500+, with Kickstart 1.3 on 1MB, and with 512K slow RAM
+(where `EnhRelocate` loads the relocation file with the first copy's loader); the pictures as
+with the loads stubbed. The bootblock test passes with the DMA starting at sector 0 and at any
+sector (347 track reads instead of 34: the byteloader reads a track again until it starts at
+sector 0).
+
 With the smaller program the memory map moved down, and the slow / fast RAM music needed a new
 order: the effects package's area now comes first after the program (`SFX_AREA`), and
 `LoadSound` runs right after `ReadProfile`, so that the 1MB music package, loaded over the

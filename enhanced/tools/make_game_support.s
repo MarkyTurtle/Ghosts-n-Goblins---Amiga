@@ -88,14 +88,101 @@ LoadLevelTables:
         rts
 MfmBuf:
         dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
+
+;---------------------------------------------------------------------------
+; LoadFile - a1 -> file record (FENTRY: dest.l, length.l, file id.w) -> a5 = the end of the
+; loaded data, a0 = CUSTOM (as the original's track loader left them); other registers kept.
+; The disk is an ordinary AmigaDOS-format disk (11 sectors a track) with a file table at
+; FT_OFFSET (boot_4489.s; build_game.py writes it): read once into FileDir, then each file is
+; loaded from its offset by the 4489_byteloader (ByteLoader), the exact number of bytes. A
+; failed load is tried again until it works (after 8 failures COLOR00 shows red).
+; The byteloader uses a6, so the interrupt handlers load a6 themselves (IrqLevel1/3).
+;---------------------------------------------------------------------------
+LoadFile:
+        movem.l d0-d7/a1-a4/a6,-(a7)
+        movea.l (a1),a5                         ; destination
+        move.l  4(a1),d5                        ; length
+        moveq   #0,d4
+        move.w  8(a1),d4                        ; file id
+        lea.l   (FileDir).l,a2
+        cmpi.l  #'GNGF',(a2)                    ; the file table, the first time
+        beq.b   lf_dir
+        movem.l d4-d5/a5,-(a7)
+        moveq   #0,d0
+        move.w  #FT_OFFSET,d0
+        move.l  #FT_SIZE,d1
+        movea.l a2,a0
+        bsr.b   lf_load
+        movem.l (a7)+,d4-d5/a5
+lf_dir:
+        lea.l   (FileDir).l,a2                  ; (the byteloader keeps no registers)
+        lsl.w   #$3,d4
+        move.l  FT_ENTRY(a2,d4.w),d0            ; the file's offset on the disk
+        move.l  d5,d1
+        movea.l a5,a0
+        movem.l d5/a5,-(a7)
+        bsr.b   lf_load
+        movem.l (a7)+,d5/a5
+        adda.l  d5,a5
+        lea.l   CUSTOM,a0
+        movem.l (a7)+,d0-d7/a1-a4/a6
+        rts
+lf_load:                                        ; d0 = offset, d1 = length, a0 = destination
+        moveq   #0,d6
+lf_try:
+        movem.l d0-d1/d6/a0/a5,-(a7)
+        moveq   #0,d2                           ; DF0
+        movea.l (MfmBuf).l,a1
+        bsr.w   ByteLoader
+        move.l  d0,d7
+        movem.l (a7)+,d0-d1/d6/a0/a5
+        tst.l   d7
+        beq.b   lf_ok
+        addq.w  #$1,d6
+        cmp.w   #$8,d6
+        bcs.b   lf_try
+        move.w  #$f00,CUSTOM+COLOR00            ; a disk error: red, and on trying
+        bra.b   lf_try
+lf_ok:
+        rts
+FileDir:
+        dcb.b   FT_SIZE,0                       ; the disk's file table (LoadFile)
+ByteLoader:
+	include	"byteloader.i"
+        even
+
+;---------------------------------------------------------------------------
+; IrqLevel1 / IrqLevel3 - the level 1 and level 3 autovectors: a6 = GLOBALS for the handlers
+; (Level1Logic, VblIRQ), which take it as given; the interrupted a6 back on the way out
+; (IrqExit1 / IrqExit3, where the handlers return). The byteloader uses a6 while a file
+; loads with the interrupts running.
+;---------------------------------------------------------------------------
+IrqLevel1:
+        move.l  a6,(IrqA6L1).l
+        lea.l   (GLOBALS).l,a6
+        jmp     Level1Logic
+IrqExit1:
+        movea.l (IrqA6L1).l,a6
+        rte
+IrqLevel3:
+        move.l  a6,(IrqA6L3).l
+        lea.l   (GLOBALS).l,a6
+        jmp     VblIRQ
+IrqExit3:
+        movea.l (IrqA6L3).l,a6
+        rte
+IrqA6L1:
+        dc.l    0
+IrqA6L3:
+        dc.l    0
 FileTables:
-	FENTRY	LEVEL_TABLES,TBLLEN0,TBLTRK0
-	FENTRY	LEVEL_TABLES,TBLLEN1,TBLTRK1
-	FENTRY	LEVEL_TABLES,TBLLEN2,TBLTRK2
-	FENTRY	LEVEL_TABLES,TBLLEN3,TBLTRK3
-	FENTRY	LEVEL_TABLES,TBLLEN4,TBLTRK4
-	FENTRY	LEVEL_TABLES,TBLLEN5,TBLTRK5
-	FENTRY	LEVEL_TABLES,TBLLEN6,TBLTRK6
+	FENTRY	LEVEL_TABLES,TBLLEN0,FID_TABLES0+0
+	FENTRY	LEVEL_TABLES,TBLLEN1,FID_TABLES0+1
+	FENTRY	LEVEL_TABLES,TBLLEN2,FID_TABLES0+2
+	FENTRY	LEVEL_TABLES,TBLLEN3,FID_TABLES0+3
+	FENTRY	LEVEL_TABLES,TBLLEN4,FID_TABLES0+4
+	FENTRY	LEVEL_TABLES,TBLLEN5,FID_TABLES0+5
+	FENTRY	LEVEL_TABLES,TBLLEN6,FID_TABLES0+6
 
 ;---------------------------------------------------------------------------
 ; EnhRelocate - Start, first thing, still at $80: with less than 1MB of chip RAM and an
@@ -110,7 +197,7 @@ FileTables:
 ;---------------------------------------------------------------------------
 IMAGE_BASE      equ     $80                     ; where the bootblock loads the program
 IMAGE_SIZE      equ     (MAP_LOW-IMAGE_BASE+3)&-4
-RELOC_ROOM      equ     IMAGE_SIZE+((RELOC_LEN+$18A7)/$18A8)*$18A8      ; LoadFile writes whole tracks
+RELOC_ROOM      equ     IMAGE_SIZE+RELOC_LEN    ; (LoadFile loads exactly the file's bytes)
 EnhRelocate:
         tst.b   (RelocDone).l
         bne.w   er_out

@@ -151,15 +151,15 @@ def hand_edits(S, V1):
     level_tables(S)
     S.sub("\torg\t$80\n", "\tifd\tRELOC_ORG\t\t; build_game.py's relocation pass\n\torg\tRELOC_ORG\n\telse\n\torg\t$80\n\tendc\n"
           "\tifnd\tRELOC_LEN\nRELOC_LEN\tequ\t0\t\t; the relocation file (EnhRelocate), from build_game.py\n\tendc\n"
-          "RELOC_TRACK\tequ\t17\t\t; (the original 1MB program's tracks, free on this disk)\n")
+          "")
     hdr = lambda t: ';---------------------------------------------------------------------------\n' + t + \
         '\n;---------------------------------------------------------------------------\n'
     # --- Start: profile, caches, sound, level 0 --------------------------------------
     S.sub("        move    a6,usp                          ; 05B2A/       USP = globals block (user-mode stack grows down from here)\n",
           "        move    a6,usp                          ; 05B2A/       USP = globals block (user-mode stack grows down from here)\n"
           + I('bsr.w   ReadProfile', 'what machine this is (Profile)') + '\n'
-          + I('bsr.w   LoadSound', 'the sound package first: whole tracks run past its end, into') + '\n'
-          + I('', 'buffers loaded after it (the 512K effects at MAP_LOW, the music where the program was)') + '\n')
+          + I('bsr.w   LoadSound', 'the sound package first (the 512K effects at MAP_LOW, the music') + '\n'
+          + I('', 'where the program was)') + '\n')
     S.sub("\nStart:\n", "\nStart:\n" + I('jsr     EnhRelocate', 'with an expansion and under 1MB of chip RAM: the program moves there') + '\n')
     for n in (58, 59, 60, 62, 63, 64, 65): S.rep(n, '')
     S.rep(61, I('bsr.w   CacheGraphics', '1MB+ chip: cache the graphics with masks, the progress map') + '\n')
@@ -226,9 +226,9 @@ l_06E80:
 """, """FileLevel6:
 	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
 FileMusic1M:
-	FENTRY	MUSIC1M_FILE,$1B394,64                 ; tracks 64-81: the 1MB music package (PF_MUSIC), for upper chip RAM
+	FENTRY	MUSIC1M_FILE,$1B394,FID_MUSIC1M        ; the 1MB music package (PF_MUSIC), for upper chip RAM
 FileRelocs:
-	FENTRY	0,RELOC_LEN,RELOC_TRACK                ; the relocation tables (EnhRelocate; build_game.py)
+	FENTRY	0,RELOC_LEN,FID_RELOCS                 ; the relocation tables (EnhRelocate; build_game.py)
 
 """ + open(os.path.join(HERE, 'make_game_support.s')).read())
     # --- FRAME runs, for CacheGraphics ---------------------------------------------------------
@@ -351,6 +351,40 @@ def widen_branches(path):
         open(path, 'w').write('\n'.join(L))
 
 
+TRACK_FID = {33: 'FID_ARTHUR', 37: 'FID_SMALLBOBS', 38: 'FID_ENEMYBOBS', 57: 'FID_ITEMS2', 58: 'FID_ESHOTS',
+             59: 'FID_ITEMS', 61: 'FID_FONT', 62: 'FID_PROGMAP', 126: 'FID_SFX', 82: 'FID_COPYRIGHT',
+             84: 'FID_LEVEL0', 89: 'FID_LEVEL0+1', 97: 'FID_LEVEL0+2', 101: 'FID_LEVEL0+3', 104: 'FID_LEVEL0+4',
+             106: 'FID_LEVEL0+5', 108: 'FID_LEVEL0+6', 64: 'FID_MUSIC1M'}
+
+
+def byteloader(S):
+    """the disk is an AmigaDOS-format disk with a file table (boot_4489.s): the file records
+    name a file (FID_...) instead of the first track, the original's track loader (LoadFile to
+    SeekTrack0) goes (the new LoadFile, with the 4489_byteloader, is in make_game_support.s),
+    and the level 1 / 3 handlers are entered through IrqLevel1 / IrqLevel3, which give them a6
+    (the byteloader uses a6 while a file loads with the interrupts running)"""
+    def fentry(m):
+        t = int(m.group(3))
+        head = f'{m.group(1)}{m.group(2)},{TRACK_FID[t]}'
+        return head.ljust(max(len(head) + 1, len(m.group(0)) - 1)) + ';'
+    S.s, n = re.subn(r'(\tFENTRY\t)([^,\n]+,[^,\n]+),(\d+)( +;)', fentry, S.s)
+    assert n == 17, n
+    S.s = re.sub(r'(\tFENTRY\t[^;\n]*FID_\w+(?:\+\d)? +; )tracks? \d+(?:-\d+)?: ', r'\1', S.s)
+    i = S.s.index('; LoadFile - the game\'s copy of the bootblock trackloader')
+    while not S.s[:i].endswith(';---------------------------------------------------------------------------\n'): i -= 1
+    i = S.s.rindex(';---------------------------------------------------------------------------\n', 0, i)
+    j = S.s.index('\nSeekTrack0:'); j = S.s.index('        rts', j); j = S.s.index('\n', j) + 1
+    S.s = S.s[:i] + '; (LoadFile: the original\'s track loader - replaced by the byteloader, make_game_support.s)\n' + S.s[j:]
+    S.sub("        lea.l   Level1Logic(pc),a1              ; 07DCA/07E20  level 1 autovector",
+          "        lea.l   (IrqLevel1).l,a1                ; 07DCA/07E20  level 1 autovector (a6 for the handler)")
+    S.sub("        lea.l   VblIRQ(pc),a1                   ; 07DDA/07E30  level 3 autovector",
+          "        lea.l   (IrqLevel3).l,a1                ; 07DDA/07E30  level 3 autovector (a6 for the handler)")
+    for addr, to in (('06BF6/06C54', 'IrqExit1'), ('071EA/07252', 'IrqExit1'), ('0BFA6/0BF3A', 'IrqExit3'),
+                     ('0BFDC/0BF70', 'IrqExit3')):
+        S.sub(f"        rte                                     ; {addr}",
+              f"        jmp     {to}                        ; {addr}  (rte, with the interrupted a6)")
+
+
 def drop_dead_code(S):
     """the original's routines the scroller replaced, and debug left-overs nothing calls: their
     bodies are removed (tools: enhanced/docs/SCROLLER.md, Dead code). For the ones the scroller
@@ -433,6 +467,7 @@ def main():
           "        move.l  (MfmBuf).l,$20(a0)              ; 0C54E/0C482  DSKPT = MFM buffer")
     S.sub("        lea.l   (MFM_BUFFER+$2).l,a3            ; 0C580/0C4B4",
           "        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4\n        addq.l  #$2,a3")
+    byteloader(S)
     dead = drop_dead_code(S)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)

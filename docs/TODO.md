@@ -47,6 +47,11 @@ Each line points to the item below with the details and measurements.
 - [ ] `tools/test_scroll.py`: its test build (`scroll_test.s`) no longer assembles since the merge
 - [x] Draw at 50 fps once the redraw cost is gone (3): see above
 
+**Disk**
+- [x] An AmigaDOS-format disk (880K ADF) with a file table, loaded with the 4489_byteloader
+      by the bootblock and the game (branch `enhanced/byteloader`)
+- [ ] Boot from any drive (the boot IORequest's unit) and load from it (5)
+
 **Memory**
 - [x] Per-level map tables: each level's `BlockTiles` / `CellTiles` entries in a file of its
       own (`LoadLevelTables`): 17 KB less resident, the program 77 KB instead of 110 KB

@@ -268,7 +268,7 @@ SPR_GFX_B2          	equ	MAP_LOW+SFX_AREA+$0A41C	; $24534
 SPR_GFX_A3          	equ	MAP_LOW+SFX_AREA+$0B81C	; $25934
 SPR_GFX_B3          	equ	MAP_LOW+SFX_AREA+$0CD1C	; $26E34
 MASK_BUF            	equ	MAP_LOW+SFX_AREA+$0E11C	; $28234: byte-plane extracted from file at tracks 61
-MUSIC_FILE          	equ	MAP_LOW	; first in the map (LoadSound runs first: whole tracks run on into what is loaded after it); sound driver + 30 effects (tracks 126-131) - source: sound/gng_sfx_512k.s
+MUSIC_FILE          	equ	MAP_LOW	; first in the map (LoadSound runs first); sound driver + 30 effects (file FID_SFX) - source: sound/gng_sfx_512k.s
 MUSIC_PLAYER        	equ	MAP_LOW+$00020	; $28E74: driver entry: d0.l = arg<<16 | cmd (0 tick, 1 tune, 2 sfx, 3 user value)
 SPRITE0_DATA        	equ	MAP_LOW+$16AA0	; $30BB8
 SPRITE4_DATA        	equ	MAP_LOW+$16B24	; $30C3C
@@ -306,13 +306,6 @@ TBLLEN3	equ	0
 TBLLEN4	equ	0
 TBLLEN5	equ	0
 TBLLEN6	equ	0
-TBLTRK0	equ	18
-TBLTRK1	equ	20
-TBLTRK2	equ	22
-TBLTRK3	equ	24
-TBLTRK4	equ	26
-TBLTRK5	equ	28
-TBLTRK6	equ	30
 	endc
 LEVEL_TABLES        	equ	CLEAR_AREA+$B40	; the level's map tables (LoadLevelTables): at most TBL_SLOTS cells
                     			; (the HUD is 16 lines of 5 planes, $B40 bytes: ClearHudArea; the
@@ -337,11 +330,34 @@ SAVE_BUF_B          	equ	MASK_LINE_BUF	; through them now (the scroller draws th
 ; sets and images are copied in after the loads) - except for the progress map, which loads after
 ; the level: then the first screen (bitplane DMA off; the map is unpacked into a higher screen)
 LEVEL_TOP           	equ	$7FB00	; the level area's end (LEVEL_GFX_LIMIT): the bootblock's machine description
-MFM_BUFFER          	equ	LEVEL_TOP-$3200	; raw track buffer for LoadFile ($1900 words)
-PM_LOAD             	equ	SCREEN_0	; the packed progress map (tracks 62-63, two whole tracks) ...
-PM_MFM              	equ	SCREEN_0+$3150	; ... and the MFM buffer while it loads
+MFM_BYTES           	equ	$1760*2	; the byteloader's raw track buffer: $1760 words
+MFM_BUFFER          	equ	LEVEL_TOP-MFM_BYTES	; LoadFile's MFM buffer
+PM_LOAD             	equ	SCREEN_0	; the packed progress map ($1D5C bytes) ...
+PM_MFM              	equ	SCREEN_0+$1D5C	; ... and the MFM buffer while it loads
+; ---- the disk (boot_4489.s): an AmigaDOS-format disk with a file table; file ids (build_game.py
+; FILES lists the files in this order)
+FT_OFFSET           	equ	$400	; the file table on the disk: 'GNGF', version.w, count.w, 8 bytes,
+FT_ENTRY            	equ	16	; then offset.l and length.l per file
+FT_SIZE             	equ	FT_ENTRY+FID_COUNT*8
+FID_MAIN            	equ	0	; the program (the bootblock loads it)
+FID_LOADPIC         	equ	1	; the loading picture (the bootblock)
+FID_ARTHUR          	equ	2
+FID_SMALLBOBS       	equ	3
+FID_ENEMYBOBS       	equ	4
+FID_ITEMS2          	equ	5
+FID_ESHOTS          	equ	6
+FID_ITEMS           	equ	7
+FID_FONT            	equ	8
+FID_PROGMAP         	equ	9
+FID_MUSIC1M         	equ	10
+FID_COPYRIGHT       	equ	11
+FID_LEVEL0          	equ	12	; 12-18: the levels' tile files
+FID_SFX             	equ	19
+FID_RELOCS          	equ	20
+FID_TABLES0         	equ	21	; 21-27: the levels' map tables
+FID_COUNT           	equ	28
 SMALLBOB_LOAD       	equ	SCREEN_0+$1D478	; the small BOBs' file (track 37): in the screens, after the enemy sets'
-                    			; file (19 whole tracks); both stay there until LoadLevel has built the level's
+                    			; file; both stay there until LoadLevel has built the level's
                     			; sets from them (BuildFrameTable, BuildLevelMasks), the screens drawn after
 
 ; ---- Global variables: offsets from a6 (GLOBALS = $1898C) ----

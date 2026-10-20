@@ -264,7 +264,6 @@ INTF_TBE	equ	$0001
 	ifnd	RELOC_LEN
 RELOC_LEN	equ	0		; the relocation file (EnhRelocate), from build_game.py
 	endc
-RELOC_TRACK	equ	17		; (the original 1MB program's tracks, free on this disk)
 
 
 ;---------------------------------------------------------------------------
@@ -3314,10 +3313,10 @@ Start:
         lea.l   (GLOBALS).l,a6                  ; 05B24/     
         move    a6,usp                          ; 05B2A/       USP = globals block (user-mode stack grows down from here)
         bsr.w   ReadProfile                     ; what machine this is (Profile)
-        bsr.w   LoadSound                       ; the sound package first: whole tracks run past its end, into
-                                                ; buffers loaded after it (the 512K effects at MAP_LOW, the music where the program was)
+        bsr.w   LoadSound                       ; the sound package first (the 512K effects at MAP_LOW, the music
+                                                ; where the program was)
         lea.l   FileTable(pc),a1                ; 05B2C/05AB6
-        jsr     (LoadFile).l                        ; 05B30/05ABA  load Arthur sprite file (tracks 33-36) to $37468
+        bsr.w   LoadFile                        ; 05B30/05ABA  load Arthur sprite file (tracks 33-36) to $37468
 
 ;---------------------------------------------------------------------------
 ; Arthur's sprite graphics (file tracks 33-36, 42 frames of 32x32, 4 planes).
@@ -4844,7 +4843,7 @@ LogicExit:
         jmp     EnhLogicEnd                     ; timing build: black, then this
 	endc
         movem.l (a7)+,d0-d7/a0-a5               ; 06BF2/06C50
-        rte                                     ; 06BF6/06C54
+        jmp     IrqExit1                        ; 06BF6/06C54  (rte, with the interrupted a6)
 
 ;---------------------------------------------------------------------------
 ; world X of the half-way checkpoint per level
@@ -5562,7 +5561,7 @@ l_071DC:
         jmp     EnhLogicEnd                     
 	endc
         movem.l (a7)+,d0-d7/a0-a5               ; 071E6/0724E
-        rte                                     ; 071EA/07252
+        jmp     IrqExit1                        ; 071EA/07252  (rte, with the interrupted a6)
 
 ;---------------------------------------------------------------------------
 ; ==================================================================
@@ -6541,11 +6540,11 @@ InitHardware:
         move.l  #COPPER_INIT,COP1LCH(a0)        ; 07DB8/07E0E
         move.w  COPJMP1(a0),d0                  ; 07DC0/07E16
         move.w  #INTF_INTEN|INTF_EXTER|INTF_DSKSYNC|INTF_RBF|INTF_AUD3|INTF_AUD2|INTF_AUD1|INTF_AUD0|INTF_BLIT|INTF_VERTB|INTF_COPER|INTF_PORTS|INTF_SOFTINT|INTF_DSKBLK|INTF_TBE,INTENA(a0); 07DC4/07E1A  all interrupts off before installing the vectors
-        lea.l   Level1Logic(pc),a1              ; 07DCA/07E20  level 1 autovector
+        lea.l   (IrqLevel1).l,a1                ; 07DCA/07E20  level 1 autovector (a6 for the handler)
         move.l  a1,(VEC_LEVEL1).w               ; 07DCE/07E24
         lea.l   KeyboardIRQ(pc),a1              ; 07DD2/07E28  level 2 autovector
         move.l  a1,(VEC_LEVEL2).w               ; 07DD6/07E2C
-        lea.l   VblIRQ(pc),a1                   ; 07DDA/07E30  level 3 autovector
+        lea.l   (IrqLevel3).l,a1                ; 07DDA/07E30  level 3 autovector (a6 for the handler)
         move.l  a1,(VEC_LEVEL3).w               ; 07DDE/07E34
         clr.l   (COPPER_INIT-4).l               ; 07DE2/07E38  clear the long before COPPER_INIT
         move.w  #DMAF_SETCLR|DMAF_BLITHOG|DMAF_MASTER|DMAF_RASTER|DMAF_COPPER|DMAF_BLITTER|DMAF_SPRITE|DMAF_DISK,DMACON(a0); 07DE8/07E3E  DMA on: blitter priority, master, bitplanes, copper, blitter, sprites, disk
@@ -6652,43 +6651,43 @@ LevelFileIndex:
 ; reads this table (from the assembled binaries of both builds) to lay out the disk.
 ;---------------------------------------------------------------------------
 FileTable:
-	FENTRY	SCREEN_0,$05400,33                     ; tracks 33-36: Arthur's sprite frames
+	FENTRY	SCREEN_0,$05400,FID_ARTHUR             ; Arthur's sprite frames
 FileSmallBobs:
-	FENTRY	SMALLBOB_LOAD,$00D20,37                ; track 37: small item / scenery BOBs (into the screens, after the enemy sets)
+	FENTRY	SMALLBOB_LOAD,$00D20,FID_SMALLBOBS     ; small item / scenery BOBs (into the screens, after the enemy sets)
 FileEnemyBobs:
-	FENTRY	SCREEN_0,$1D042,38                     ; tracks 38-56: enemy BOB sets
+	FENTRY	SCREEN_0,$1D042,FID_ENEMYBOBS          ; enemy BOB sets
 FileItemGfx2:
-	FENTRY	ITEM_GFX2_BUF,$00EA6,57                ; track 57: weapon / effect BOBs, tail
+	FENTRY	ITEM_GFX2_BUF,$00EA6,FID_ITEMS2        ; weapon / effect BOBs, tail
 FileEnemyShotGfx:
-	FENTRY	ESHOT_GFX_BUF,$01234,58                ; track 58: enemy shot BOBs
+	FENTRY	ESHOT_GFX_BUF,$01234,FID_ESHOTS        ; enemy shot BOBs
 FileItemGfx:
-	FENTRY	ITEM_GFX_BUF,$01AC2,59                 ; tracks 59-60: weapon / pickup / effect BOBs
+	FENTRY	ITEM_GFX_BUF,$01AC2,FID_ITEMS          ; weapon / pickup / effect BOBs
 FileFont:
-	FENTRY	SCREEN_0,$01840,61                     ; track 61: font
+	FENTRY	SCREEN_0,$01840,FID_FONT               ; font
 FileProgressMap:
-	FENTRY	PM_LOAD,$01D5C,62                      ; tracks 62-63: progress map (RLE; into the first screen)
+	FENTRY	PM_LOAD,$01D5C,FID_PROGMAP             ; progress map (RLE; into the first screen)
 FileMusic:
-	FENTRY	MUSIC_FILE,$07D64,126                  ; tracks 126-131: sound driver and effects (512K)
+	FENTRY	MUSIC_FILE,$07D64,FID_SFX              ; sound driver and effects (512K)
 FileCopyrightScreen:
-	FENTRY	SCREEN_2,$025FE,82                     ; tracks 82-83: copyright warning screen (RLE)
+	FENTRY	SCREEN_2,$025FE,FID_COPYRIGHT          ; copyright warning screen (RLE)
 FileLevel0:
-	FENTRY	LEVEL_FILE,$07440,84                   ; tracks 84-88: level 0 tiles
+	FENTRY	LEVEL_FILE,$07440,FID_LEVEL0           ; level 0 tiles
 FileLevel1:
-	FENTRY	LEVEL_FILE,$0C120,89                   ; tracks 89-96: level 1 tiles
+	FENTRY	LEVEL_FILE,$0C120,FID_LEVEL0+1         ; level 1 tiles
 FileLevel2:
-	FENTRY	LEVEL_FILE,$05460,97                   ; tracks 97-100: level 2 tiles
+	FENTRY	LEVEL_FILE,$05460,FID_LEVEL0+2         ; level 2 tiles
 FileLevel3:
-	FENTRY	LEVEL_FILE,$04880,101                  ; tracks 101-103: level 3 tiles
+	FENTRY	LEVEL_FILE,$04880,FID_LEVEL0+3         ; level 3 tiles
 FileLevel4:
-	FENTRY	LEVEL_FILE,$02760,104                  ; tracks 104-105: level 4 tiles
+	FENTRY	LEVEL_FILE,$02760,FID_LEVEL0+4         ; level 4 tiles
 FileLevel5:
-	FENTRY	LEVEL_FILE,$029E0,106                  ; tracks 106-107: level 5 tiles
+	FENTRY	LEVEL_FILE,$029E0,FID_LEVEL0+5         ; level 5 tiles
 FileLevel6:
-	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
+	FENTRY	LEVEL_FILE,$019A0,FID_LEVEL0+6         ; level 6 tiles
 FileMusic1M:
-	FENTRY	MUSIC1M_FILE,$1B394,64                 ; tracks 64-81: the 1MB music package (PF_MUSIC), for upper chip RAM
+	FENTRY	MUSIC1M_FILE,$1B394,FID_MUSIC1M        ; the 1MB music package (PF_MUSIC), for upper chip RAM
 FileRelocs:
-	FENTRY	0,RELOC_LEN,RELOC_TRACK                ; the relocation tables (EnhRelocate; build_game.py)
+	FENTRY	0,RELOC_LEN,FID_RELOCS                 ; the relocation tables (EnhRelocate; build_game.py)
 
 ;---------------------------------------------------------------------------
 ; ==================================================================
@@ -6780,14 +6779,101 @@ LoadLevelTables:
         rts
 MfmBuf:
         dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
+
+;---------------------------------------------------------------------------
+; LoadFile - a1 -> file record (FENTRY: dest.l, length.l, file id.w) -> a5 = the end of the
+; loaded data, a0 = CUSTOM (as the original's track loader left them); other registers kept.
+; The disk is an ordinary AmigaDOS-format disk (11 sectors a track) with a file table at
+; FT_OFFSET (boot_4489.s; build_game.py writes it): read once into FileDir, then each file is
+; loaded from its offset by the 4489_byteloader (ByteLoader), the exact number of bytes. A
+; failed load is tried again until it works (after 8 failures COLOR00 shows red).
+; The byteloader uses a6, so the interrupt handlers load a6 themselves (IrqLevel1/3).
+;---------------------------------------------------------------------------
+LoadFile:
+        movem.l d0-d7/a1-a4/a6,-(a7)
+        movea.l (a1),a5                         ; destination
+        move.l  4(a1),d5                        ; length
+        moveq   #0,d4
+        move.w  8(a1),d4                        ; file id
+        lea.l   (FileDir).l,a2
+        cmpi.l  #'GNGF',(a2)                    ; the file table, the first time
+        beq.b   lf_dir
+        movem.l d4-d5/a5,-(a7)
+        moveq   #0,d0
+        move.w  #FT_OFFSET,d0
+        move.l  #FT_SIZE,d1
+        movea.l a2,a0
+        bsr.b   lf_load
+        movem.l (a7)+,d4-d5/a5
+lf_dir:
+        lea.l   (FileDir).l,a2                  ; (the byteloader keeps no registers)
+        lsl.w   #$3,d4
+        move.l  FT_ENTRY(a2,d4.w),d0            ; the file's offset on the disk
+        move.l  d5,d1
+        movea.l a5,a0
+        movem.l d5/a5,-(a7)
+        bsr.b   lf_load
+        movem.l (a7)+,d5/a5
+        adda.l  d5,a5
+        lea.l   CUSTOM,a0
+        movem.l (a7)+,d0-d7/a1-a4/a6
+        rts
+lf_load:                                        ; d0 = offset, d1 = length, a0 = destination
+        moveq   #0,d6
+lf_try:
+        movem.l d0-d1/d6/a0/a5,-(a7)
+        moveq   #0,d2                           ; DF0
+        movea.l (MfmBuf).l,a1
+        bsr.w   ByteLoader
+        move.l  d0,d7
+        movem.l (a7)+,d0-d1/d6/a0/a5
+        tst.l   d7
+        beq.b   lf_ok
+        addq.w  #$1,d6
+        cmp.w   #$8,d6
+        bcs.b   lf_try
+        move.w  #$f00,CUSTOM+COLOR00            ; a disk error: red, and on trying
+        bra.b   lf_try
+lf_ok:
+        rts
+FileDir:
+        dcb.b   FT_SIZE,0                       ; the disk's file table (LoadFile)
+ByteLoader:
+	include	"byteloader.i"
+        even
+
+;---------------------------------------------------------------------------
+; IrqLevel1 / IrqLevel3 - the level 1 and level 3 autovectors: a6 = GLOBALS for the handlers
+; (Level1Logic, VblIRQ), which take it as given; the interrupted a6 back on the way out
+; (IrqExit1 / IrqExit3, where the handlers return). The byteloader uses a6 while a file
+; loads with the interrupts running.
+;---------------------------------------------------------------------------
+IrqLevel1:
+        move.l  a6,(IrqA6L1).l
+        lea.l   (GLOBALS).l,a6
+        jmp     Level1Logic
+IrqExit1:
+        movea.l (IrqA6L1).l,a6
+        rte
+IrqLevel3:
+        move.l  a6,(IrqA6L3).l
+        lea.l   (GLOBALS).l,a6
+        jmp     VblIRQ
+IrqExit3:
+        movea.l (IrqA6L3).l,a6
+        rte
+IrqA6L1:
+        dc.l    0
+IrqA6L3:
+        dc.l    0
 FileTables:
-	FENTRY	LEVEL_TABLES,TBLLEN0,TBLTRK0
-	FENTRY	LEVEL_TABLES,TBLLEN1,TBLTRK1
-	FENTRY	LEVEL_TABLES,TBLLEN2,TBLTRK2
-	FENTRY	LEVEL_TABLES,TBLLEN3,TBLTRK3
-	FENTRY	LEVEL_TABLES,TBLLEN4,TBLTRK4
-	FENTRY	LEVEL_TABLES,TBLLEN5,TBLTRK5
-	FENTRY	LEVEL_TABLES,TBLLEN6,TBLTRK6
+	FENTRY	LEVEL_TABLES,TBLLEN0,FID_TABLES0+0
+	FENTRY	LEVEL_TABLES,TBLLEN1,FID_TABLES0+1
+	FENTRY	LEVEL_TABLES,TBLLEN2,FID_TABLES0+2
+	FENTRY	LEVEL_TABLES,TBLLEN3,FID_TABLES0+3
+	FENTRY	LEVEL_TABLES,TBLLEN4,FID_TABLES0+4
+	FENTRY	LEVEL_TABLES,TBLLEN5,FID_TABLES0+5
+	FENTRY	LEVEL_TABLES,TBLLEN6,FID_TABLES0+6
 
 ;---------------------------------------------------------------------------
 ; EnhRelocate - Start, first thing, still at $80: with less than 1MB of chip RAM and an
@@ -6802,7 +6888,7 @@ FileTables:
 ;---------------------------------------------------------------------------
 IMAGE_BASE      equ     $80                     ; where the bootblock loads the program
 IMAGE_SIZE      equ     (MAP_LOW-IMAGE_BASE+3)&-4
-RELOC_ROOM      equ     IMAGE_SIZE+((RELOC_LEN+$18A7)/$18A8)*$18A8      ; LoadFile writes whole tracks
+RELOC_ROOM      equ     IMAGE_SIZE+RELOC_LEN    ; (LoadFile loads exactly the file's bytes)
 EnhRelocate:
         tst.b   (RelocDone).l
         bne.w   er_out
@@ -12965,7 +13051,7 @@ l_0BF84:
         bne.b   l_0BFA8                         ; 0BF9C/0BF30
         movem.l (a7)+,d0-d7/a0-a5               ; 0BF9E/0BF32
         move.w  g_SavedSR(a6),-(a7)             ; 0BFA2/0BF36
-        rte                                     ; 0BFA6/0BF3A
+        jmp     IrqExit3                        ; 0BFA6/0BF3A  (rte, with the interrupted a6)
 l_0BFA8:
         tst.b   g_SkipLogic(a6)                 ; 0BFA8/0BF3C
         bne.b   l_0BFB4                         ; 0BFAC/0BF40
@@ -12983,7 +13069,7 @@ l_0BFB4:
         move    a6,usp                          ; 0BFD6/0BF6A
 l_0BFD8:
         move.w  g_SavedSR(a6),-(a7)             ; 0BFD8/0BF6C
-        rte                                     ; 0BFDC/0BF70
+        jmp     IrqExit3                        ; 0BFDC/0BF70  (rte, with the interrupted a6)
 
 ;---------------------------------------------------------------------------
 ; RedrawScreen - full redraw of the playfield at the new origin g_NewTileX/Y, into
@@ -13189,212 +13275,7 @@ l_0C46E:
         dbra    d7,l_0C452                      ; 0C470/0C3A4
         rts                                     ; 0C474/0C3A8
 
-;---------------------------------------------------------------------------
-; ==================================================================
-; LoadFile - the game's copy of the bootblock trackloader
-; In: a1 -> file record: dest.L, length.L, start_track.W
-; Out: a5 = end of loaded data
-; Track format: one block per track after DSKSYNC $A245 (set by the
-; boot loader), track-number word, $62A longs of odd/even MFM data and
-; a checksum long = NOT(sum). Reads $1900 words into $33FE8 by DMA.
-; Up to 8 retries per track; a bad track number re-seeks via track 0.
-; ==================================================================
-;---------------------------------------------------------------------------
-LoadFile:
-        movea.l (a1)+,a5                        ; 0C476/0C3AA  a5 = destination
-        move.l  (a1)+,d5                        ; 0C478/0C3AC  d5 = length in bytes
-        move.w  (a1)+,(LDR_TRACK).w             ; 0C47A/0C3AE  start track
-        lea.l   CUSTOM,a0                       ; 0C47E/0C3B2
-        lea.l   $bfe001.l,a1                    ; 0C484/0C3B8
-        lea.l   CIAB_PRB,a2                     ; 0C48A/0C3BE
-        st.b    (a2)                            ; 0C490/0C3C4  select DF0, motor on
-        bclr    #$7,(a2)                        ; 0C492/0C3C6
-        bclr    #$3,(a2)                        ; 0C496/0C3CA
-        move.l  d5,d7                           ; 0C49A/0C3CE  tracks = (length + $18A7) / $18A8 (6312 bytes per track)
-        addi.l  #$18a7,d7                       ; 0C49C/0C3D0
-        divu.w  #$18a8,d7                       ; 0C4A2/0C3D6
-        subq.w  #$1,d7                          ; 0C4A6/0C3DA
-l_0C4A8:
-        move.w  #$8,(LDR_RETRY).w               ; 0C4A8/0C3DC  8 attempts per track
-        bsr.w   SeekTrack                       ; 0C4AE/0C3E2  seek to LDR_TRACK
-l_0C4B2:
-        bsr.w   ReadTrackDMA                    ; 0C4B2/0C3E6  DMA one track
-        bsr.w   DecodeTrack                     ; 0C4B6/0C3EA  decode and checksum
-        cmp.l   d4,d1                           ; 0C4BA/0C3EE  checksum ok?
-        beq.b   l_0C4CC                         ; 0C4BC/0C3F0
-        subq.w  #$1,(LDR_RETRY).w               ; 0C4BE/0C3F2
-        beq.b   l_0C4E6                         ; 0C4C2/0C3F6
-        addi.l  #$18a8,d5                       ; 0C4C4/0C3F8
-        bra.b   l_0C4B2                         ; 0C4CA/0C3FE
-l_0C4CC:
-        cmp.w   (LDR_TRACK).w,d2                ; 0C4CC/0C400  right track number?
-        bne.b   l_0C4F2                         ; 0C4D0/0C404
-        addq.w  #$1,(LDR_TRACK).w               ; 0C4D2/0C406
-        movea.l a4,a5                           ; 0C4D6/0C40A
-        dbra    d7,l_0C4A8                      ; 0C4D8/0C40C
-        st.b    (a2)                            ; 0C4DC/0C410  deselect, motor off
-        bclr    #$3,(a2)                        ; 0C4DE/0C412
-        st.b    (a2)                            ; 0C4E2/0C416
-        rts                                     ; 0C4E4/0C418
-l_0C4E6:
-        bsr.w   SeekTrack0                      ; 0C4E6/0C41A  too many errors: recalibrate to track 0
-        addi.l  #$18a8,d5                       ; 0C4EA/0C41E
-        bra.b   l_0C4A8                         ; 0C4F0/0C424
-l_0C4F2:
-        bsr.w   SeekTrack0                      ; 0C4F2/0C426
-        addi.l  #$18a8,d5                       ; 0C4F6/0C42A
-        bra.b   l_0C4A8                         ; 0C4FC/0C430
-
-;---------------------------------------------------------------------------
-; Pulse the step line, wait 3ms (17ms on direction change) on CIA-B TOD
-;---------------------------------------------------------------------------
-StepHead:
-        btst    #$1,(a2)                        ; 0C4FE/0C432
-        seq.b   d0                              ; 0C502/0C436
-        cmp.b   (LDR_DIRFLAG).w,d0              ; 0C504/0C438
-        beq.b   l_0C516                         ; 0C508/0C43C
-        move.l  #$11d,d1                        ; 0C50A/0C43E
-        not.b   (LDR_DIRFLAG).w                 ; 0C510/0C444
-        bra.b   l_0C518                         ; 0C514/0C448
-l_0C516:
-        moveq   #$2f,d1                         ; 0C516/0C44A
-l_0C518:
-        moveq   #$0,d0                          ; 0C518/0C44C
-        move.b  $900(a2),d0                     ; 0C51A/0C44E
-        lsl.w   #$8,d0                          ; 0C51E/0C452
-        move.b  $800(a2),d0                     ; 0C520/0C454
-        lsl.l   #$8,d0                          ; 0C524/0C458
-        move.b  $700(a2),d0                     ; 0C526/0C45A
-        cmp.l   d1,d0                           ; 0C52A/0C45E
-        bls.b   l_0C518                         ; 0C52C/0C460
-        bclr    #$0,(a2)                        ; 0C52E/0C462
-        bset    #$0,(a2)                        ; 0C532/0C466
-        clr.b   $900(a2)                        ; 0C536/0C46A
-        clr.b   $800(a2)                        ; 0C53A/0C46E
-        clr.b   $700(a2)                        ; 0C53E/0C472
-        rts                                     ; 0C542/0C476
-WaitDiskReady:
-        btst    #$5,(a1)                        ; 0C544/0C478
-        bne.b   WaitDiskReady                   ; 0C548/0C47C
-        rts                                     ; 0C54A/0C47E
-
-;---------------------------------------------------------------------------
-; DSKPT = $33FE8, DSKLEN $9900 written twice, wait for DSKBLK
-;---------------------------------------------------------------------------
-ReadTrackDMA:
-        bsr.b   WaitDiskReady                   ; 0C54C/0C480
-        move.l  (MfmBuf).l,$20(a0)              ; 0C54E/0C482  DSKPT = MFM buffer
-        move.w  #$9900,$24(a0)                  ; 0C556/0C48A  DSKLEN written twice to start DMA ($1900 words)
-        move.w  #$9900,$24(a0)                  ; 0C55C/0C490
-l_0C562:
-        move.w  $1e(a0),d0                      ; 0C562/0C496  wait DSKBLK
-        andi.w  #$2,d0                          ; 0C566/0C49A
-        beq.b   l_0C562                         ; 0C56A/0C49E
-        move.w  d0,$9c(a0)                      ; 0C56C/0C4A0
-        clr.w   d0                              ; 0C570/0C4A4
-        move.w  d0,$24(a0)                      ; 0C572/0C4A6
-        rts                                     ; 0C576/0C4AA
-
-;---------------------------------------------------------------------------
-; Unreferenced
-;---------------------------------------------------------------------------
-StepOut:	; (no references found - unused/debug code)
-        bclr    #$1,(a2)                        ; 0C578/0C4AC
-        bsr.b   StepHead                        ; 0C57C/0C4B0
-        rts                                     ; 0C57E/0C4B2
-
-;---------------------------------------------------------------------------
-; MFM decode into a5 (handles a partial last long); out d1 = stored checksum, d4 = computed, d2 = track number
-;---------------------------------------------------------------------------
-DecodeTrack:
-        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4
-        addq.l  #$2,a3
-        movea.l a5,a4                           ; 0C586/0C4BA
-        move.l  #$55555555,d3                   ; 0C588/0C4BC
-        move.w  (a3)+,d2                        ; 0C58E/0C4C2
-        move.w  (a3)+,d1                        ; 0C590/0C4C4
-        and.w   d3,d2                           ; 0C592/0C4C6
-        and.w   d3,d1                           ; 0C594/0C4C8
-        add.w   d2,d2                           ; 0C596/0C4CA
-        or.w    d2,d1                           ; 0C598/0C4CC
-        move.w  d1,-(a7)                        ; 0C59A/0C4CE
-        moveq   #-1,d4                          ; 0C59C/0C4D0  checksum accumulator = -1, minus each long = NOT(sum)
-        move.w  #$629,d6                        ; 0C59E/0C4D2
-l_0C5A2:
-        move.l  d3,d1                           ; 0C5A2/0C4D6
-        and.l   $18ac(a3),d1                    ; 0C5A4/0C4D8  even bits from second half ($18AC bytes on)
-        move.l  d3,d2                           ; 0C5A8/0C4DC
-        and.l   (a3)+,d2                        ; 0C5AA/0C4DE  odd bits from first half
-        add.l   d2,d2                           ; 0C5AC/0C4E0
-        or.l    d2,d1                           ; 0C5AE/0C4E2
-        sub.l   d1,d4                           ; 0C5B0/0C4E4
-        subq.l  #$4,d5                          ; 0C5B2/0C4E6  stop at the exact file length (last long may be partial)
-        bmi.b   l_0C5CE                         ; 0C5B4/0C4E8
-        move.l  d1,(a4)+                        ; 0C5B6/0C4EA
-l_0C5B8:
-        dbra    d6,l_0C5A2                      ; 0C5B8/0C4EC
-        move.l  $18ac(a3),d1                    ; 0C5BC/0C4F0
-        and.l   d3,d1                           ; 0C5C0/0C4F4
-        move.l  (a3)+,d2                        ; 0C5C2/0C4F6
-        and.l   d3,d2                           ; 0C5C4/0C4F8
-        add.l   d2,d2                           ; 0C5C6/0C4FA
-        or.l    d2,d1                           ; 0C5C8/0C4FC
-        move.w  (a7)+,d2                        ; 0C5CA/0C4FE
-        rts                                     ; 0C5CC/0C500
-l_0C5CE:
-        cmp.l   #$fffffffd,d5                   ; 0C5CE/0C502
-        blt.b   l_0C5B8                         ; 0C5D4/0C508
-        beq.b   l_0C5EC                         ; 0C5D6/0C50A
-        cmp.l   #$fffffffe,d5                   ; 0C5D8/0C50C
-        beq.b   l_0C5E6                         ; 0C5DE/0C512
-        ror.l   #$8,d1                          ; 0C5E0/0C514
-        move.b  d1,(a4)+                        ; 0C5E2/0C516
-        bra.b   l_0C5B8                         ; 0C5E4/0C518
-l_0C5E6:
-        swap    d1                              ; 0C5E6/0C51A
-        move.w  d1,(a4)+                        ; 0C5E8/0C51C
-        bra.b   l_0C5B8                         ; 0C5EA/0C51E
-l_0C5EC:
-        swap    d1                              ; 0C5EC/0C520
-        move.w  d1,(a4)+                        ; 0C5EE/0C522
-        ror.l   #$8,d1                          ; 0C5F0/0C524
-        move.b  d1,(a4)+                        ; 0C5F2/0C526
-        bra.b   l_0C5B8                         ; 0C5F4/0C528
-SeekTrack:
-        move.w  (LDR_TRACK).w,d4                ; 0C5F6/0C52A
-        lsr.w   #$1,d4                          ; 0C5FA/0C52E
-        bcc.b   l_0C604                         ; 0C5FC/0C530
-        bclr    #$2,(a2)                        ; 0C5FE/0C532
-        bra.b   l_0C608                         ; 0C602/0C536
-l_0C604:
-        bset    #$2,(a2)                        ; 0C604/0C538
-l_0C608:
-        sub.w   (LDR_CYL).w,d4                  ; 0C608/0C53C
-        beq.b   l_0C626                         ; 0C60C/0C540
-        bpl.b   l_0C618                         ; 0C60E/0C542
-        neg.w   d4                              ; 0C610/0C544
-        bset    #$1,(a2)                        ; 0C612/0C546
-        bra.b   l_0C61C                         ; 0C616/0C54A
-l_0C618:
-        bclr    #$1,(a2)                        ; 0C618/0C54C
-l_0C61C:
-        subq.w  #$1,d4                          ; 0C61C/0C550
-l_0C61E:
-        bsr.w   StepHead                        ; 0C61E/0C552
-        dbra    d4,l_0C61E                      ; 0C622/0C556
-l_0C626:
-        move.w  (LDR_TRACK).w,d4                ; 0C626/0C55A
-        lsr.w   #$1,d4                          ; 0C62A/0C55E
-        move.w  d4,(LDR_CYL).w                  ; 0C62C/0C560
-        rts                                     ; 0C630/0C564
-SeekTrack0:
-        bset    #$1,(a2)                        ; 0C632/0C566
-l_0C636:
-        bsr.w   StepHead                        ; 0C636/0C56A
-        btst    #$4,(a1)                        ; 0C63A/0C56E
-        bne.b   l_0C636                         ; 0C63E/0C572
-        clr.w   (LDR_CYL).w                     ; 0C640/0C574
-        rts                                     ; 0C644/0C578
+; (LoadFile: the original's track loader - replaced by the byteloader, make_game_support.s)
 
 ;---------------------------------------------------------------------------
 ; Out: a4 = free slot in g_EnemyShots (or last slot)

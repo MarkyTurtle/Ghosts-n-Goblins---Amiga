@@ -271,7 +271,7 @@ EnhLogicStart:  move.w  #$0004,CUSTOM+INTREQ      ; INTF_SOFTINT
                 rts
 EnhLogicEnd:    RASTER  $000                    ; black: idle
                 movem.l (a7)+,d0-d7/a0-a5
-                rte
+                jmp     IrqExit1                ; (rte, with the interrupted a6)
 
 ;------------------------------------------------------------------------------
 EnhDrawBobs:

@@ -11,7 +11,8 @@ with its DrawBob top-clip bug fixed, both originals with the one program's MapTi
 The game state must stay the same every frame and so must the picture (compare_runs.py does
 the comparing; the camera tables are not compared byte for byte, as they hold pointers).
 
-  python3 compare_game.py [frames] [seed] --machine 512k|1mb [--level N] [--teleport N] [--png DIR]"""
+  python3 compare_game.py [frames] [seed] --machine 512k|1mb [--level N] [--teleport N] [--png DIR] [--disk]
+(--disk: the one program loads its files from the disk image with its own loader, tools/floppy.py)"""
 import sys
 import compare_runs, test_bootinfo
 from game import GameRun, game
@@ -26,10 +27,10 @@ MACHINES = {'512k': (M['A500 512K chip'], '512k'), '1mb': (M['A500+ 1MB chip'], 
             'fast': (M['A500 + 1.5MB slow + 2MB fast'], '1mb')}
 
 
-def main(frames, seed, machine, level=None, teleport=0, png=None):
+def main(frames, seed, machine, level=None, teleport=0, png=None, disk=False):
     (name, regions, vb, attn), build = MACHINES[machine]
     print(f'the one program on "{name}" against the original {build} program')
-    ref, test = GameRun(build=build), game((regions, vb, attn))
+    ref, test = GameRun(build=build), game((regions, vb, attn), disk=disk)
     if build == '1mb':
         # The globals overlay the end of the program file, and the game uses some before it sets
         # them (the fraction of g_ArthurX in the opening scene, for one): with the 1MB file's
@@ -61,8 +62,8 @@ def fix_map_reads(ref, test):
 
 
 if __name__ == '__main__':
-    a = sys.argv[1:]
+    a = [x for x in sys.argv[1:] if x != '--disk']
     opt = lambda k, d=None, f=str: f(a[a.index(k) + 1]) if k in a else d
     args = [x for i, x in enumerate(a) if not x.startswith('--') and (i == 0 or not a[i - 1].startswith('--'))]
     sys.exit(main(int(args[0]) if args else 2000, int(args[1]) if len(args) > 1 else 1, opt('--machine', '512k'),
-                  opt('--level', None, int), opt('--teleport', 0, int), opt('--png')))
+                  opt('--level', None, int), opt('--teleport', 0, int), opt('--png'), '--disk' in sys.argv))
