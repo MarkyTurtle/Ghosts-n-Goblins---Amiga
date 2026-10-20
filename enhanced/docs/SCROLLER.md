@@ -738,7 +738,7 @@ the program from tracks 134-150 (it is 17 tracks now); effects package at 126 (a
 the program's `MUSIC_FILE`), music package at 64; the original programs' tracks are empty.
 `tools/disk/mkdisk.py --one` builds it.
 
-### Two-button joysticks
+### Two-button joysticks (made on branch `enhanced/joystick`, merged; tried in WinUAE)
 
 The joystick's second button (port 2, pin 9: a Sega-style pad or a two-button stick) can make
 Arthur jump, as on the arcade machine. The title menu's **INPUT** item (or the J key) switches
@@ -764,7 +764,7 @@ only climbs with jump on button 2. The emulator harness's `frame()` takes the se
 (`fire2`; `POTINP` reads as not pressed otherwise). The comparisons with the originals (jump on
 up) stay in step as before.
 
-### The title menu
+### The title menu (made on branch `enhanced/titlemenu`, merged; tried in WinUAE)
 
 The title screen's instructions ('Press fire for 1 player game', the F1 / F2 lines, 'Press
 SPACE to pause game', 'Press Esc to abort game') are replaced by a menu (`scroller.s`: `EnhMenu`

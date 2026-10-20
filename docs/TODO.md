@@ -101,10 +101,12 @@ decided against, kept for the record with the reason.
 **Controls and extras**
 - [x] Two-button joysticks: one button fires, the other jumps; up-to-jump kept as an option (8):
       the title menu's INPUT item (or J) switches it (`JumpButton`); see
-      `enhanced/docs/SCROLLER.md`, *Two-button joysticks*
+      `enhanced/docs/SCROLLER.md`, *Two-button joysticks* (made on branch `enhanced/joystick`,
+      merged; tried in WinUAE)
 - [x] A title menu instead of the instructions: PLAYER 1 START, PLAYER 2 START, INPUT (the jump
       setting), TEST MENU (the memory line and the cheat, moved from the title) (8); see
-      `enhanced/docs/SCROLLER.md`, *The title menu*
+      `enhanced/docs/SCROLLER.md`, *The title menu* (made on branch `enhanced/titlemenu`,
+      merged; tried in WinUAE)
 - [ ] A sound test on the test page: play each tune and effect (8)
 - [ ] A sprite test on the test page: show the BOB and sprite frames (8), if there is room
 - [ ] An input test on the test page, as on an arcade machine: the joystick directions and both
