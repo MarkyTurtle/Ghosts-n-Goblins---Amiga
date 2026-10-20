@@ -11,7 +11,7 @@
 | `sound/` | Sound driver and music/sfx data: annotated sources, samples, renders (`sound/SOUND.md`) |
 | `render/` | Scripts that render levels, enemy BOBs and Arthur's sprites from the disk data; output in `render/out/`, including `worldmap_cells.png` (the whole world map with every cell number) |
 | `disk/` | **Every file loaded from the disk** (`disk/files/`), the file table (`disk/FILES.md`) and a track-by-track disk map (`disk/DISKMAP.md`). `tools/disk/mkdisk.py` builds a playable disk image from them (see *Making a disk image*) |
-| `docs/` | `HOW_IT_WORKS.md` (a guided tour with diagrams: interrupts, the state machine, a frame, objects, spawning, drawing, level data), `GLOBALS.md` (every global, the memory map, object slot and per-type fields), `XREF.md` (which routines use each global, routine and table), `SPAWNS.md` (every level's spawn zones and scripts, decoded), `TODO.md` (planned enhancements: a shared file directory and own loader, automatic disk layout, corkscrew scrolling with a pristine buffer, zx0 / per-level files / caching / music on 512K, further space savings, emulator tests), sprite/BOB flipping spreadsheet |
+| `docs/` | `HOW_IT_WORKS.md` (a guided tour with diagrams: interrupts, the state machine, a frame, objects, spawning, drawing, level data), `GLOBALS.md` (every global, the memory map, object slot and per-type fields), `XREF.md` (which routines use each global, routine and table), `SPAWNS.md` (every level's spawn zones and scripts, decoded), `TODO.md` (planned enhancements as first written: a shared file directory and own loader, automatic disk layout, corkscrew scrolling with a pristine buffer, zx0 / per-level files / caching / music on 512K, further space savings, emulator tests; the current list is on `enhanced/scroll`, see *Branches*), sprite/BOB flipping spreadsheet |
 | `bin/tracks/` | All 131 decoded tracks (6,312 bytes each) used by the render scripts |
 | `bin/main_1mb.bin` | The expanded-memory build (tracks 17-32) |
 
@@ -24,6 +24,54 @@ vasmm68k_mot -Fbin -m68000 -no-opt -o boot.bin gng_boot.s                     ; 
 ```
 
 `-no-opt` matters: the source keeps the original instruction sizes explicitly.
+
+## Branches
+
+| Branch | What it holds |
+|---|---|
+| `main` | **The original game**: this annotated disassembly, which reassembles byte-identical to the original disk (above). Nothing here changes the game. |
+| `enhanced/scroll` | **The enhanced game** - the main enhancement branch, with every feature below merged in. Built from `main` (merged into it as `main` moved on); its own documentation is `enhanced/docs/SCROLLER.md`, and its `docs/TODO.md` is the up-to-date list of what is done and what is left. |
+
+**What the enhanced game is** (`enhanced/src/gng_game.s`, made from `gng_main.s` by
+`enhanced/tools/make_game.py`; `enhanced/tools/build_game.py` builds `enhanced/build/gng_game.adf`):
+
+* **One program for every machine.** The bootblock surveys the memory and leaves a description
+  of the machine; the program picks its features from it: graphics caches and one-blit BOBs
+  with 1MB of chip RAM, the program moved into slow / fast RAM on expanded 512K machines.
+* **Incremental scrolling** (a double-buffered corkscrew with a pristine background buffer)
+  instead of the original's full redraws: no freezes, and drawing at 50 fps instead of 25.
+* **Faster BOBs on 512K**: one-plane masks made at level load, and pre-masked one-blit images
+  as far as each level's memory goes.
+* **Music on every machine**, including a plain 512K A500 (the 1MB tunes added to the 512K
+  effects; on 512K the tunes' samples are at 3/4 of their rate to leave memory for pre-masking).
+* **A standard AmigaDOS-format disk** (880K ADF) with a file table, loaded with the
+  4489_byteloader.
+* **Two-button joysticks** (jump on the second button, or on up as the original).
+* **A title menu** (1 or 2 players, the input setting, and a test page with the memory found
+  and the cheat) instead of the original's instructions.
+* Memory freed for all this: per-level map tables, joined gaps, the old background save areas
+  and dead code removed. An original bug fixed (`MapTileAt` reading the program's code as map
+  cells for an object far below a level).
+
+Tested by running the enhanced program and the original side by side in a 68000 emulator
+(`enhanced/tools/compare_game.py`: the same game state every frame, on every stage and
+machine), by the bootblock's and the features' own tests, and in WinUAE (A500, A500 + 512K,
+A500+, A600, A1200).
+
+**The feature branches.** Each feature was made on a branch of its own, tried in WinUAE and then
+merged into `enhanced/scroll`. They are all fully merged and kept for the record; each holds
+`enhanced/scroll` as it was when that feature was finished:
+
+| Branch | Feature | Made from |
+|---|---|---|
+| `enhanced/byteloader` | the AmigaDOS-format disk and the 4489_byteloader (bootblock and game); the progress map's tune started when the map appears | `enhanced/scroll` |
+| `enhanced/music512` | music on a plain 512K A500: the combined package `sound/gng_music_512k.s` | `enhanced/byteloader` |
+| `enhanced/joystick` | two-button joysticks | `enhanced/scroll` (with the two above merged) |
+| `enhanced/titlemenu` | the title menu and its test page | `enhanced/joystick` |
+| `enhanced/musicquality` | the 512K music package at 3/4 of the tunes' sample rate (`build_game.py --music-rate` for others) | `enhanced/scroll` (with the above merged) |
+
+New features go on a new branch from `enhanced/scroll` in the same way. The `docs/TODO.md` on
+`main` is the plan as it stood before the enhanced work; see the one on `enhanced/scroll`.
 
 ## Disk contents (see `disk/FILES.md` and `disk/DISKMAP.md`)
 
