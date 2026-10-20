@@ -27,7 +27,7 @@ WinUAE: A500, A500+, A600, A1200 and others tried). It boots by itself.
 
 * **Title menu**: up / down choose, fire selects - `PLAYER 1 START`, `PLAYER 2 START`,
   `INPUT` (jump on up or on the joystick's second button: fire, left or right switch it),
-  `TEST MENU` (the memory the machine has, the cheat, `EXIT`).
+  `TEST MENU` (the machine's memory, a sound test, an input test, a sprite test, the cheat, `EXIT`).
 * **Keys** (as the original): space pauses, Esc gives up the game; on the title F1 / F2 start a
   1 / 2 player game at once, J switches the jump input, C the cheat.
 * **Joystick** in port 2. With jump on button 2, up only climbs ladders, as on the arcade
@@ -152,10 +152,23 @@ is not possible, as in the original. The setting is on the title menu (`INPUT`).
 remains for the in-game keys. A change redraws the title (double-buffered) and restarts its
 time-out to the high-score table. On the high-score table the joystick returns to the menu.
 
-**Test page** (`TEST MENU`): the machine's memory (from the bootblock's description), the cheat
-(the original's own cheat - lives never decrease, no harm once the armour is gone - that typing
-`)!(` as a high-score name turns on), `EXIT`. The page has no time-out. Sound, sprite and input
-tests are planned (`docs/TODO.md`).
+**Test page** (`TEST MENU`; no time-out): the machine's memory (from the bootblock's
+description), then:
+
+| Item | |
+|---|---|
+| `MUSIC OFF` / `nn` | the sound test's tunes: left / right choose (`OFF`, 00-14), fire plays the tune or, on `OFF`, stops the music (`StopMusic`) |
+| `EFFECT nn` | the sound effects: left / right choose (00-29), fire plays it |
+| `INPUT TEST` | an arcade-style switch test: `UP`, `DOWN`, `LEFT`, `RIGHT`, `FIRE`, `FIRE 2` (port 2) lit while held, and `KEY $nn`: the raw code of the last key pressed |
+| `SPRITE TEST` | Arthur on screen in each of his 42 sprite frames (left / right) and, for frames 0-39, their mirrored copies (fire), with the frame's number |
+| `CHEAT OFF` / `ON` | the original's own cheat (lives never decrease, no harm once the armour is gone - what typing `)!(` as a high-score name turns on) |
+| `EXIT` | back to the title (the music stopped) |
+
+The input and sprite tests go back to the test page with Esc or with fire held for 3 seconds.
+The tests' pages are drawn again when what they show changes, so the input test follows the
+joystick within a few frames. Only Arthur's sprites are shown: the enemies' BOBs exist only for
+the level being played (on 512K) and are drawn by the game's play loop, so a BOB viewer would
+have to load a level's graphics into the title screen.
 
 ## Fixes
 
@@ -198,7 +211,7 @@ All in a 68000 emulator (Unicorn) with a model of the blitter, copper, display a
 | `test_boot4489.py` | the bootblock from Kickstart's call to the program's entry (`--random-start`) |
 | `test_bootinfo.py` | the machine description on seven memory configurations |
 | `test_jump.py` | the two jump inputs: open ground, at a ladder, on it |
-| `test_menu.py` | the title menu and the test page |
+| `test_menu.py` | the title menu, the test page and its sound, input and sprite tests |
 | `test_bobs.py`, `test_scroll.py`, `check_harness.py` | the scroller and BOB drawing against the original's (the first enhanced builds) |
 | `sound/tools/check_music_512k.py` | the 512K music package against the original packages |
 

@@ -834,6 +834,42 @@ program is 206 bytes longer (the menu, less the original's instruction code and 
 player games from the menu and with F1 / F2, moving round, the input and cheat switches, the
 test page staying, EXIT, the time-out to the high scores and back).
 
+### The test page's tests (made on branch `enhanced/testmenu`)
+
+The test page (`TEST MENU`) has a sound test, an input test and a sprite test (`scroller.s`:
+`EnhMenu`, `EnhTitleText`, `StopMusic`, `EnhTitleSprite`; `MenuPage` is now `PAGE_TITLE`,
+`PAGE_TEST`, `PAGE_INPUT` or `PAGE_SPRITE`). Its items start a row higher (`ItemRow` = `$70`)
+to fit six.
+
+*Sound*: `MUSIC` and `EFFECT` call `PlayMusic` / `PlaySfx` as the game does (with no machine
+description there is no music, and `MUSIC` does nothing). The driver has no command to stop a
+tune - the game only ever starts another - so `StopMusic` points each of its four music voices
+at an end-of-track byte (`$67`), as `CmdPlayTune` points them at a tune: at the next tick each
+voice stops and its channel gets the silent sample. The driver's workspace is found from its
+code (`lea DriverVars(pc),a3` in `CmdPlayTune`, at the entry + `$1E`; the same driver in all
+three packages: checked there before writing). Leaving the test page or starting a game stops
+the music.
+
+*Input*: the page shows the bits of `g_Joy` (the vertical blank's joystick reading: directions,
+fire, the second button) and the last raw key code; when either changes and the title is not
+being drawn, it is drawn again (`InputShown`, `InputKeyShown`). Esc, or fire held for 150
+frames (`HoldTime`), goes back.
+
+*Sprite*: the title's step 0 now calls `EnhTitleSprite` where it cleared `g_ArthurVisible`: on
+the sprite test Arthur is made visible, placed a fixed distance from the camera
+(`SPR_X`, `SPR_Y`) so that `ArthurSpritePos` (called next) puts him between the text lines,
+and given the frame chosen (`~n` for a mirrored copy, frames 0-39); `g_ArthurShownFrame` is set
+to an impossible frame so the vertical blank copies the frame into the sprite data. Everything
+else on the title is as before (`g_ArthurVisible` cleared on every other page).
+
+Memory: the program is 1,376 bytes longer; stage 2 draws one more small set (set 20) with 5
+blits. *Testing*: `test_menu.py` now has 24 cases (the sound test's tunes and effects, playing and
+stopping, checked in the driver's voices; the input test's display of held directions, the
+second button and a key; Esc; the sprite test's frames, mirrored copies and visibility; fire
+held to go back), `StopMusic` also checked with the driver in upper chip RAM (1MB) and at `$80`
+(the program moved). The emulator draws no sprites, so Arthur's place was checked from his
+sprite control words (an overlay in a test script).
+
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,

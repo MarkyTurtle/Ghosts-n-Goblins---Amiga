@@ -3494,7 +3494,7 @@ l_05CF8:
 l_05D14:
         move.l  d0,(a0)+                        ; 05D14/05D3C
         dbra    d1,l_05D14                      ; 05D16/05D3E
-        lea.l   DefaultHiNames(pc),a0           ; 05D1A/05D42
+        lea.l   (DefaultHiNames).l,a0           ; 05D1A/05D42
         lea.l   g_HiNames(a6),a1                ; 05D1E/05D46
         moveq   #$1d,d0                         ; 05D22/05D4A
 l_05D24:
@@ -3663,7 +3663,7 @@ AttractTitle:
         clr.w   g_RawKey(a6)                    ; 05EE8/05F3E
         bsr.w   SwapScreens                     ; 05EEC/05F42
         bsr.w   DrawCreditsScreen               ; 05EF0/05F46
-        clr.b   g_ArthurVisible(a6)             ; 05EF4/05F4A
+        jsr     EnhTitleSprite                  ; Arthur hidden, except on the sprite test (05EF4: clr.b g_ArthurVisible)
         clr.b   g_Spr47Visible(a6)              ; 05EF8/05F4E
         bsr.w   ArthurSpritePos                 ; 05EFC/05F52
         bsr.w   SetBitplanePtrs                 ; 05F00/05F56
@@ -3800,7 +3800,7 @@ DrawNameGrid:
         moveq   #$0,d4                          ; 060A6/06100
         moveq   #$4,d7                          ; 060A8/06102
         moveq   #$38,d2                         ; 060AA/06104
-        lea.l   NameGridLetters(pc),a0          ; 060AC/06106
+        lea.l   (NameGridLetters).l,a0          ; 060AC/06106
 l_060B0:
         moveq   #$4,d1                          ; 060B0/0610A
         moveq   #$c,d6                          ; 060B2/0610C
@@ -3826,7 +3826,7 @@ l_060DA:
         dbra    d7,l_060B0                      ; 060EE/06148
         move.b  #$3,g_TextInk(a6)               ; 060F2/0614C
         move.b  #$6,g_TextPaper(a6)             ; 060F8/06152
-        lea.l   TxtInitial(pc),a3               ; 060FE/06158
+        lea.l   (TxtInitial).l,a3               ; 060FE/06158
         moveq   #$8,d1                          ; 06102/0615C
         move.w  #$d8,d2                         ; 06104/0615E
         bsr.w   PrintString                     ; 06108/06162
@@ -11420,7 +11420,7 @@ SetBoxClass:
         clr.w   d1                              ; 0AB92/0ABF6
         move.b  O_Size(a5),d1                   ; 0AB94/0ABF8
         add.w   d1,d1                           ; 0AB98/0ABFC
-        lea.l   BoxSizeTable(pc),a0             ; 0AB9A/0ABFE
+        lea.l   (BoxSizeTable).l,a0             ; 0AB9A/0ABFE
         move.b  $1(a0,d1.w),d1                  ; 0AB9E/0AC02
         move.b  d0,O_Size(a5)                   ; 0ABA2/0AC06
         ext.w   d0                              ; 0ABA6/0AC0A
@@ -11790,7 +11790,7 @@ AddScore:
 DrawWeaponIcon:
         move.w  g_Weapon(a6),d0                 ; 0AEB4/0AF18
         mulu.w  #$80,d0                         ; 0AEB8/0AF1C
-        lea.l   WeaponIcons(pc),a0              ; 0AEBC/0AF20
+        lea.l   (WeaponIcons).l,a0              ; 0AEBC/0AF20
         adda.w  d0,a0                           ; 0AEC0/0AF24
         lea.l   $40(a0),a1                      ; 0AEC2/0AF26
         lea.l   (SPRITE4B_DATA+$69).l,a2        ; 0AEC6/0AF2A

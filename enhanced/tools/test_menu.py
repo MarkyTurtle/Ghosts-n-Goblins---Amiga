@@ -2,12 +2,15 @@
 saved state of the title screen:
   fire on PLAYER 1 START / PLAYER 2 START starts a 1 / 2 player game; F1 / F2 too;
   INPUT: fire, left and right switch the jump input (JumpButton);
-  TEST MENU: the test page (no time-out), CHEAT switches the cheat, EXIT goes back;
+  TEST MENU: the test page (no time-out): MUSIC plays and stops tunes, EFFECT plays effects;
+    the input test shows what is held and the last key, Esc goes back; the sprite test shows
+    Arthur's frames and their mirrored copies, fire held 3 s goes back; CHEAT switches the
+    cheat, EXIT goes back;
   the title goes on to the high scores after 400 frames, where fire goes back to the title
   (it does not start a game).
 
   python3 test_menu.py        (after build_game.py)"""
-import copy, sys
+import copy, struct, sys
 import compare_game
 from game import game
 
@@ -56,11 +59,52 @@ def main():
     check(f'INPUT: fire, right, left switch the jump input ({j0} {j1} {j2} {j3})',
           j0 == 0 and j1 and not j2 and j3 and not playing())
     load(); press('U'); press('', True)
-    check('TEST MENU: the test page', var('MenuPage') and var('MenuItem') == 0 and g('g_GameState') == 1)
-    c0 = g('g_CheatOn'); press('', True); c1 = g('g_CheatOn'); press('R'); c2 = g('g_CheatOn')
+    check('TEST MENU: the test page', var('MenuPage') == 1 and var('MenuItem') == 0 and g('g_GameState') == 1)
+    # the sound test: the driver's voices (its workspace found as StopMusic finds it)
+    drv = m.r32(0x60)
+    dv = drv + 0x20 + struct.unpack('>h', bytes(m.u.mem_read(drv + 0x20, 2)))[0]
+    voice = lambda k: m.r32(dv + 4 + 0x68 * k)
+    press('R'); press('R'); press('R')
+    t = m.r8(m.L['TestMusic'])
+    press('', True)
+    for _ in range(50): m.frame()
+    on = [voice(k) for k in range(4)]
+    check(f'MUSIC: right three times is tune {t}, fire plays it ({sum(1 for v in on if v)} voices)', t == 2 and any(on))
+    press('L'); press('L'); press('L'); press('', True)
+    for _ in range(10): m.frame()
+    check(f'MUSIC: back to OFF ({m.r8(m.L["TestMusic"])}), fire stops it', m.r8(m.L['TestMusic']) == 0xFF
+          and not any(voice(k) for k in range(4)))
+    press('L'); press('L')
+    check(f'MUSIC: left from OFF goes round to the last tune ({m.r8(m.L["TestMusic"])})', m.r8(m.L['TestMusic']) == 13)
+    press('D'); press('L'); press('', True, wait=2)
+    e = m.r8(m.L['TestEffect'])
+    check(f'EFFECT: left from 0 is 29 ({e}), fire plays it', e == 29 and any(voice(k) for k in range(4, 8)))
+    # the input test
+    press('D'); press('', True)
+    check('INPUT TEST: its page', var('MenuPage') == 2)
+    for _ in range(30): m.frame('UL', False, True)
+    shown = m.r16(m.L['InputShown'])
+    check(f'the page shows up, left and fire 2 held (${shown:04X})', shown == 0x4300)
+    for _ in range(5): m.frame()
+    m.w8(m.G['g_RawKey'], 0x21); [m.frame() for _ in range(30)]
+    check(f'a key: shown by its raw code (${m.r8(m.L["InputKeyShown"]):02X})', m.r8(m.L['InputKeyShown']) == 0x21)
+    key(0x45)
+    check('Esc: back to the test page', var('MenuPage') == 1 and var('MenuItem') == 2)
+    # the sprite test
+    press('D'); press('', True)
+    check('SPRITE TEST: its page, Arthur shown', var('MenuPage') == 3 and g('g_ArthurVisible'))
+    press('R'); press('R'); press('L', wait=25); press('L'); press('L')
+    f1 = m.r8(m.L['SprFrame'])
+    check(f'left / right step the frames round ({f1})', f1 == 41 and g('g_ArthurFrame') == 41)
+    press('R'); press('R'); press('', True)
+    check(f'fire: frame 1 mirrored (g_ArthurFrame ${g("g_ArthurFrame"):02X})', g('g_ArthurFrame') == 0xFE)
+    for _ in range(160): m.frame('', True)
+    for _ in range(25): m.frame()
+    check('fire held 3 s: back to the test page, Arthur hidden', var('MenuPage') == 1 and not g('g_ArthurVisible'))
+    press('D'); c0 = g('g_CheatOn'); press('', True); c1 = g('g_CheatOn'); press('R'); c2 = g('g_CheatOn')
     check(f'CHEAT: fire, right switch the cheat ({c0} {c1} {c2})', not c0 and c1 and not c2)
     for _ in range(500): m.frame()
-    check('the test page stays (500 frames)', g('g_GameState') == 1 and var('MenuPage'))
+    check('the test page stays (500 frames)', g('g_GameState') == 1 and var('MenuPage') == 1)
     press('D'); press('', True)
     check('EXIT: the title, on TEST MENU', not var('MenuPage') and var('MenuItem') == 3 and g('g_GameState') == 1)
     load()
