@@ -1121,75 +1121,219 @@ MakeMasks:
                 rts
 
 ;------------------------------------------------------------------------------
-; EnhShowMachine - after DrawCreditsScreen (the title screen): the cheat line (EnhShowCheat), then one line in the free row
-; under the credits with the memory the bootblock found, for example
+; The title menu (replaces the original's start and key instructions). Two pages, chosen with
+; the joystick (up / down move, fire chooses; left / right or fire change a setting) or keys:
+;   title:  PLAYER 1 START, PLAYER 2 START, INPUT - JUMP ON UP / BUTTON 2, TEST MENU
+;   test:   the memory the bootblock found (EnhShowMachine), CHEAT OFF / ON, EXIT
+; F1 / F2 start a 1 / 2 player game at once, J switches the jump input, C the cheat (as
+; before). Any change draws the title again (GS_TITLE from step 0: double-buffered, and its
+; 400-frame time-out to the high scores starts again; the test page has no time-out). On the
+; high-score page the joystick goes back to the title.
+;------------------------------------------------------------------------------
+MENU_ITEMS      equ     4               ; title page
+TEST_ITEMS      equ     2               ; test page
+
+; EnhMenu - CheckGameStart (the title and high-score screens): -> d0 nonzero = start a game
+; (g_TwoPlayer set); 0 = carry on
+EnhMenu:
+                move.b  g_RawKey(a6),d1
+                cmpi.b  #$50,d1                 ; F1
+                beq.w   .one
+                cmpi.b  #$51,d1                 ; F2
+                beq.w   .two
+                cmpi.b  #$26,d1                 ; J
+                beq.w   .jump
+                cmpi.b  #$33,d1                 ; C
+                beq.w   .cheat
+                move.w  g_JoyPrev(a6),d2        ; newly pressed: b0 down, b1 right, b8 up, b9 left,
+                not.w   d2                      ; b15 fire
+                and.w   g_Joy(a6),d2
+                andi.w  #$8303,d2
+                beq.w   .none
+                cmpi.b  #GS_TITLE,g_GameState(a6)
+                bne.w   .title                  ; the high scores: back to the menu
+                lea     (MenuItem).l,a0
+                moveq   #MENU_ITEMS,d4
+                tst.b   (MenuPage).l
+                beq.w   .main
+                moveq   #TEST_ITEMS,d4
+.main:          move.b  (a0),d1
+                btst    #8,d2                   ; up
+                beq.w   .down
+                subq.b  #1,d1
+                bpl.w   .moved
+                move.b  d4,d1
+                subq.b  #1,d1
+                bra.w   .moved
+.down:          btst    #0,d2
+                beq.w   .choose
+                addq.b  #1,d1
+                cmp.b   d4,d1
+                bcs.w   .moved
+                moveq   #0,d1
+.moved:         move.b  d1,(a0)
+                bra.w   .redraw
+.choose:        tst.b   (MenuPage).l
+                bne.w   .testpg
+                cmpi.b  #2,d1                   ; INPUT: fire, left or right switch it
+                beq.w   .jump
+                tst.w   d2                      ; the others: fire only
+                bpl.w   .none
+                tst.b   d1
+                beq.w   .one
+                cmpi.b  #1,d1
+                beq.w   .two
+                st.b    (MenuPage).l            ; TEST MENU
+                clr.b   (a0)
+                bra.w   .redraw
+.testpg:        tst.b   d1
+                beq.w   .cheat                  ; CHEAT: fire, left or right
+                tst.w   d2                      ; EXIT: fire
+                bpl.w   .none
+                move.b  #3,(a0)                 ; back on TEST MENU
+.title:         clr.b   (MenuPage).l
+                bra.w   .redraw
+.one:           clr.b   g_TwoPlayer(a6)
+                bra.w   .start
+.two:           st.b    g_TwoPlayer(a6)
+.start:         clr.b   (MenuPage).l
+                moveq   #1,d0
+                rts
+.jump:          not.b   (JumpButton).l
+                bra.w   .redraw
+.cheat:         not.b   g_CheatOn(a6)
+.redraw:        clr.w   g_RawKey(a6)
+                move.b  #GS_TITLE,g_GameState(a6)       ; the title again
+                clr.b   g_SubState(a6)
+.none:          moveq   #0,d0
+                rts
+
+; EnhTitleText - DrawCreditsScreen, after the logo: the credits and the menu, or the test page
+EnhTitleText:
+                movem.l d0-d7/a0-a5,-(a7)
+                tst.b   (MenuPage).l
+                bne.b   .test
+                bsr.w   .credcol
+                lea     TxtCreditProgram,a3
+                moveq   #6,d1
+                moveq   #$48,d2
+                jsr     PrintString
+                lea     TxtCreditGraphics,a3
+                moveq   #6,d1
+                moveq   #$58,d2
+                jsr     PrintString
+                lea     TxtCreditSound,a3
+                moveq   #6,d1
+                moveq   #$68,d2
+                jsr     PrintString
+                lea     TxtMenu1(pc),a1
+                moveq   #0,d6                   ; item
+                bsr.w   .item
+                lea     TxtMenu2(pc),a1
+                bsr.w   .item
+                lea     TxtMenuInput(pc),a1
+                lea     TxtJumpUp(pc),a2
+                tst.b   (JumpButton).l
+                beq.b   .in
+                lea     TxtJumpB2(pc),a2
+.in:            bsr.w   .item2
+                lea     TxtMenuTest(pc),a1
+                bsr.w   .item
+                lea     TxtKeys(pc),a3          ; the keys in play
+                moveq   #0,d5
+                move.w  #$C2,d2
+                bsr.w   .line
+                bra.b   .out
+.test:          bsr.w   .credcol
+                lea     TxtMenuTest(pc),a3
+                moveq   #11,d1
+                moveq   #$48,d2
+                jsr     PrintString
+                bsr.w   EnhShowMachine          ; the memory, at $58
+                lea     TxtCheatItem(pc),a1
+                lea     TxtOff(pc),a2
+                tst.b   g_CheatOn(a6)
+                beq.b   .ch
+                lea     TxtOn(pc),a2
+.ch:            moveq   #0,d6
+                bsr.w   .item2
+                lea     TxtExit(pc),a1
+                bsr.w   .item
+.out:           movem.l (a7)+,d0-d7/a0-a5
+                rts
+.credcol:       move.b  #$18,g_TextShadow(a6)   ; the credits' colours
+                move.b  #$0D,g_TextInk(a6)
+                move.b  #$1F,g_TextPaper(a6)
+                rts
+; item d6 (then d6 + 1): text a1 (.item2: and a2), at row $80 + 16 x d6, '> ... <' and in the
+; credits' colours when it is the one chosen
+.item:          suba.l  a2,a2
+.item2:         lea     (OptText).l,a3
+                moveq   #0,d5
+                cmp.b   (MenuItem).l,d6
+                seq     d5
+                bne.b   .i1
+                move.b  #'>',(a3)+
+                move.b  #' ',(a3)+
+.i1:            move.b  (a1)+,(a3)+
+                bne.b   .i1
+                subq.l  #1,a3
+                move.l  a2,d0
+                beq.b   .i3
+.i2:            move.b  (a2)+,(a3)+
+                bne.b   .i2
+                subq.l  #1,a3
+.i3:            tst.b   d5
+                beq.b   .i4
+                move.b  #' ',(a3)+
+                move.b  #'<',(a3)+
+.i4:            clr.b   (a3)
+                move.w  d6,d2
+                lsl.w   #4,d2
+                add.w   #$80,d2
+                addq.w  #1,d6
+                lea     (OptText).l,a3
+; a3 = text, centred at row d2; d5 nonzero: the credits' colours, else the instructions' ones
+.line:          movea.l a3,a0
+.len:           tst.b   (a0)+
+                bne.b   .len
+                suba.l  a3,a0
+                moveq   #33,d1                  ; (length + 1 counted)
+                sub.w   a0,d1
+                lsr.w   #1,d1
+                tst.b   d5
+                beq.b   .plain
+                bsr.b   .credcol
+                bra.b   .print
+.plain:         move.b  #$1F,g_TextShadow(a6)   ; the instructions' colours
+                move.b  #$01,g_TextInk(a6)
+                move.b  #$19,g_TextPaper(a6)
+.print:         jmp     PrintString
+
+TxtMenu1:       dc.b    'PLAYER 1 START',0
+TxtMenu2:       dc.b    'PLAYER 2 START',0
+TxtMenuInput:   dc.b    'INPUT - ',0
+TxtJumpUp:      dc.b    'JUMP ON UP',0
+TxtJumpB2:      dc.b    'JUMP ON BUTTON 2',0
+TxtMenuTest:    dc.b    'TEST MENU',0
+TxtKeys:        dc.b    'SPACE pause   Esc abort',0
+TxtCheatItem:   dc.b    'CHEAT ',0
+TxtOff:         dc.b    'OFF',0
+TxtOn:          dc.b    'ON',0
+TxtExit:        dc.b    'EXIT',0
+MenuPage:       dc.b    0                       ; 0 the title, else the test page
+MenuItem:       dc.b    0                       ; the item chosen on the page
+JumpButton:     dc.b    0                       ; nonzero: jump on the joystick's second button
+                even
+OptText:        dcb.b   40,0                    ; a line, made up
+
+;------------------------------------------------------------------------------
+; EnhShowMachine - the test page: one line with the memory the bootblock found, for example
 ;       CHIP 512K SLOW 512K FAST 0K
 ; Nothing is printed when the bootblock left no description (the original bootblock).
 ; Sizes: chip = its upper end; slow / fast = upper end - the 64K boundary below mh_Lower.
-;------------------------------------------------------------------------------
-;------------------------------------------------------------------------------
-; EnhCheatKey - CheckGameStart (the title and high-score screens), first: the J key switches
-; jump between up (the original) and the joystick's second button (JumpButton; with it, up
-; only climbs ladders); the C key turns the game's cheat on or off (g_CheatOn, as entering
-; ')!(' on the high-score table: lives never decrease, no harm once the armour is gone; for
-; testing). Either shows the title again, with the line that says which (EnhShowCheat).
-;------------------------------------------------------------------------------
-EnhCheatKey:
-                cmpi.b  #$26,g_RawKey(a6)       ; raw key code of J
-                bne.b   .cheat
-                not.b   (JumpButton).l
-                bra.b   .title
-.cheat:         cmpi.b  #$33,g_RawKey(a6)       ; raw key code of C
-                bne.b   .out
-                not.b   g_CheatOn(a6)
-.title:         clr.w   g_RawKey(a6)
-                move.b  #GS_TITLE,g_GameState(a6)       ; the title again, with the line
-                clr.b   g_SubState(a6)
-.out:           rts
-
-; EnhShowCheat - with the title, between the keys and the copyright lines: how Arthur jumps
-; and the key that changes it, then 'CHEAT ON' while the cheat is on, centred:
-;       J  jump on UP              J  jump on BUTTON 2  CHEAT ON
-EnhShowCheat:
-                movem.l d0-d7/a0-a5,-(a7)
-                lea     (OptText).l,a3
-                lea     TxtJumpUp(pc),a1
-                tst.b   (JumpButton).l
-                beq.b   .jump
-                lea     TxtJumpB2(pc),a1
-.jump:          bsr.b   .copy
-                tst.b   g_CheatOn(a6)
-                beq.b   .show
-                lea     TxtCheat(pc),a1
-                bsr.b   .copy
-.show:          clr.b   (a3)
-                lea     (OptText).l,a0
-                suba.l  a0,a3                   ; length
-                moveq   #32,d1                  ; centred on the 32 columns
-                sub.w   a3,d1
-                lsr.w   #1,d1
-                move.b  #$18,g_TextShadow(a6)   ; the credits' colours
-                move.b  #$0D,g_TextInk(a6)
-                move.b  #$1F,g_TextPaper(a6)
-                movea.l a0,a3
-                move.w  #$C4,d2                 ; between 'Press Esc ...' ($B8) and the copyright ($D0)
-                jsr     PrintString
-                movem.l (a7)+,d0-d7/a0-a5
-                rts
-.copy:          move.b  (a1)+,(a3)+
-                bne.b   .copy
-                subq.l  #1,a3
-                rts
-TxtJumpUp:      dc.b    'J  jump on UP',0
-TxtJumpB2:      dc.b    'J  jump on BUTTON 2',0
-TxtCheat:       dc.b    '  CHEAT ON',0
-JumpButton:     dc.b    0                       ; nonzero: jump on the joystick's second button
-                even
-OptText:        dcb.b   32,0                    ; the line, made up
-
 EnhShowMachine:
                 movem.l d0-d7/a0-a5,-(a7)
-                bsr.w   EnhShowCheat
                 lea     (EnhMachine).l,a4
                 cmpi.l  #'GNGM',(a4)
                 bne.b   .out
@@ -1215,7 +1359,7 @@ EnhShowMachine:
                 move.b  #$0D,g_TextInk(a6)
                 move.b  #$1F,g_TextPaper(a6)
                 lea     (MachText).l,a3
-                moveq   #$78,d2                 ; the free line between SOUND and 'Press fire'
+                moveq   #$58,d2                 ; under 'TEST MENU'
                 jsr     PrintString
 .out:           movem.l (a7)+,d0-d7/a0-a5
                 rts

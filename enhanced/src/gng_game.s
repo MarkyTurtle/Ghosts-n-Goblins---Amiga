@@ -3593,7 +3593,7 @@ l_05E36:
         movem.l d0-d7,COLOR00(a0)               ; 05E78/05ECE
         movem.l (a1)+,d0-d7                     ; 05E7E/05ED4
         movem.l d0-d7,COLOR16(a0)               ; 05E82/05ED8
-        bsr.w   RedrawScreen                    ; 05E88/05EDE
+        jsr     (RedrawScreen).l                    ; 05E88/05EDE
         bsr.w   SwapScreens                     ; 05E8C/05EE2
         move.b  #GS_TITLE,g_GameState(a6)       ; 05E90/05EE6
         clr.b   g_SubState(a6)                  ; 05E96/05EEC
@@ -3653,7 +3653,6 @@ AttractTitle:
         clr.w   g_RawKey(a6)                    ; 05EE8/05F3E
         bsr.w   SwapScreens                     ; 05EEC/05F42
         bsr.w   DrawCreditsScreen               ; 05EF0/05F46
-        jsr     EnhShowMachine                  ; and the memory the bootblock found
         clr.b   g_ArthurVisible(a6)             ; 05EF4/05F4A
         clr.b   g_Spr47Visible(a6)              ; 05EF8/05F4E
         bsr.w   ArthurSpritePos                 ; 05EFC/05F52
@@ -3667,6 +3666,8 @@ l_05F16:
         sub.w   g_FrameStamp(a6),d0             ; 05F1A/05F70
         cmp.w   #$190,d0                        ; 05F1E/05F74
         bcs.b   l_05F2C                         ; 05F22/05F78
+        tst.b   (MenuPage).l                    ; the test page: no time-out
+        bne.b   l_05F2C                         
         addq.b  #GS_TITLE,g_GameState(a6)       ; 05F24/05F7A
         clr.b   g_SubState(a6)                  ; 05F28/05F7E
 l_05F2C:
@@ -3697,22 +3698,14 @@ l_05F5C:
         clr.b   g_SubState(a6)                  ; 05F70/05FC6
 
 ;---------------------------------------------------------------------------
-; Start a game: fire (CIA-A PRA bit 7) starts with the current mode,
-; F1 = one player, F2 = two players.  Resets both player blocks
+; Start a game: the title menu (EnhMenu; the original: fire started with the current
+; mode), F1 = one player, F2 = two players.  Resets both player blocks
 ; (level 0, weapon 1 = lance, 7 lives, intro cut-scene pending).
 ;---------------------------------------------------------------------------
 CheckGameStart:
-        jsr     EnhCheatKey                     ; the title / high scores: 'C' turns the cheat on or off
-        btst    #$7,$bfe001.l                   ; 05F74/05FCA
-        beq.b   l_05F9A                         ; 05F7C/05FD2
-        cmpi.b  #$50,g_RawKey(a6)               ; 05F7E/05FD4  F1 pressed?
-        bne.b   l_05F8C                         ; 05F84/05FDA
-        clr.b   g_TwoPlayer(a6)                 ; 05F86/05FDC
-        bra.b   l_05F9A                         ; 05F8A/05FE0
-l_05F8C:
-        cmpi.b  #$51,g_RawKey(a6)               ; 05F8C/05FE2  F2 pressed?
-        bne.w   LogicExit                       ; 05F92/05FE8
-        st.b    g_TwoPlayer(a6)                 ; 05F96/05FEC
+        jsr     EnhMenu                         ; the title menu (and F1 / F2): d0 nonzero = start, g_TwoPlayer set
+        tst.b   d0                              
+        beq.w   LogicExit                       
 l_05F9A:
         clr.w   g_RawKey(a6)                    ; 05F9A/05FF0
         clr.b   g_Paused(a6)                    ; 05F9E/05FF4
@@ -4021,45 +4014,7 @@ l_062C4:
         bsr.w   PrintChar                       ; 062DA/06338
         move.b  #$6d,d0                         ; 062DE/0633C
         bsr.w   PrintChar                       ; 062E2/06340
-        lea.l   TxtCreditProgram(pc),a3         ; 062E6/06344
-        moveq   #$6,d1                          ; 062EA/06348
-        move.w  #$48,d2                         ; 062EC/0634A
-        bsr.w   PrintString                     ; 062F0/0634E
-        lea.l   TxtCreditGraphics(pc),a3        ; 062F4/06352
-        moveq   #$6,d1                          ; 062F8/06356
-        move.w  #$58,d2                         ; 062FA/06358
-        bsr.w   PrintString                     ; 062FE/0635C
-        lea.l   TxtCreditSound(pc),a3           ; 06302/06360
-        moveq   #$6,d1                          ; 06306/06364
-        move.w  #$68,d2                         ; 06308/06366
-        bsr.w   PrintString                     ; 0630C/0636A
-        move.b  #$1f,g_TextShadow(a6)           ; 06310/0636E
-        move.b  #$1,g_TextInk(a6)               ; 06316/06374
-        move.b  #$19,g_TextPaper(a6)            ; 0631C/0637A
-        lea.l   TxtFire1(pc),a3                 ; 06322/06380  fire starts the mode last chosen (1 or 2 players), F1 / F2 choose
-        tst.b   g_TwoPlayer(a6)                 ; 06326/06384
-        beq.b   l_06330                         ; 0632A/06388
-        lea.l   TxtPressF1(pc),a3               ; 0632C/0638A
-l_06330:
-        moveq   #$3,d1                          ; 06330/0638E
-        move.w  #$88,d2                         ; 06332/06390
-        bsr.w   PrintString                     ; 06336/06394
-        lea.l   TxtPressF2(pc),a3               ; 0633A/06398
-        tst.b   g_TwoPlayer(a6)                 ; 0633E/0639C
-        beq.b   l_06348                         ; 06342/063A0
-        lea.l   TxtFire2(pc),a3                 ; 06344/063A2
-l_06348:
-        moveq   #$3,d1                          ; 06348/063A6
-        move.w  #$98,d2                         ; 0634A/063A8
-        bsr.w   PrintString                     ; 0634E/063AC
-        lea.l   TxtPause(pc),a3                 ; 06352/063B0
-        moveq   #$4,d1                          ; 06356/063B4
-        move.w  #$a8,d2                         ; 06358/063B6
-        bsr.w   PrintString                     ; 0635C/063BA
-        lea.l   TxtAbort(pc),a3                 ; 06360/063BE
-        moveq   #$4,d1                          ; 06364/063C2
-        move.w  #$b8,d2                         ; 06366/063C4
-        bsr.w   PrintString                     ; 0636A/063C8
+        jsr     EnhTitleText                    ; the credits and the menu (or the test page)
         bra.w   DrawCopyright                   ; 0636E/063CC
 
 ;---------------------------------------------------------------------------
@@ -12774,24 +12729,6 @@ TxtRanks:
 	dc.b	$48,$00
 TxtPts:
 	dc.b	$20,$50,$54,$53,$00
-TxtPressF1:
-	dc.b	'Press  F1  for 1 player game'
-	dc.b	$00
-TxtPressF2:
-	dc.b	'Press  F2  for 2 player game'
-	dc.b	$00
-TxtFire1:
-	dc.b	'Press fire for 1 player game'
-	dc.b	$00
-TxtFire2:
-	dc.b	'Press fire for 2 player game'
-	dc.b	$00
-TxtPause:
-	dc.b	'Press SPACE to pause game'
-	dc.b	$00
-TxtAbort:
-	dc.b	'Press Esc   to abort game'
-	dc.b	$00
 TxtGameOver:
 	dc.b	'GAME OVER PLAYER '
 	dc.b	$00
@@ -13092,7 +13029,7 @@ l_0BFB4:
         beq.b   l_0BFD8                         ; 0BFC4/0BF58
         clr.b   g_RedrawPending(a6)             ; 0BFC6/0BF5A
         addq.l  #$4,a7                          ; 0BFCA/0BF5E  replace the return address; reset the user stack
-        pea.l   RedrawEntry(pc)                 ; 0BFCC/0BF60  redirect user-mode return to RedrawEntry
+        pea.l   (RedrawEntry).l                 ; 0BFCC/0BF60  redirect user-mode return to RedrawEntry
         andi.w  #$dfff,g_SavedSR(a6)            ; 0BFD0/0BF64
         move    a6,usp                          ; 0BFD6/0BF6A
 l_0BFD8:

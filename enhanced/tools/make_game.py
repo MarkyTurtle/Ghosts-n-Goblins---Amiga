@@ -303,11 +303,7 @@ def fold_scroller(S):
           "        move.b  #250,g_StateTimer(a6)           ; 'TAKE A KEY FOR COMING IN !': 5 s (the original: 36 frames)\n")
     S.sub("        move.b  #$40,g_StateTimer(a6)           ; 06500/0655E\n",
           "        move.b  #150,g_StateTimer(a6)           ; 'BONUS' and the amount: 3 s (the original: 64 frames)\n")
-    S.sub("CheckGameStart:\n        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n",
-          "CheckGameStart:\n" + I('jsr     EnhCheatKey', "the title / high scores: 'C' turns the cheat on or off") + '\n'
-          "        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n")
-    S.sub("        bsr.w   DrawCreditsScreen               ; 05EF0/05F46\n",
-          "        bsr.w   DrawCreditsScreen               ; 05EF0/05F46\n" + I('jsr     EnhShowMachine', 'and the memory the bootblock found') + '\n')
+    title_menu(S)
     # the timing build: the logic's start and end colour the background
     S.sub("Level1Logic:\n        move.w  #INTF_SOFTINT,CUSTOM+INTREQ     ; 05EB6/05F0C\n",
           "Level1Logic:\n\tifd\tRASTER_BUILD\n" + I('jsr     EnhLogicStart', 'timing build: (does the INTREQ write) grey') + '\n\telse\n'
@@ -388,10 +384,33 @@ def byteloader(S):
               f"        jmp     {to}                        ; {addr}  (rte, with the interrupted a6)")
 
 
+def title_menu(S):
+    """the title screen's start and key instructions become a menu (scroller.s: EnhMenu,
+    EnhTitleText): PLAYER 1 START, PLAYER 2 START, INPUT - JUMP ON UP / BUTTON 2, TEST MENU
+    (the memory the bootblock found, the cheat); F1 / F2 still start a game at once"""
+    a = S.s.index("CheckGameStart:\n        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n")
+    b = S.s.index("l_05F9A:\n", a)
+    S.s = (S.s[:a] + "CheckGameStart:\n"
+           + I('jsr     EnhMenu', 'the title menu (and F1 / F2): d0 nonzero = start, g_TwoPlayer set') + '\n'
+           + I('tst.b   d0') + '\n' + I('beq.w   LogicExit') + '\n' + S.s[b:])
+    S.sub("; Start a game: fire (CIA-A PRA bit 7) starts with the current mode,\n; F1 = one player, F2 = two players.",
+          "; Start a game: the title menu (EnhMenu; the original: fire started with the current\n; mode), F1 = one player, F2 = two players.")
+    a = S.s.index("        lea.l   TxtCreditProgram(pc),a3         ; 062E6/06344\n")
+    b = S.s.index("        bra.w   DrawCopyright                   ; 0636E/063CC\n", a)
+    S.s = (S.s[:a] + I('jsr     EnhTitleText', 'the credits and the menu (or the test page)') + '\n' + S.s[b:])
+    # the instructions the menu replaces (168 bytes, an even number: what follows keeps its alignment)
+    S.s, n = re.subn(r"\n(TxtPressF1|TxtPressF2|TxtFire1|TxtFire2|TxtPause|TxtAbort):\n\tdc\.b\t'[^'\n]*'\n\tdc\.b\t\$00", '', S.s)
+    assert n == 6, n
+    # the test page stays until it is left; the title page goes on to the high scores
+    S.sub("        addq.b  #GS_TITLE,g_GameState(a6)       ; 05F24/05F7A\n",
+          I('tst.b   (MenuPage).l', 'the test page: no time-out') + '\n' + I('bne.b   l_05F2C') + '\n'
+          "        addq.b  #GS_TITLE,g_GameState(a6)       ; 05F24/05F7A\n")
+
+
 def two_buttons(S):
     """two-button joysticks: the second button (port 2's pin 9, read on POTINP) is bit 14 of
     g_Joy. With JumpButton set (the title's J key) it jumps and up only climbs ladders, as on
-    the arcade machine; otherwise up jumps, as the original (scroller.s: EnhCheatKey)"""
+    the arcade machine; otherwise up jumps, as the original (scroller.s: EnhMenu)"""
     S.sub("""l_0BF84:
         move.w  d0,g_Joy(a6)                    ; 0BF84/0BF18
 """, """l_0BF84:

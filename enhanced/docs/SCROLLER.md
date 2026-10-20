@@ -741,11 +741,9 @@ the program's `MUSIC_FILE`), music package at 64; the original programs' tracks 
 ### Two-button joysticks
 
 The joystick's second button (port 2, pin 9: a Sega-style pad or a two-button stick) can make
-Arthur jump, as on the arcade machine. **J on the title screen** switches between jump on up
-(the original, and the default) and jump on button 2; the title says which, in the line where
-CHEAT ON shows (`J  jump on UP` / `J  jump on BUTTON 2`, then `CHEAT ON` while the cheat is on;
-C still turns the cheat on or off). The setting is `JumpButton` (`scroller.s`), kept until the
-machine is reset; an options menu is to come (`docs/TODO.md`, 8).
+Arthur jump, as on the arcade machine. The title menu's **INPUT** item (or the J key) switches
+between jump on up (the original, and the default) and jump on button 2 (*The title menu*,
+below). The setting is `JumpButton` (`scroller.s`), kept until the machine is reset.
 
 *Reading it* (`make_game.py`, `two_buttons`): the vertical blank, which reads the joystick into
 `g_Joy` (right, down, left, up as decoded from `JOY1DAT`; fire bit 15), now also sets bit 14 when
@@ -766,6 +764,37 @@ only climbs with jump on button 2. The emulator harness's `frame()` takes the se
 (`fire2`; `POTINP` reads as not pressed otherwise). The comparisons with the originals (jump on
 up) stay in step as before.
 
+### The title menu
+
+The title screen's instructions ('Press fire for 1 player game', the F1 / F2 lines, 'Press
+SPACE to pause game', 'Press Esc to abort game') are replaced by a menu (`scroller.s`: `EnhMenu`
+from `CheckGameStart`, `EnhTitleText` from `DrawCreditsScreen` after the logo; `make_game.py`:
+`title_menu`). The logo, the credits and the copyright lines stay.
+
+| Page | Items |
+|---|---|
+| title | `PLAYER 1 START`, `PLAYER 2 START`, `INPUT - JUMP ON UP` / `JUMP ON BUTTON 2`, `TEST MENU`; then one line `SPACE pause   Esc abort` |
+| test | `TEST MENU`, the memory the bootblock found (`CHIP 512K SLOW 0K FAST 0K`: the line that was on the title), then `CHEAT OFF` / `ON`, `EXIT` |
+
+Up and down move (round from the last item to the first), fire chooses; on `INPUT` and `CHEAT`
+left, right and fire switch the setting. The item chosen shows as `> ... <` in the credits'
+colours. A move or a change draws the title again (as the C key did: `GS_TITLE` from step 0,
+double-buffered), which also starts its 400-frame time-out to the high scores again; the test
+page has no time-out. On the high-score page the joystick goes back to the title (it no longer
+starts a game there). The keys still work: F1 / F2 start a 1 / 2 player game at once, J switches
+the jump input, C the cheat. Moves and fire count when newly pressed (`g_Joy` against
+`g_JoyPrev`; the original read the fire button's level), so a held button does not repeat: fire
+on `PLAYER 1 START` starts a game in the same frame as the original's fire did, and the
+comparisons stay in step.
+
+The sound, sprite and input tests (`docs/TODO.md`, 8) are to go on the test page. Memory: the
+program is 206 bytes longer (the menu, less the original's instruction code and texts); stages
+1 and 2 now pre-mask one small enemy set fewer.
+
+*Testing*: `tools/test_menu.py` (12 cases from one saved state of the title: starting 1 and 2
+player games from the menu and with F1 / F2, moving round, the input and cheat switches, the
+test page staying, EXIT, the time-out to the high scores and back).
+
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
@@ -784,6 +813,7 @@ up) stay in step as before.
 * `tools/test_scroll.py`: the scroller against the original, frame by frame.
 * `src/boot_patches.s`: the bootblock's memory survey; `tools/test_bootinfo.py` tests it.
 * `tools/test_jump.py`: the two-button joystick settings (jump on up or on button 2).
+* `tools/test_menu.py`: the title menu.
 * `tools/test_bobs.py`: BOBs, restores and scenery against the original's `DrawBobs` and
   `DrawSceneryOnRedraw`.
 

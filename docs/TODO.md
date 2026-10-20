@@ -100,13 +100,15 @@ decided against, kept for the record with the reason.
 
 **Controls and extras**
 - [x] Two-button joysticks: one button fires, the other jumps; up-to-jump kept as an option (8):
-      J on the title switches it (`JumpButton`), until the options menu; see
+      the title menu's INPUT item (or J) switches it (`JumpButton`); see
       `enhanced/docs/SCROLLER.md`, *Two-button joysticks*
-- [ ] An options menu (controls and the other settings) (8)
-- [ ] A sound test: play each tune and effect (8)
-- [ ] A sprite test: show the BOB and sprite frames (8), if there is room
-- [ ] An input test, as on an arcade machine: the joystick directions and both buttons shown on
-      screen as they are pressed (8), if there is room
+- [x] A title menu instead of the instructions: PLAYER 1 START, PLAYER 2 START, INPUT (the jump
+      setting), TEST MENU (the memory line and the cheat, moved from the title) (8); see
+      `enhanced/docs/SCROLLER.md`, *The title menu*
+- [ ] A sound test on the test page: play each tune and effect (8)
+- [ ] A sprite test on the test page: show the BOB and sprite frames (8), if there is room
+- [ ] An input test on the test page, as on an arcade machine: the joystick directions and both
+      buttons shown on screen as they are pressed (8), if there is room
 
 **Testing**
 - [x] Boot and timing tests of the disk image and the enhanced builds in a full emulator (6):
@@ -628,10 +630,10 @@ second button is read from `POTINP` bit 14 (port 2's pin 9, set as an output dri
 original), switched with J on the title for now and in the options menu later. With jump on the
 button, up only climbs ladders. (A CD32 pad's extra buttons need its serial read-out: not done.)
 
-**Options menu.** From the title screen: controls (up or button 2 to jump), and room for the
-other settings the one program already has (music on or off where it plays, the cheat now on
-C). Kept small: it must fit in what the 512K map has left (about 7 KB on the fullest stage,
-less if it is resident; the title screen's own memory is free while it shows).
+**Options menu** (done as the title menu: `enhanced/docs/SCROLLER.md`, *The title menu*). The
+title page has the start items and INPUT; the test page the memory line, CHEAT and EXIT, with
+room for the tests below. Every byte of it is resident: on 512K it comes out of the level
+data area, where the fullest stages pre-mask what fits.
 
 **Sound test.** Play each of the 15 tunes and 30 effects through the driver already loaded
 (`MUSIC_PLAYER` commands 1 and 2); on 512K the 512K package has every tune and effect, on 1MB
