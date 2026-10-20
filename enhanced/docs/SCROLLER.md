@@ -490,7 +490,7 @@ the original drawing the scroller replaced (`DrawBob`, `DrawBobMasked`, `DrawSce
 50,828 bytes free. About 300 bytes of small unreachable pieces of the original are left as they
 are (an unused path routine of the Petite Devil, a few instructions after jumps).
 
-**The disk: an AmigaDOS-format disk and the 4489_byteloader** (branch `enhanced/byteloader`).
+**The disk: an AmigaDOS-format disk and the 4489_byteloader** (made on branch `enhanced/byteloader`, merged).
 The one program's disk (`build_game.py`: `gng_game.adf`, 901,120 bytes) is now an ordinary
 880K disk, 11 sectors of 512 bytes a track with the `$4489` sync, with no filesystem (Workbench
 shows it as NDOS). Every file is read with the [4489_byteloader](https://github.com/MarkyTurtle/4489_byteloader)
@@ -548,7 +548,7 @@ order: the effects package's area now comes first after the program (`SFX_AREA`)
 `LoadSound` runs right after `ReadProfile`, so that the 1MB music package, loaded over the
 program's old place, can run on into buffers that are only filled later.
 
-### Music on 512K (branch `enhanced/music512`)
+### Music on 512K (made on branch `enhanced/music512`, merged)
 
 A plain 512K A500 now plays the music. The memory came from the work above: the per-level map
 tables (17 KB), two joined gaps (3 KB), the old background save areas (24 KB) and the dead code
@@ -574,7 +574,7 @@ grows from `$7D64` to `$12700` (43,420 bytes more), and everything after it in t
 (the sprite data and `MASK_LINE_BUF` are now relative to `SFX_AREA` as the rest already were).
 The level area loses the same amount, so `BuildLevelMasks` pre-masks less:
 
-| Stage | Data ends (music) | Still 5 blits with music | Without music (`enhanced/byteloader`) |
+| Stage | Data ends (music) | Still 5 blits with music | Without music (before this change) |
 |---|---|---|---|
 | 1 | $7F9D4 | items / weapons, 7 enemy sets | 2 enemy sets |
 | 2 | $7F9BC | enemy shots, items / weapons, 5 enemy sets | 3 enemy sets |
@@ -596,6 +596,10 @@ A500+ and an A1200 with fast RAM), and with `--disk` (the byteloader reading the
 the title's machine line, the loading frames and, on stage 6, the one progress-map frame the
 slow-RAM comparison already showed against the 1MB original. On 512K the channels play the tunes'
 samples (1MB samples 5-9 in the opening tune) alongside the effects' samples.
+
+*In WinUAE* (tried on an unexpanded A500, an A500 + 512K, an unexpanded A500+, an A600 and an
+A1200): it works on all of them. On the plain A500 the slow-down is small and brief, mostly at
+the end of a level with the dragon and on the dragon's level itself, and hardly noticeable.
 
 **Where the originals differ** both versions are in the source, chosen at run time. In the
 sound code the choice keeps the condition codes (`move sr,-(a7)` ... `move (a7)+,ccr`; game
