@@ -251,10 +251,19 @@ MAP_LOW             	equ	MAP_FIX	; somewhere else, the memory map where it is at
 MAP_LOW             	equ	GLOBALS+GLOBALS_SIZE	; ($1A118) the memory map below starts here, right after
                     			; the globals, so it moves with the program
 	endc
-SFX_AREA            	equ	$12700	; the sound package at MUSIC_FILE: on 512K the music package (the
-                    			; 512K effects and the 1MB tunes, sound/gng_music_512k.s: 75,514 bytes; was
-                    			; $7D64 for the effects alone), then the rest of the map: offsets as the
-                    			; original's with the package moved to the front
+	ifd	MUSIC512_LEN
+	ifgt	MUSIC512_LEN-$7D64
+SFX_AREA            	equ	(MUSIC512_LEN+15)/16*16	; the sound package at MUSIC_FILE: on 512K the music
+                    			; package (the 512K effects and the 1MB tunes, sound/gng_music_512k.s, its
+                    			; length from build_game.py: 75,514 bytes at full quality, less with
+                    			; --music-rate), then the rest of the map: offsets as the original's with
+                    			; the package moved to the front
+	else
+SFX_AREA            	equ	$7D70	; (at least the 512K effects package: $7D64)
+	endc
+	else
+SFX_AREA            	equ	$12700	; (assembled without the build's lengths: as at full quality)
+	endc
 COPPER_INIT         	equ	MAP_LOW+SFX_AREA+$00000	; $1A118: copper list template ($180 bytes copied from CopperTemplate)
 COPPER_A1           	equ	MAP_LOW+SFX_AREA+$00078	; $1A190
 COPPER_A2           	equ	MAP_LOW+SFX_AREA+$000A8	; $1A1C0

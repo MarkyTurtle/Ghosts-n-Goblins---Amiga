@@ -20,8 +20,16 @@ instruments, and its samples in the same order: the instruments that run past th
 into the next one find the same neighbours; the last one runs past the end of the package, as
 the 512K one did).
 
-  python3 sound/tools/make_music_512k.py        (writes sound/gng_music_512k.s)"""
-import os, re
+Quality (--rate N/D, default 1): the tunes' sampled instruments (samples 5-9: 32,726 bytes)
+resampled to N/D of their rate (scipy's polyphase filter; the loop samples 7-9 as loops), their
+instruments' lengths set to the new sizes and their period multipliers divided by N/D (capped
+at $FFFF: $8000 x 2 is 1 in 65,536 short), so every note keeps its pitch. Samples 0-4 (the
+single-cycle waveforms, 1,650 bytes) stay: their length is their pitch. The new samples go to
+sound/samples/r<N>_<D>/ (made again each time).
+
+  python3 sound/tools/make_music_512k.py [--rate N/D] [--out FILE]   (default sound/gng_music_512k.s)"""
+import os, re, sys
+from fractions import Fraction
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SND = os.path.join(HERE, '..')
@@ -73,5 +81,63 @@ out += ['; ---- the effects\' samples (the 512K package\'s, in its order)']
 k0 = at(K, 'SmpHdr00')
 out += effects(K[k0:])
 out += ['\teven', 'SndEnd:']
-open(os.path.join(SND, 'gng_music_512k.s'), 'w').write('\n'.join(out).rstrip('\n') + '\n')
-print('sound/gng_music_512k.s written')
+
+RESAMPLED = (5, 6, 7, 8, 9)                 # the sampled instruments' samples
+LOOPS = (7, 8, 9)                           # played as loops (Ins05: 8 whole; Ins06: 7; Ins08: 9)
+TUNE_INS = {5: (8, 8), 6: (5, 7), 7: (6, 9), 8: (6, 9)}     # instrument: (attack, loop) sample
+
+
+def resample(data, f, loop):
+    """8-bit signed samples at f (a Fraction) of their rate, an even number of bytes"""
+    import numpy as np
+    from scipy.signal import resample_poly
+    x = np.frombuffer(data, dtype=np.int8).astype(float)
+    p, q = f.numerator, f.denominator
+    pad = 32 * q
+    if loop: x = np.concatenate([x[-pad:], x, x[:pad]])            # as it repeats
+    y = resample_poly(x, p, q)
+    if loop: y = y[pad * p // q:len(y) - pad * p // q]
+    n = int(round(len(data) * f / 2)) * 2
+    y = np.resize(y, n) if len(y) < n else y[:n]
+    return np.clip(np.round(y), -128, 127).astype(np.int8).tobytes()
+
+
+def quality(lines, f):
+    """the tunes' sampled instruments at f of their rate (see the module's text)"""
+    tag = f'r{f.numerator}_{f.denominator}'
+    d = os.path.join(SND, 'samples', tag)
+    os.makedirs(d, exist_ok=True)
+    size = {}
+    for n in RESAMPLED:
+        raw = open(os.path.join(SND, 'samples', f'gng_music_1mb_smp{n:02d}.raw'), 'rb').read()
+        new = resample(raw, f, n in LOOPS)
+        open(os.path.join(d, f'gng_music_1mb_smp{n:02d}.raw'), 'wb').write(new)
+        size[n] = len(new)
+    text = '\n'.join(lines)
+    for n in RESAMPLED:
+        old = re.search(rf'(SmpHdr{n:02d}:\n\s+dc\.b\s+)\$00,\$00,\$([0-9A-F]{{2}}),\$([0-9A-F]{{2}}),\$([0-9A-F]{{2}}),\$([0-9A-F]{{2}})[^\n]*', text)
+        hz = round(int(old.group(4) + old.group(5), 16) * f)
+        b = size[n].to_bytes(2, 'big') + hz.to_bytes(2, 'big')
+        text = text.replace(old.group(0), old.group(1) + '$00,$00,' + ','.join(f'${x:02X}' for x in b)
+                            + f'     ; sample {n} header: length {size[n]} bytes, {hz} Hz (resampled to {f} of the rate)')
+        text, k = re.subn(rf'incbin  "samples/gng_music_1mb_smp{n:02d}\.raw",0,\d+;[^\n]*',
+                          f'incbin  "samples/{tag}/gng_music_1mb_smp{n:02d}.raw",0,{size[n]}; {size[n]} bytes', text)
+        assert k == 1
+    for ins, (a, l) in TUNE_INS.items():
+        m = re.search(rf'(Ins{ins:02d}:\n(?:[^\n]*\n){{4}})\s+dc\.w\s+\$([0-9A-F]{{4}}),\$([0-9A-F]{{4}})[^\n]*\n\s+dc\.w\s+\$([0-9A-F]{{4}}),\$([0-9A-F]{{4}})[^\n]*', text)
+        mul = [min(0xFFFF, round(int(m.group(k), 16) / f)) for k in (4, 5)]
+        new = (m.group(1) + f'        dc.w    ${size[a] // 2:04X},${size[l] // 2:04X}                 ; attack / loop length (words) = {size[a]} / {size[l]} bytes\n'
+               + f'        dc.w    ${mul[0]:04X},${mul[1]:04X}                 ; period multipliers (PitchTable * mul >> 16): / {f}')
+        text = text.replace(m.group(0), new)
+    return text.split('\n')
+
+
+args = sys.argv[1:]
+rate = Fraction(args[args.index('--rate') + 1]) if '--rate' in args else Fraction(1)
+dest = args[args.index('--out') + 1] if '--out' in args else os.path.join(SND, 'gng_music_512k.s')
+if rate != 1:
+    assert 0 < rate < 1, rate
+    out = quality(out, rate)
+    out[2] = out[2] + f' Tunes\' samples 5-9 at {rate} of their rate (--rate).'
+open(dest, 'w').write('\n'.join(out).rstrip('\n') + '\n')
+print(os.path.relpath(dest, os.path.join(SND, '..')), 'written' + (f' (tunes\' samples 5-9 at {rate} of their rate)' if rate != 1 else ''))

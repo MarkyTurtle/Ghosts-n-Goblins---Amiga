@@ -156,6 +156,9 @@ Big Man, Astaroth), 11 the torch bursting into flame, 14 extra life, 18 Woody Pi
 * `gng_music_512k.s` – the music for 512K machines (enhanced game): made by
   `tools/make_music_512k.py` from the two sources (the 512K effects with the 1MB tunes); checked
   against both by `tools/check_music_512k.py`
+  (`--rate N/D`: the tunes' sampled instruments, samples 5-9, resampled to N/D of their rate,
+  with their period multipliers divided by N/D so every note keeps its pitch; written elsewhere
+  with `--out`, used by the game's `build_game.py --music-rate N/D`)
 * `audio/tunes/`, `audio/sfx_1mb/`, `audio/sfx_512k/` – MP3 renders (looping tunes: two passes)
 * `audio/samples_1mb/`, `audio/samples_512k/` – every sample as an 8-bit WAV at its recorded rate
 * `tools/` – `sndparse.py` (data parser), `gen_snd.py` + `snd_anno.py` (source generator), `sndemu.py`

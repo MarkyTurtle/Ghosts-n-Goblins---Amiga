@@ -8,6 +8,9 @@ is running (grey logic, red new edges / restore, orange text, blue BOBs, yellow 
 green waiting for line $44, black idle); build/game_raster/, build/gng_game_raster.adf
 --nasty-wait: blitter priority only while waiting for the blitter (NASTY_WAIT, scroll.s);
 build/game_nastywait/ (with --raster: game_raster_nastywait/), build/gng_game_nastywait.adf
+--music-rate N/D: the 512K music package with the tunes' sampled instruments at N/D of their
+rate (sound/tools/make_music_512k.py --rate; smaller, so the level area gets the difference);
+build/game_musicN_D/, build/gng_game_musicN_D.adf
 
 Writes enhanced/build/game/:
   game.bin, game.lst   the main program (loaded to $80 on every machine)
@@ -27,8 +30,12 @@ ENH = os.path.join(HERE, '..')
 ROOT = os.path.join(ENH, '..')
 RASTER = '--raster' in sys.argv
 NASTY = '--nasty-wait' in sys.argv
-VARIANT = ('_raster' if RASTER else '') + ('_nastywait' if NASTY else '')
+MUSIC_RATE = sys.argv[sys.argv.index('--music-rate') + 1] if '--music-rate' in sys.argv else None
+VARIANT = (('_raster' if RASTER else '') + ('_nastywait' if NASTY else '')
+           + (f'_music{MUSIC_RATE.replace("/", "_")}' if MUSIC_RATE else ''))
 OUT = os.path.join(ENH, 'build', 'game' + VARIANT)
+M512_SRC = (os.path.join(OUT, 'gng_music_512k.s') if MUSIC_RATE        # (the committed one: full quality)
+            else os.path.join(ROOT, 'sound', 'gng_music_512k.s'))
 VASM = os.environ.get('VASM', 'vasmm68k_mot')
 ADF_SIZE = 901120                        # 80 cylinders x 2 heads x 11 sectors x 512 bytes
 FT_OFFSET, FT_VERSION = 0x400, 1         # the file table (gng_game.i FT_OFFSET, boot_4489.s)
@@ -36,7 +43,8 @@ FILES_START = 0x600
 
 
 def vasm(src, out, listing=None, defs=()):
-    cmd = [VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', os.path.join(ENH, 'src'), '-I', ROOT, '-o', out]
+    cmd = [VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', os.path.join(ENH, 'src'), '-I', ROOT,
+           '-I', os.path.join(ROOT, 'sound'), '-o', out]
     if listing: cmd += ['-L', listing]
     cmd += [f'-D{k}={v}' for k, v in defs] + [src]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -135,10 +143,10 @@ def build(extra_defs=()):
         tdefs += [(f'TBLLEN{l}', len(data))]
     # the 512K music package (sound/tools/make_music_512k.py): its length for the program's file
     # record (the same wherever it is assembled; it is assembled again for MUSIC_FILE below)
-    subprocess.run([sys.executable, os.path.join(ROOT, 'sound', 'tools', 'make_music_512k.py')], check=True,
-                   capture_output=True)
+    subprocess.run([sys.executable, os.path.join(ROOT, 'sound', 'tools', 'make_music_512k.py')]
+                   + (['--rate', MUSIC_RATE, '--out', M512_SRC] if MUSIC_RATE else []), check=True, capture_output=True)
     music512 = os.path.join(OUT, 'music512.bin')
-    vasm(os.path.join(ROOT, 'sound', 'gng_music_512k.s'), music512)
+    vasm(M512_SRC, music512)
     tdefs += [('MUSIC512_LEN', os.path.getsize(music512))]
     extra_defs = tuple(extra_defs) + tuple(tdefs)
     print(f'level tables: {slots} cells at most, {", ".join(f"{len(t):,}" for t in tables)} bytes')
@@ -149,7 +157,7 @@ def build(extra_defs=()):
     sfx, music = os.path.join(OUT, 'sfx.bin'), os.path.join(OUT, 'music.bin')
     vasm(os.path.join(ROOT, 'sound', 'gng_sfx_512k.s'), sfx, defs=(('SND_ORG', syms['MUSIC_FILE']),))
     vasm(os.path.join(ROOT, 'sound', 'gng_music_1mb.s'), music, defs=(('SND_ORG', syms['MUSIC1M_FILE']),))
-    vasm(os.path.join(ROOT, 'sound', 'gng_music_512k.s'), music512, defs=(('SND_ORG', syms['MUSIC_FILE']),))
+    vasm(M512_SRC, music512, defs=(('SND_ORG', syms['MUSIC_FILE']),))
     # the relocation file (EnhRelocate): the program assembled 2MB on with the memory map where
     # it is, and the music package likewise; then the program again with the file's length
     moved, music2 = os.path.join(OUT, 'moved.bin'), os.path.join(OUT, 'music_moved.bin')
