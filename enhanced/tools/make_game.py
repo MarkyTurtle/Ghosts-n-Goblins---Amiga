@@ -44,7 +44,17 @@ HEADER = """; Ghosts'n Goblins (Elite, 1990, v3) - main program, ONE PROGRAM FOR
 ;   Profile bit PF_EVERY  - draw every frame (the 1MB program has no odd-frame test)
 ; Otherwise the program does exactly what the 512K original does. Where the two originals differ,
 ; both versions are here, chosen at run time (search for 'Profile').
-; The address column still gives the original addresses (512K/1MB)."""
+;
+; Also new in this program (enhanced/docs/FEATURES.md has them all): the incremental scroller,
+; BOB masks, playfield text and the title menu (scroller.s, scroll.s, included below); per-level
+; map tables (LoadLevelTables); the program's move to expansion memory (EnhRelocate); the
+; AmigaDOS-format disk read with the 4489_byteloader (LoadFile; IrqLevel1 / IrqLevel3 give the
+; interrupt handlers their a6); two-button joysticks (ArthurReadUpDown, the vertical blank's
+; joystick read). The routines the scroller replaced keep their labels and jump into it. The
+; memory map is in gng_game.i and enhanced/docs/MEMORY.md.
+;
+; The address column still gives the original addresses (512K/1MB), for reading this alongside
+; the root gng_main.s and docs/XREF.md; lines without one are new."""
 
 
 def view(lines, one):
@@ -74,6 +84,9 @@ def sound_choice(n, one, five):
 
 
 def first_pass(src):
+    """the 512K view of the merged source, with each ifd BUILD_1MB block where the programs
+    really differ turned into a run-time choice: the sound blocks into sound_choice()s, the
+    jump-table entries pointed at them, the blocks done by hand marked (;@@ PROFILE n)"""
     L = src.split('\n')
     bl = {b[0]: (n, b) for n, b in enumerate(srcedit.blocks(L), 1)}
     assert len(bl) == NBLOCKS, f'{len(bl)} blocks in gng_main.s, expected {NBLOCKS}: renumber SOUND/MARK'
@@ -111,6 +124,8 @@ def grab(V1, start, end, suffix):
 
 
 class Src:
+    """the program's source text being edited: sub() replaces text that must be there (the
+    given number of times), rep() a marked block, resub() a pattern"""
     def __init__(self, s): self.s = s
     def block(self, n):
         a = self.s.index(f';@@ PROFILE {n}\n'); e = self.s.index(f';@@ END {n}\n') + len(f';@@ END {n}\n')
@@ -148,6 +163,8 @@ def level_tables(S):
 
 
 def hand_edits(S, V1):
+    """every change made by hand to the generated text: the marked blocks, the per-level tables,
+    the scroller folded in (fold_scroller), the support code appended (make_game_support.s)"""
     level_tables(S)
     S.sub("\torg\t$80\n", "\tifd\tRELOC_ORG\t\t; build_game.py's relocation pass\n\torg\tRELOC_ORG\n\telse\n\torg\t$80\n\tendc\n"
           "\tifnd\tRELOC_LEN\nRELOC_LEN\tequ\t0\t\t; the relocation file (EnhRelocate), from build_game.py\n\tendc\n"
@@ -407,6 +424,22 @@ def title_menu(S):
           "        addq.b  #GS_TITLE,g_GameState(a6)       ; 05F24/05F7A\n")
 
 
+NOTES = {   # headers for routines the original's annotations left without one
+    'StartGame': 'StartGame - CheckGameStart, after the players\' blocks are set: the HUD cleared, PLAYER 1 (and\n; PLAYER 2) and their scores, TOP SCORE, then on to the level (sub state 0: LoadLevel)',
+    'DrawCopyright': 'DrawCopyright - the copyright and licence lines at the foot of the title and high-score\n; screens (rows $D0-$F8)',
+    'ClearHudArea': 'ClearHudArea - clear the HUD\'s 16 lines of 5 planes (CLEAR_AREA, $B40 bytes)',
+    'HudDigit': 'HudDigit - character d0 of the font (MASK_BUF) into two HUD sprites: its 8 lines of two\n; planes, plane 0 to a1, plane 1 to a2 (the sprites\' data words, 4 bytes a line)',
+    'DrawLives': 'DrawLives - the lives digit in the HUD (sprites 6 / 7): g_Lives - 1, at most 7; blank when 0',
+    'DrawTimer': 'DrawTimer - the timer in the HUD (sprites 4-7, the second block): minutes, then the two BCD\n; digits of the seconds (g_TimeLeft)',
+}
+
+
+def routine_notes(S):
+    """a header comment for each routine in NOTES"""
+    for name, text in NOTES.items():
+        S.sub(f'\n{name}:\n', '\n;' + '-' * 75 + '\n; ' + text + '\n;' + '-' * 75 + f'\n{name}:\n')
+
+
 def two_buttons(S):
     """two-button joysticks: the second button (port 2's pin 9, read on POTINP) is bit 14 of
     g_Joy. With JumpButton set (the title's J key) it jumps and up only climbs ladders, as on
@@ -486,6 +519,9 @@ def drop_dead_code(S):
 
 
 def main():
+    """gng_main.s -> src/gng_game.s: the first pass, the hand edits, the loading changes, the
+    byteloader, the title menu, the two-button joystick, the dead code removed, then branches
+    out of reach widened (checked by assembling)"""
     src = open(os.path.join(ROOT, 'gng_main.s')).read()
     V1 = view(src.split('\n'), True)
     S = Src(first_pass(src))
@@ -533,6 +569,7 @@ def main():
           "        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4\n        addq.l  #$2,a3")
     byteloader(S)
     two_buttons(S)
+    routine_notes(S)
     dead = drop_dead_code(S)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)

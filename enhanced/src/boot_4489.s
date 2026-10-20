@@ -171,6 +171,9 @@ Level3:         move.l  a0,-(a7)                ; the original's: acknowledge, a
 .long:          movea.l (a7)+,a0
         rte
 
+; the loading picture's two copper lists (interlace: the level 3 interrupt shows CopperA on a
+; long field, CopperB on a short one): the 6 bitplane pointers of the picture at $60000 - a
+; line's plane rows are 32 bytes apart, and CopperB starts one line (192 bytes) on: the other field
 CopperA:        dc.w    $00E0,$0006,$00E2,$0000,$00E4,$0006,$00E6,$0020
         dc.w    $00E8,$0006,$00EA,$0040,$00EC,$0006,$00EE,$0060
         dc.w    $00F0,$0006,$00F2,$0080,$00F4,$0006,$00F6,$00A0
@@ -179,13 +182,16 @@ CopperB:        dc.w    $00E0,$0006,$00E2,$00C0,$00E4,$0006,$00E6,$00E0
         dc.w    $00E8,$0006,$00EA,$0100,$00EC,$0006,$00EE,$0120
         dc.w    $00F0,$0006,$00F2,$0140,$00F4,$0006,$00F6,$0160
         dc.w    $FFFF,$FFFE
+; the loading picture's 16 colours (the original bootblock's, at its $382)
 Palette:        dc.w    $0000,$0FFF,$0002,$0003,$0501,$0227,$0467,$0838
         dc.w    $026B,$0E55,$0F37,$07BC,$0F5A,$0F97,$0FE7,$0EFC
 
+; the 4489_byteloader (byteloader.i): d0 = offset on the disk, d1 = length, d2 = drive,
+; a0 = destination, a1 = MFM buffer -> d0 = 0 if it worked; uses every register
 ByteLoader:
 	include "byteloader.i"
 	cnop	0,4
-LoaderEnd:
+LoaderEnd:                                      ; (the loader copied to LOADER ends here)
 
 	ifgt	*-1024
 	fail	the bootblock is over 1024 bytes

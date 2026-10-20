@@ -1,3 +1,6 @@
+"""A plain 68000 disassembly of a binary (capstone), for looking at code before it was
+annotated.
+   python3 dis.py <file> [base hex] [start hex] [end hex]"""
 import sys,capstone
 d=open(sys.argv[1],'rb').read()
 base=int(sys.argv[2],16) if len(sys.argv)>2 else 0

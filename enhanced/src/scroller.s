@@ -1,18 +1,29 @@
 ;==============================================================================
-; scroller.s - the scroller and its glue, in the one program for every machine
-; (gng_game.s includes it; BUILD_ONE). The same code as module.s (the module the earlier
-; enhanced builds load and patch in); here the game's own routines call it directly
-; (tools/make_game.py puts the calls in): RedrawScreen, SwapScreens, SetBitplanePtrs,
-; ShowBackBuffer, RestoreBackground, DrawBobs, CameraJump, PrintChar's playfield path,
-; RedrawEntry, and after DrawCreditsScreen the machine line.
+; scroller.s - the enhanced game's own code that is not the original game's: the incremental
+; scroller and its glue, faster BOB drawing, playfield text, the title menu. Included by
+; gng_game.s (BUILD_ONE); tools/make_game.py puts the calls into the game's routines (see
+; enhanced/docs/FEATURES.md for what each feature does):
 ;
-; Memory, in the program's memory map (it moves with the program):
-;   SCREEN_0 + 0          pristine buffer   47,120 bytes  (the background: tiles and scenery)
+;   the scroller (scroll.s, included here: ScrFullDraw, ScrScrollTo, ScrPrepare / ScrPrepareRow,
+;   ScrRestore, ScrDrawBobs, ScrBuildCopper, CopyAll) and its glue, called in place of the
+;   original's RedrawScreen, RedrawEntry, SwapScreens, SetBitplanePtrs, ShowBackBuffer,
+;   RestoreBackground, DrawBobs, CameraJump:      EnhInit, Enh* below
+;   BOB masks on 512K (one-plane masks, pre-masked copies): BuildLevelMasks, BobMaskFind
+;   playfield text (PrintChar's playfield path): EnhPrintField, TextReplay, TextFlush, PrFast,
+;   DrawStrip (a line of text as one pre-masked BOB)
+;   the title menu and test page: EnhMenu (CheckGameStart), EnhTitleText (DrawCreditsScreen),
+;   EnhShowMachine (the memory line); JumpButton (the jump input), MenuPage, MenuItem
+;   the timing build (RASTER_BUILD): EnhLogicStart / EnhLogicEnd, the RASTER macro
+;
+; Memory, in the program's memory map (it moves with the program; enhanced/docs/MEMORY.md):
+;   SCREEN_0 + 0          pristine buffer   BUF_SIZE (47,120) bytes: the background, tiles and scenery
 ;            + BUF_SIZE   display buffer A
-;            + 2*BUF_SIZE display buffer B              (ends SCREEN_0 + $22530)
-;   SCROLL_STORE          records, copper lists, restore lists, PrintChar scratch, text queue
-; The progress map still unpacks its picture into the original screen area (SCREEN_2 ..
-; SCREEN_2 + $DA40), below SCROLL_STORE, while no playfield is shown.
+;            + 2*BUF_SIZE display buffer B
+;   SCROLL_STORE          records, copper lists, restore lists, text queue, glyph cache,
+;                         the machine description's copy (cleared by EnhInit)
+; Between levels the progress map unpacks its picture into the original screen area (SCREEN_2 ..
+; SCREEN_2 + $DA40) and a level's graphics files load into the buffers, while no playfield is
+; shown; the game draws the level again afterwards.
 ;==============================================================================
 BUF_P           equ     SCREEN_0
 MASKBUF         equ     MASK_LINE_BUF   ; the original DrawBob's mask area (640 bytes)

@@ -1,3 +1,5 @@
+"""Amiga custom chip register names by offset (CUSTOM: offset -> name), for the sound tools'
+disassembly and traces (trace_snd.py, snd_anno.py)."""
 CUSTOM={0x000:'BLTDDAT',0x002:'DMACONR',0x004:'VPOSR',0x006:'VHPOSR',0x008:'DSKDATR',0x00a:'JOY0DAT',0x00c:'JOY1DAT',0x00e:'CLXDAT',
 0x010:'ADKCONR',0x012:'POT0DAT',0x014:'POT1DAT',0x016:'POTGOR',0x018:'SERDATR',0x01a:'DSKBYTR',0x01c:'INTENAR',0x01e:'INTREQR',
 0x020:'DSKPTH',0x022:'DSKPTL',0x024:'DSKLEN',0x026:'DSKDAT',0x028:'REFPTR',0x02a:'VPOSW',0x02c:'VHPOSW',0x02e:'COPCON',
