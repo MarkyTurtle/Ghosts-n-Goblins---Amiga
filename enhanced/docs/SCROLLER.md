@@ -1,5 +1,10 @@
 # Incremental scroller (enhanced build, branch `enhanced/scroll`)
 
+> **The development log.** This file records how the enhanced game was made, step by step, with
+> the measurements and tests of each step; the earlier sections describe builds that came before
+> the one program (the patched original programs with a scroller module) and figures from then.
+> For the game as it is now see `FEATURES.md`, `MEMORY.md`, `DISK.md` and `FORMATS.md`.
+
 Replaces the original full-screen redraws (`RedrawScreen`, a 288-blit redraw plus a 46 KB CPU copy
 every time the view crosses a 16-px tile boundary) with buffers that are updated one tile column or
 row at a time.
@@ -908,7 +913,7 @@ VASM=/path/to/vasmm68k_mot python3 test_scroll.py 80     # steps per level
 VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, then the scenery sweeps
 ```
 
-## Next steps
+## Next steps (as planned at the time; all done - the current list is `docs/TODO.md`)
 
 0. **Fold the scroller into the game source.** Today the enhanced program is the original binary
    with patches written over it, plus the module loaded from track 132. The aim is one source on

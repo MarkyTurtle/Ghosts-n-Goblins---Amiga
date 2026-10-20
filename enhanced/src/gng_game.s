@@ -15,7 +15,18 @@
 ;   Profile bit PF_EVERY  - draw every frame (the 1MB program has no odd-frame test)
 ; Otherwise the program does exactly what the 512K original does. Where the two originals differ,
 ; both versions are here, chosen at run time (search for 'Profile').
-; The address column still gives the original addresses (512K/1MB).
+;
+; Also new in this program (enhanced/docs/FEATURES.md has them all): the incremental scroller,
+; BOB masks, playfield text and the title menu (scroller.s, scroll.s, included below); per-level
+; map tables (LoadLevelTables); the program's move to expansion memory (EnhRelocate); the
+; AmigaDOS-format disk read with the 4489_byteloader (LoadFile; IrqLevel1 / IrqLevel3 give the
+; interrupt handlers their a6), the level's enemy sets only (LoadEnemySets) and the file cache on
+; expanded machines (CacheInit, LoadFile); two-button joysticks (ArthurReadUpDown, the vertical blank's
+; joystick read). The routines the scroller replaced keep their labels and jump into it. The
+; memory map is in gng_game.i and enhanced/docs/MEMORY.md.
+;
+; The address column still gives the original addresses (512K/1MB), for reading this alongside
+; the root gng_main.s and docs/XREF.md; lines without one are new.
 ; ===========================================================================
 ; HOW TO READ THIS FILE
 ;  a6      always points at the globals block (GLOBALS); globals are g_Name(a6).
@@ -3733,6 +3744,10 @@ l_05F9A:
         clr.b   $a8(a0)                         ; 05FFA/     
         st.b    $a9(a0)                         ; 05FFE/     
         clr.b   $a7(a0)                         ; 06002/     
+;---------------------------------------------------------------------------
+; StartGame - CheckGameStart, after the players' blocks are set: the HUD cleared, PLAYER 1 (and
+; PLAYER 2) and their scores, TOP SCORE, then on to the level (sub state 0: LoadLevel)
+;---------------------------------------------------------------------------
 StartGame:
         bsr.w   ClearHudArea                    ; 06006/06060
         move.b  #$1f,g_TextShadow(a6)           ; 0600A/06064
@@ -4066,6 +4081,10 @@ l_063CE:
         bsr.w   PrintBCD                        ; 063F8/06456
         addi.w  #$10,d2                         ; 063FC/0645A
         dbra    d7,l_063CE                      ; 06400/0645E
+;---------------------------------------------------------------------------
+; DrawCopyright - the copyright and licence lines at the foot of the title and high-score
+; screens (rows $D0-$F8)
+;---------------------------------------------------------------------------
 DrawCopyright:
         move.b  #$1f,g_TextShadow(a6)           ; 06404/06462
         move.b  #$6,g_TextInk(a6)               ; 0640A/06468
@@ -6432,6 +6451,9 @@ BitReverseTable:
 	dc.b	$0B,$8B,$4B,$CB,$2B,$AB,$6B,$EB,$1B,$9B,$5B,$DB,$3B,$BB,$7B,$FB
 	dc.b	$07,$87,$47,$C7,$27,$A7,$67,$E7,$17,$97,$57,$D7,$37,$B7,$77,$F7
 	dc.b	$0F,$8F,$4F,$CF,$2F,$AF,$6F,$EF,$1F,$9F,$5F,$DF,$3F,$BF,$7F,$FF
+;---------------------------------------------------------------------------
+; ClearHudArea - clear the HUD's 16 lines of 5 planes (CLEAR_AREA, $B40 bytes)
+;---------------------------------------------------------------------------
 ClearHudArea:
         lea.l   (CLEAR_AREA).l,a0               ; 07CD8/07D38
         move.w  #$2cf,d7                        ; 07CDE/07D3E
@@ -6647,6 +6669,19 @@ FileRelocs:
 ;---------------------------------------------------------------------------
 ; ==================================================================
 ; One program for every machine (enhanced branch)
+; ==================================================================
+; make_game.py appends this file to gng_game.s: the enhanced game's start-up and loading
+; code that has no place in the original's routines (enhanced/docs/FEATURES.md, MEMORY.md):
+;   ReadProfile       the machine (Profile) from the bootblock's description
+;   LoadSound         the sound package for the machine
+;   LoadLevelTables   a level's map tables file
+;   LoadEnemySets     only the level's sets of the enemy graphics file (LoadOffset)
+;   CacheInit         the file cache's memory on an expanded machine
+;   LoadFile          a file by its id: from the file cache, or from the disk (LoadDisk, with the
+;                     4489_byteloader; FileDir: the disk's file table)
+;   IrqLevel1 / 3     the interrupt entries that give the handlers their a6
+;   EnhRelocate       the program's move to expansion memory (ApplyRelocs)
+;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx)
 ; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
 ; (MACHINE_INFO). With 1MB or more of chip RAM (any chip RAM above $80000: Kickstart 1.3 keeps the
@@ -7052,10 +7087,10 @@ IrqExit3:
         movea.l (IrqA6L3).l,a6
         rte
 IrqA6L1:
-        dc.l    0
+        dc.l    0                               ; the a6 the level 1 handler interrupted
 IrqA6L3:
-        dc.l    0
-FileTables:
+        dc.l    0                               ; ... and the level 3 handler
+FileTables:                                     ; the levels' map table files (LoadLevelTables)
 	FENTRY	LEVEL_TABLES,TBLLEN0,FID_TABLES0+0
 	FENTRY	LEVEL_TABLES,TBLLEN1,FID_TABLES0+1
 	FENTRY	LEVEL_TABLES,TBLLEN2,FID_TABLES0+2
@@ -12034,6 +12069,10 @@ l_0AEE0:
         addq.l  #$2,a5                          ; 0AF1E/0AF82
         dbra    d6,l_0AEE0                      ; 0AF20/0AF84
         rts                                     ; 0AF24/0AF88
+;---------------------------------------------------------------------------
+; HudDigit - character d0 of the font (MASK_BUF) into two HUD sprites: its 8 lines of two
+; planes, plane 0 to a1, plane 1 to a2 (the sprites' data words, 4 bytes a line)
+;---------------------------------------------------------------------------
 HudDigit:
         lea.l   (MASK_BUF).l,a0                 ; 0AF26/0AF8A
         andi.w  #$ff,d0                         ; 0AF2C/0AF94
@@ -12056,6 +12095,9 @@ HudDigit:
         move.b  (a0)+,$1e(a2)                   ; 0AF6A/0AFD2
         move.b  (a0)+,$1c(a2)                   ; 0AF6E/0AFD6
         rts                                     ; 0AF72/0AFDA
+;---------------------------------------------------------------------------
+; DrawLives - the lives digit in the HUD (sprites 6 / 7): g_Lives - 1, at most 7; blank when 0
+;---------------------------------------------------------------------------
 DrawLives:
         move.b  g_Lives(a6),d0                  ; 0AF74/0AFDC
         subq.b  #$1,d0                          ; 0AF78/0AFE0
@@ -12070,6 +12112,10 @@ l_0AF88:
         lea.l   (SPRITE6_DATA+$C).l,a1          ; 0AF88/0AFF0
         lea.l   (SPRITE7_DATA+$C).l,a2          ; 0AF8E/0AFF6
         bra.b   HudDigit                        ; 0AF94/0AFFC
+;---------------------------------------------------------------------------
+; DrawTimer - the timer in the HUD (sprites 4-7, the second block): minutes, then the two BCD
+; digits of the seconds (g_TimeLeft)
+;---------------------------------------------------------------------------
 DrawTimer:
         move.b  g_TimeLeft(a6),d0               ; 0AF96/0AFFE
         lea.l   (SPRITE4B_DATA+$24).l,a1        ; 0AF9A/0B002

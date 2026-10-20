@@ -1,3 +1,6 @@
+"""Decode the original disk's custom tracks (sync $A245, 6,312 data bytes a track) from raw
+MFM track dumps (tracks/tNNN.bin): the first decoder; mkdisk.py and extract_files.py are the
+tools to use now."""
 import sys,os,struct
 M=0x55555555
 def load(fn):

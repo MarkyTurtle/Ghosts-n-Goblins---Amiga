@@ -1,4 +1,13 @@
-; Ghosts'n Goblins - hardware, globals and memory-map equates (both builds; BUILD_1MB selects the 1MB memory map)
+; Ghosts'n Goblins - the enhanced game's equates (enhanced/src/gng_game.s includes this):
+; the custom chip and CIA registers, the globals block (a6) and its fields, the object slot
+; fields, the memory map, and the enhanced game's own (machine description, profile, disk file
+; ids, file table). Edited by hand on this branch (it started as the root gng_equates.i).
+;
+; Memory map: everything from MAP_LOW (the end of the globals) is placed after the program, so it
+; moves when the program's size changes. Comments of the form '; $1A118' or '(the original:
+; $37468)' give where a buffer was in the original 512K program, for reading the root source
+; and docs/GLOBALS.md alongside; the addresses in this build are in enhanced/docs/MEMORY.md
+; (enhanced/tools/make_docs.py writes it from the listing).
 
 CUSTOM		equ	$DFF000	; custom chip base
 ; custom chip register offsets
@@ -264,35 +273,42 @@ SFX_AREA            	equ	$7D70	; (at least the 512K effects package: $7D64)
 	else
 SFX_AREA            	equ	$12700	; (assembled without the build's lengths: as at full quality)
 	endc
-COPPER_INIT         	equ	MAP_LOW+SFX_AREA+$00000	; $1A118: copper list template ($180 bytes copied from CopperTemplate)
-COPPER_A1           	equ	MAP_LOW+SFX_AREA+$00078	; $1A190
-COPPER_A2           	equ	MAP_LOW+SFX_AREA+$000A8	; $1A1C0
-COPPER_B1           	equ	MAP_LOW+SFX_AREA+$000D8	; $1A1F0
-COPPER_B2           	equ	MAP_LOW+SFX_AREA+$00108	; $1A220
-COPPER_MAP          	equ	MAP_LOW+SFX_AREA+$00138	; $1A250: copper list used by the between-level progress map
-ARTHUR_SPR_GFX      	equ	MAP_LOW+SFX_AREA+$03D1C	; $1DE34: Arthur hardware-sprite frames, 4 planes x $2880 apart, $80 bytes/frame
-SPR_GFX_B0          	equ	MAP_LOW+SFX_AREA+$0521C	; $1F334
-SPR_GFX_A1          	equ	MAP_LOW+SFX_AREA+$0661C	; $20734
-SPR_GFX_B1          	equ	MAP_LOW+SFX_AREA+$07B1C	; $21C34
-SPR_GFX_A2          	equ	MAP_LOW+SFX_AREA+$08F1C	; $23034
-SPR_GFX_B2          	equ	MAP_LOW+SFX_AREA+$0A41C	; $24534
-SPR_GFX_A3          	equ	MAP_LOW+SFX_AREA+$0B81C	; $25934
-SPR_GFX_B3          	equ	MAP_LOW+SFX_AREA+$0CD1C	; $26E34
-MASK_BUF            	equ	MAP_LOW+SFX_AREA+$0E11C	; $28234: byte-plane extracted from file at tracks 61
-MUSIC_FILE          	equ	MAP_LOW	; first in the map (LoadSound runs first); sound driver + 30 effects (file FID_SFX) - source: sound/gng_sfx_512k.s
-MUSIC_PLAYER        	equ	MAP_LOW+$00020	; $28E74: driver entry: d0.l = arg<<16 | cmd (0 tick, 1 tune, 2 sfx, 3 user value)
-SPRITE0_DATA        	equ	MAP_LOW+SFX_AREA+$0ED3C	; $30BB8
-SPRITE4_DATA        	equ	MAP_LOW+SFX_AREA+$0EDC0	; $30C3C
-SPRITE1_DATA        	equ	MAP_LOW+SFX_AREA+$0EDFC	; $30C78
-SPRITE5_DATA        	equ	MAP_LOW+SFX_AREA+$0EE80	; $30CFC
-SPRITE2_DATA        	equ	MAP_LOW+SFX_AREA+$0EEBC	; $30D38
-SPRITE6_DATA        	equ	MAP_LOW+SFX_AREA+$0EF40	; $30DBC
-SPRITE3_DATA        	equ	MAP_LOW+SFX_AREA+$0EF7C	; $30DF8
-SPRITE7_DATA        	equ	MAP_LOW+SFX_AREA+$0F000	; $30E7C
-SPRITE4B_DATA       	equ	MAP_LOW+SFX_AREA+$0F03C	; $30EB8: second HUD sprite block (sprite reused lower down)
-SPRITE5B_DATA       	equ	MAP_LOW+SFX_AREA+$0F108	; $30F84
-SPRITE6B_DATA       	equ	MAP_LOW+SFX_AREA+$0F1D4	; $31050
-SPRITE7B_DATA       	equ	MAP_LOW+SFX_AREA+$0F2A0	; $3111C
+COPPER_INIT         	equ	MAP_LOW+SFX_AREA+$00000	; (orig. $1A118): copper list template ($180 bytes copied from CopperTemplate)
+COPPER_A1           	equ	MAP_LOW+SFX_AREA+$00078	; (orig. $1A190)
+COPPER_A2           	equ	MAP_LOW+SFX_AREA+$000A8	; (orig. $1A1C0)
+COPPER_B1           	equ	MAP_LOW+SFX_AREA+$000D8	; (orig. $1A1F0)
+COPPER_B2           	equ	MAP_LOW+SFX_AREA+$00108	; (orig. $1A220)
+COPPER_MAP          	equ	MAP_LOW+SFX_AREA+$00138	; (orig. $1A250): copper list used by the between-level progress map
+ARTHUR_SPR_GFX      	equ	MAP_LOW+SFX_AREA+$03D1C	; (orig. $1DE34): Arthur's sprite frames: four banks $2900 apart, one per
+                    			; hardware sprite (0+1 the left 16 px, 2+3 the right; attached pairs), each
+                    			; 42 frames of $80 bytes (SPR_GFX_An, this one A0) then the mirrored copies of
+                    			; frames 0-39 (SPR_GFX_Bn), built by Start
+SPR_GFX_B0          	equ	MAP_LOW+SFX_AREA+$0521C	; (orig. $1F334)
+SPR_GFX_A1          	equ	MAP_LOW+SFX_AREA+$0661C	; (orig. $20734)
+SPR_GFX_B1          	equ	MAP_LOW+SFX_AREA+$07B1C	; (orig. $21C34)
+SPR_GFX_A2          	equ	MAP_LOW+SFX_AREA+$08F1C	; (orig. $23034)
+SPR_GFX_B2          	equ	MAP_LOW+SFX_AREA+$0A41C	; (orig. $24534)
+SPR_GFX_A3          	equ	MAP_LOW+SFX_AREA+$0B81C	; (orig. $25934)
+SPR_GFX_B3          	equ	MAP_LOW+SFX_AREA+$0CD1C	; (orig. $26E34)
+MASK_BUF            	equ	MAP_LOW+SFX_AREA+$0E11C	; (orig. $28234): the font, 194 characters x 16 bytes (every other byte of
+                    			; the font file, FID_FONT: two planes of 8 lines; PrintChar)
+MUSIC_FILE          	equ	MAP_LOW	; first in the map (LoadSound runs first): the sound package (SFX_AREA bytes):
+                    			; the 512K music package on 512K (FID_MUSIC512), the 512K effects without a
+                    			; machine description (FID_SFX); with the program moved, the 1MB package loaded
+                    			; at MUSICB_FILE runs on into it; unused with 1MB of chip RAM
+MUSIC_PLAYER        	equ	MAP_LOW+$00020	; (orig. $28E74) driver entry: d0.l = arg<<16 | cmd (0 tick, 1 tune, 2 sfx, 3 user value)
+SPRITE0_DATA        	equ	MAP_LOW+SFX_AREA+$0ED3C	; (orig. $30BB8)
+SPRITE4_DATA        	equ	MAP_LOW+SFX_AREA+$0EDC0	; (orig. $30C3C)
+SPRITE1_DATA        	equ	MAP_LOW+SFX_AREA+$0EDFC	; (orig. $30C78)
+SPRITE5_DATA        	equ	MAP_LOW+SFX_AREA+$0EE80	; (orig. $30CFC)
+SPRITE2_DATA        	equ	MAP_LOW+SFX_AREA+$0EEBC	; (orig. $30D38)
+SPRITE6_DATA        	equ	MAP_LOW+SFX_AREA+$0EF40	; (orig. $30DBC)
+SPRITE3_DATA        	equ	MAP_LOW+SFX_AREA+$0EF7C	; (orig. $30DF8)
+SPRITE7_DATA        	equ	MAP_LOW+SFX_AREA+$0F000	; (orig. $30E7C)
+SPRITE4B_DATA       	equ	MAP_LOW+SFX_AREA+$0F03C	; (orig. $30EB8): second HUD sprite block (sprite reused lower down)
+SPRITE5B_DATA       	equ	MAP_LOW+SFX_AREA+$0F108	; (orig. $30F84)
+SPRITE6B_DATA       	equ	MAP_LOW+SFX_AREA+$0F1D4	; (orig. $31050)
+SPRITE7B_DATA       	equ	MAP_LOW+SFX_AREA+$0F2A0	; (orig. $3111C)
 MASK_LINE_BUF       	equ	MAP_LOW+SFX_AREA+$0F36C	; DrawBob: the mask built for one BOB (640 bytes; only for an image with
                     			; no mask, which the runs never found)
 SCREEN_0            	equ	MASK_LINE_BUF+$280	; (the original: $37468) also load address of the big graphics file
@@ -331,9 +347,9 @@ LEVEL_FILE          	equ	LEVEL_TABLES_END	; ... and the per-level data file afte
                     			; the level's BOB sets are copied after it): the program has
                     			; grown, and stage 2 (file $C120 + sets $DE76) must end below
                     			; $7F4DE as in the original (build_game.py checks)
-ESHOT_GFX_BUF       	equ	MAP_LOW+SFX_AREA+$00180	; $1A298: enemy projectile graphics (file track 58)
-ITEM_GFX_BUF        	equ	MAP_LOW+SFX_AREA+$013B4	; $1B4CC: item and explosion graphics (file track 59)
-ITEM_GFX2_BUF       	equ	MAP_LOW+SFX_AREA+$02E76	; $1CF8E: item graphics 2 (file track 57)
+ESHOT_GFX_BUF       	equ	MAP_LOW+SFX_AREA+$00180	; (orig. $1A298): enemy projectile graphics (file track 58)
+ITEM_GFX_BUF        	equ	MAP_LOW+SFX_AREA+$013B4	; (orig. $1B4CC): item and explosion graphics (file track 59)
+ITEM_GFX2_BUF       	equ	MAP_LOW+SFX_AREA+$02E76	; (orig. $1CF8E): item graphics 2 (file track 57)
 SAVE_BUF_A          	equ	MASK_LINE_BUF	; g_SaveBufA / B: the original's background save areas; nothing writes
 SAVE_BUF_B          	equ	MASK_LINE_BUF	; through them now (the scroller draws the BOBs), so they point anywhere
 ; LoadFile's MFM buffer (MfmBuf), needed only while a file loads: at the top of the level area,

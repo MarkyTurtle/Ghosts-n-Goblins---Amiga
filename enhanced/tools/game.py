@@ -173,6 +173,8 @@ class GameRun(Amiga):
 
     # ---- running
     def boot(self):
+        """run the program's Start (without the copyright screen's wait) to its idle loop, as
+        after the bootblock enters it"""
         self.u.reg_write(UC_M68K_REG_SR, 0x2700)
         self.reg('a7', self.cfg['ssp'])
         self.u.emu_start(self.entry, self.copyright_wait, count=50_000_000)
@@ -193,6 +195,9 @@ class GameRun(Amiga):
         self.user_pc = pc
 
     def frame(self, joy='', fire=False, fire2=False):
+        """one frame: the joystick (joy: '', 'U', 'D', 'L', 'R', 'UL'...; fire; fire2 = the
+        second button) into the hardware registers, the vertical blank interrupt, then the
+        game logic's level 1 interrupt if the vertical blank asked for it"""
         self.w16(CUSTOM+0x0C, JOY[joy])
         self.w8(0xBFE001, 0x7F if fire else 0xFF)
         self.w16(CUSTOM+0x16, 0xBF00 if fire2 else 0xFF00)    # POTINP: the second buttons (bit 14: port 2)

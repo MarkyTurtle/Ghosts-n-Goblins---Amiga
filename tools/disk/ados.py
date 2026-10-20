@@ -1,3 +1,5 @@
+"""Decode the AmigaDOS-format (11-sector, $4489 sync) tracks of a raw MFM track dump: used
+while reading the original disk image (track 0, the bootblock, is a standard AmigaDOS track)."""
 import sys
 def load(fn):
     d=open(fn,'rb').read(); n=len(d)*8; v=int.from_bytes(d,'big'); s=bin(v)[2:].zfill(n); return s+s[:20000],n

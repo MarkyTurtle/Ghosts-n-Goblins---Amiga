@@ -1,3 +1,7 @@
+"""Control-flow trace of a sound package's driver code (capstone): from the entry at +$20 and
+the seeds in <out>_seeds.json, every instruction reached, written to <out> (JSON) for the
+source generator (gen_snd.py).
+   python3 trace_snd.py <package.hunk> <base hex> <out.json>"""
 import capstone,re,json,sys
 import sys
 FN=sys.argv[1]; BASE=int(sys.argv[2],16); OUT=sys.argv[3]

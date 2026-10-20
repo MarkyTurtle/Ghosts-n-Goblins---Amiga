@@ -2,6 +2,19 @@
 ; ==================================================================
 ; One program for every machine (enhanced branch)
 ; ==================================================================
+; make_game.py appends this file to gng_game.s: the enhanced game's start-up and loading
+; code that has no place in the original's routines (enhanced/docs/FEATURES.md, MEMORY.md):
+;   ReadProfile       the machine (Profile) from the bootblock's description
+;   LoadSound         the sound package for the machine
+;   LoadLevelTables   a level's map tables file
+;   LoadEnemySets     only the level's sets of the enemy graphics file (LoadOffset)
+;   CacheInit         the file cache's memory on an expanded machine
+;   LoadFile          a file by its id: from the file cache, or from the disk (LoadDisk, with the
+;                     4489_byteloader; FileDir: the disk's file table)
+;   IrqLevel1 / 3     the interrupt entries that give the handlers their a6
+;   EnhRelocate       the program's move to expansion memory (ApplyRelocs)
+;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx)
+; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
 ; (MACHINE_INFO). With 1MB or more of chip RAM (any chip RAM above $80000: Kickstart 1.3 keeps the
 ; top of a 1MB machine's chip RAM for itself and lists it as ending at $FE800): PF_CACHE, PF_MUSIC - the 1MB program's
@@ -406,10 +419,10 @@ IrqExit3:
         movea.l (IrqA6L3).l,a6
         rte
 IrqA6L1:
-        dc.l    0
+        dc.l    0                               ; the a6 the level 1 handler interrupted
 IrqA6L3:
-        dc.l    0
-FileTables:
+        dc.l    0                               ; ... and the level 3 handler
+FileTables:                                     ; the levels' map table files (LoadLevelTables)
 	FENTRY	LEVEL_TABLES,TBLLEN0,FID_TABLES0+0
 	FENTRY	LEVEL_TABLES,TBLLEN1,FID_TABLES0+1
 	FENTRY	LEVEL_TABLES,TBLLEN2,FID_TABLES0+2

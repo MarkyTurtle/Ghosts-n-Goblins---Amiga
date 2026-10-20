@@ -1,8 +1,24 @@
 ;==============================================================================
-; scroll.s - incremental scroller for the enhanced build (prototype, step 1)
+; scroll.s - the incremental scroller: the core of the enhanced game's display
 ;
 ; Replaces the original full-screen redraw (RedrawScreen) with buffers that are
 ; updated one tile column / row at a time as the camera moves.
+;
+; Routines (each has its own header below):
+;   Window          the tile window a camera position needs
+;   ScrFullDraw     draw a buffer's whole window (level start, a jump of the camera)
+;   CopyAll         a whole display buffer from the pristine one, in one blit
+;   ScrScrollTo     bring a buffer to the camera: new columns / rows only
+;   SetClip         the buffer's visible lines and first column, for the BOB clipping
+;   DrawColumnNew   a column coming into view (only the rows the look-ahead has not done)
+;   ScrPrepare      look-ahead: build the next column out of sight, a few tiles a frame
+;   DrawRowNew      a row coming into view (only the columns not done)
+;   ScrPrepareRow   look-ahead: build the next row in the ring's spare row
+;   DrawRow         a row of tiles;  DrawTile: one tile (or its copy from the pristine buffer)
+;   ScrBuildCopper  a buffer's playfield copper list (pointers, scroll, the ring's wrap)
+;   ScrRestore      undo the buffer's BOBs from the pristine buffer (its restore list)
+;   ScrDrawBobs     the game's draw list;  ScrDrawBob: one BOB, clipped, split at the wrap
+;   ScrDrawScenery  the shootable scenery (gravestones...) into the pristine buffer
 ;
 ; Screen layout (see enhanced/docs/SCROLLER.md):
 ;  * Line-interleaved, as the original: each 180-byte line holds the 5 planes' 36-byte
@@ -27,8 +43,9 @@
 ; Buffers: a pristine buffer holds the background only (drawn from the tiles); the
 ; two display buffers copy new edges from it and restore under their BOBs from it.
 ;
-; This file is the core only: it is included by module.s (the game module, loaded by the
-; enhanced build) and by scroll_test.s (the unit tests' build at $7A000). The includer
+; This file is the core only: it is included by scroller.s (the one program, gng_game.s) and,
+; in the earlier builds, by module.s (the game module the patched programs load) and by
+; scroll_test.s (the unit tests' build at $7A000). The includer
 ; defines the custom-chip / globals equates (gng_equates.i, with BUILD_1MB for the 1MB build), CellTiles,
 ; ItemBoxSizes, SmallBobSizes and MASKBUF (a one-plane BOB mask, at most 64 x 80 pixels; 512K
 ; only). BUILD_1MB selects the 1MB build: its program tables are offsets from g_BaseAddr, and

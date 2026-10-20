@@ -43,6 +43,8 @@ FILES_START = 0x600
 
 
 def vasm(src, out, listing=None, defs=()):
+    """assemble src to out (vasm, -Fbin -no-opt) with the include paths the game needs and -D
+    for each (name, value) in defs; the listing too if asked; stops the build on an error"""
     cmd = [VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', os.path.join(ENH, 'src'), '-I', ROOT,
            '-I', os.path.join(ROOT, 'sound'), '-o', out]
     if listing: cmd += ['-L', listing]
@@ -77,6 +79,8 @@ def relocations(a, b, what, lst=None):
 
 
 def reloc_table(offs):
+    """a relocation table (FORMATS.md): count.l, then the word gap from the previous offset to
+    each (the first from 0)"""
     import struct
     out, prev = bytearray(struct.pack('>L', len(offs))), 0
     for o in offs:
@@ -132,6 +136,9 @@ def level_tables():
 
 
 def build(extra_defs=()):
+    """the whole build into OUT: the level table files, the sound packages, the program (and its
+    relocation file: the program assembled again at RELOC_ORG), the layout checks, the stage
+    plan, the bootblock and the disk image"""
     os.makedirs(OUT, exist_ok=True)
     prog, lst = os.path.join(OUT, 'game.bin'), os.path.join(OUT, 'game.lst')
     src = os.path.join(ENH, 'src', 'gng_game.s')
