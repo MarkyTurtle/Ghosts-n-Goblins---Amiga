@@ -50,6 +50,16 @@ Each line points to the item below with the details and measurements.
 **Memory**
 - [x] Per-level map tables: each level's `BlockTiles` / `CellTiles` entries in a file of its
       own (`LoadLevelTables`): 17 KB less resident, the program 77 KB instead of 110 KB
+- [ ] 512K: the old background save areas (`$6000` bytes before the screens) only hold the small
+      BOBs ($D20) during play; the rest is the load buffer of the progress map and the MFM track
+      buffer, needed only while loading. Load trace (every `LoadFile` on 512K): during loads the
+      top of the level area is never live (the level's loads end far below it; the sets and
+      images are copied in after), so the MFM buffer can go there, and the progress map can load
+      into the level area (the level is reloaded after it). Then move the screens down: about
+      21 KB more for the level data (and the music) (4)
+- [ ] Remove the original routines the scroller replaced (`RedrawScreen`, `DrawBob`,
+      `DrawBobMasked`, `DrawSceneryOnRedraw`, `SwapScreens`, `SetBitplanePtrs`... after the `jmp`
+      to the scroller) and a few unused debug routines: about 3.3 KB of the program (5)
 - [ ] Per-level `TileAttr` banks (8 KB resident; a level uses 1-3 of the 4 banks): a few KB (5)
 - [ ] The rest of the per-level data: zones, spawns, placements and the level's enemy graphics
       (no 118 KB load into a screen buffer) (4)
