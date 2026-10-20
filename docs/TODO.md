@@ -50,13 +50,9 @@ Each line points to the item below with the details and measurements.
 **Memory**
 - [x] Per-level map tables: each level's `BlockTiles` / `CellTiles` entries in a file of its
       own (`LoadLevelTables`): 17 KB less resident, the program 77 KB instead of 110 KB
-- [ ] 512K: the old background save areas (`$6000` bytes before the screens) only hold the small
-      BOBs ($D20) during play; the rest is the load buffer of the progress map and the MFM track
-      buffer, needed only while loading. Load trace (every `LoadFile` on 512K): during loads the
-      top of the level area is never live (the level's loads end far below it; the sets and
-      images are copied in after), so the MFM buffer can go there, and the progress map can load
-      into the level area (the level is reloaded after it). Then move the screens down: about
-      21 KB more for the level data (and the music) (4)
+- [x] 512K: the old background save areas: the small BOBs and the progress map load into the
+      screens, the MFM buffer is at the top of the level area (the first screen while the
+      progress map loads); a trace of every `LoadFile`. The screens come 24 KB lower
 - [ ] Remove the original routines the scroller replaced (`RedrawScreen`, `DrawBob`,
       `DrawBobMasked`, `DrawSceneryOnRedraw`, `SwapScreens`, `SetBitplanePtrs`... after the `jmp`
       to the scroller) and a few unused debug routines: about 3.3 KB of the program (5)
@@ -74,8 +70,8 @@ Each line points to the item below with the details and measurements.
 - [x] Music on 512K machines with an expansion (slow or fast RAM): the whole 1MB package, in the
       chip RAM the program moved out of
 - [ ] Music on a plain 512K A500: needs about 43 KB of chip RAM; the per-level map tables freed
-      17 KB and two joined gaps 3 KB (the fullest stage now leaves 23 KB free, 3 KB before), so about 20 KB more (mirrored
-      Arthur / enemy frames), and a combined package (the tunes' samples and note data added to
+      17 KB, two joined gaps 3 KB and the old save areas 24 KB (the fullest stage now leaves 47 KB
+      free, 3 KB before): enough for the estimate; next a combined package (the tunes' samples and note data added to
       the 512K effects package) (4)
 - [ ] Music quality tiers chosen by the machine's memory (4)
 - [ ] Resample the music samples (2/3 saves about 11 KB) by scaling the instruments' period

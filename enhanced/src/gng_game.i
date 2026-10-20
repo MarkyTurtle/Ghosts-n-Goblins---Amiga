@@ -282,13 +282,18 @@ SPRITE4B_DATA       	equ	MAP_LOW+$16DA0	; $30EB8: second HUD sprite block (sprit
 SPRITE5B_DATA       	equ	MAP_LOW+$16E6C	; $30F84
 SPRITE6B_DATA       	equ	MAP_LOW+$16F38	; $31050
 SPRITE7B_DATA       	equ	MAP_LOW+$17004	; $3111C
-BOB_GFX_A           	equ	MAP_LOW+$170D0	; $311E8: file tracks 37 / 62-63 load address
-MFM_BUFFER          	equ	MAP_LOW+$19ED0	; $33FE8: raw track buffer for LoadFile ($1900 words)
-BOB_GFX_B           	equ	MAP_LOW+$1A0D0	; $341E8
-SCREEN_0            	equ	MAP_LOW+$1D350	; $37468: also load address of the big graphics file (tracks 38-56) before unpacking
-SCREEN_1            	equ	MAP_LOW+$28750	; $42868
-SCREEN_2            	equ	MAP_LOW+$33B50	; $4DC68
-SCREEN_3            	equ	MAP_LOW+$3EF50	; $59068
+MASK_LINE_BUF       	equ	MAP_LOW+$170D0	; DrawBob: the mask built for one BOB (640 bytes; only for an image with
+                    			; no mask, which the runs never found)
+SCREEN_0            	equ	MASK_LINE_BUF+$280	; (the original: $37468) also load address of the big graphics file
+                    			; (tracks 38-56) before unpacking. Before it the original had the small BOBs'
+                    			; load buffer (BOB_GFX_A, $311E8) and two $3000-byte background save areas
+                    			; holding LoadFile's MFM buffer: the scroller restores from its pristine
+                    			; buffer, the small BOBs' file and the progress map load into the screens
+                    			; (SMALLBOB_LOAD, PM_LOAD) and the MFM buffer is at the top of the level area
+                    			; (MFM_BUFFER, MfmBuf), so the screens come $6000 lower
+SCREEN_1            	equ	SCREEN_0+$B400	; (the original: $42868)
+SCREEN_2            	equ	SCREEN_0+$16800	; (the original: $4DC68)
+SCREEN_3            	equ	SCREEN_0+$21C00	; (the original: $59068)
 CLEAR_AREA          	equ	SCREEN_0+$26700	; (the original: SCREEN_0+$2D000, $64468) the HUD's planes:
                     			; moved down into the old fourth screen, which the scroller
                     			; leaves free above its storage (SCROLL_STORE, scroller.s) ...
@@ -325,9 +330,19 @@ LEVEL_FILE          	equ	LEVEL_TABLES_END	; ... and the per-level data file afte
 ESHOT_GFX_BUF       	equ	MAP_LOW+SFX_AREA+$00180	; $1A298: enemy projectile graphics (file track 58)
 ITEM_GFX_BUF        	equ	MAP_LOW+SFX_AREA+$013B4	; $1B4CC: item and explosion graphics (file track 59)
 ITEM_GFX2_BUF       	equ	MAP_LOW+SFX_AREA+$02E76	; $1CF8E: item graphics 2 (file track 57)
-SAVE_BUF_A          	equ	MAP_LOW+$170D0	; $311E8: background save area A ($3000 bytes; g_SaveBufA) - also BOB_GFX_A
-SAVE_BUF_B          	equ	MAP_LOW+$1A0D0	; $341E8: background save area B - also BOB_GFX_B
-MASK_LINE_BUF       	equ	MAP_LOW+$1D0D0	; $371E8: DrawBob: the mask built for one BOB (512K build; 640 bytes)
+SAVE_BUF_A          	equ	MASK_LINE_BUF	; g_SaveBufA / B: the original's background save areas; nothing writes
+SAVE_BUF_B          	equ	MASK_LINE_BUF	; through them now (the scroller draws the BOBs), so they point anywhere
+; LoadFile's MFM buffer (MfmBuf), needed only while a file loads: at the top of the level area,
+; which is never in use then (a level's files load far below it, build_game.py checks; its BOB
+; sets and images are copied in after the loads) - except for the progress map, which loads after
+; the level: then the first screen (bitplane DMA off; the map is unpacked into a higher screen)
+LEVEL_TOP           	equ	$7FB00	; the level area's end (LEVEL_GFX_LIMIT): the bootblock's machine description
+MFM_BUFFER          	equ	LEVEL_TOP-$3200	; raw track buffer for LoadFile ($1900 words)
+PM_LOAD             	equ	SCREEN_0	; the packed progress map (tracks 62-63, two whole tracks) ...
+PM_MFM              	equ	SCREEN_0+$3150	; ... and the MFM buffer while it loads
+SMALLBOB_LOAD       	equ	SCREEN_0+$1D478	; the small BOBs' file (track 37): in the screens, after the enemy sets'
+                    			; file (19 whole tracks); both stay there until LoadLevel has built the level's
+                    			; sets from them (BuildFrameTable, BuildLevelMasks), the screens drawn after
 
 ; ---- Global variables: offsets from a6 (GLOBALS = $1898C) ----
 ; [1MB] ---- Global variables: offsets from a6 (GLOBALS = load address + $1893A; offsets >= 2 are 4 more than in the 512K build) ----

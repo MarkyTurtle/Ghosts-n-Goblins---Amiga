@@ -130,6 +130,8 @@ class GameRun(Amiga):
             a1 = self.reg('a1')
             dest, length, track = self.r32(a1), self.r32(a1+4), self.r16(a1+8)
             data = open(names[track], 'rb').read()[:length]
+            if OVERRUN and 'MfmBuf' in self.L:          # the MFM buffer the disk DMA fills ($1900 words)
+                self.u.mem_write(self.r32(self.L['MfmBuf']), b'\xEE' * 0x3200)
             self.u.mem_write(dest, data)
             pad = (-len(data)) % 0x18A8 if OVERRUN else 0   # LoadFile writes whole tracks: what follows
             if pad:                                  # a file on its last track lands after it (GNG_OVERRUN=1

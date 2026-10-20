@@ -367,6 +367,36 @@ def main():
     assert n == 2, n                  # Start loads level 0's tile file (1MB early, 512K later): its tables too
     ins = I('moveq   #0,d0', "level 0's map tables (the title shows level 0)") + '\n        jsr     LoadLevelTables\n'
     S.s = re.sub(r'\n(        lea\.l   FileLevel0\(pc\),a1)', lambda m: '\n' + ins + m.group(1), S.s)
+    # the original's load buffer BOB_GFX_A is gone (gng_game.i): the small BOBs' file loads into the
+    # screens after the enemy sets (SMALLBOB_LOAD), where LoadLevel and BuildLevelMasks take the
+    # sets from, with the bitplane DMA turned off first. LoadFile's MFM buffer is the top of the
+    # level area (MFM_BUFFER), except while the progress map loads: that comes after the level is
+    # loaded, so its file and the MFM buffer then go into the first screen (PM_LOAD, PM_MFM; the
+    # bitplane DMA is off, the map is unpacked into a higher screen) - MfmBuf
+    S.sub("	FENTRY	BOB_GFX_A,$00D20,37                    ; track 37: small item / scenery BOBs",
+          "	FENTRY	SMALLBOB_LOAD,$00D20,37                ; track 37: small item / scenery BOBs (into the screens, after the enemy sets)")
+    S.sub("	FENTRY	BOB_GFX_A,$01D5C,62                    ; tracks 62-63: progress map (RLE)",
+          "	FENTRY	PM_LOAD,$01D5C,62                      ; tracks 62-63: progress map (RLE; into the first screen)")
+    S.sub("        lea.l   (BOB_GFX_A).l,a5                ; 06894/068EE",
+          "        lea.l   (SMALLBOB_LOAD).l,a5            ; 06894/068EE")
+    S.sub("""        lea.l   FileSmallBobs(pc),a1            ; 0682C/     
+        bsr.w   LoadFile                        ; 06830/     
+        move.w  #DMAF_RASTER,$96(a0)            ; 06834/       disable copper DMA while loading
+""", """        move.w  #DMAF_RASTER,(CUSTOM+$96).l     ; bitplane DMA off while loading (first now: the small
+        lea.l   FileSmallBobs(pc),a1            ; BOBs load into the screens too)
+        bsr.w   LoadFile                        ; 06830/     
+""")
+    S.sub("""        lea.l   FileProgressMap(pc),a1          ; 07744/       load the packed map picture
+        bsr.w   LoadFile                        ; 07748/     
+""", """        move.l  #PM_MFM,(MfmBuf).l              ; (the level area is in use now: MFM buffer in the first screen)
+        lea.l   FileProgressMap(pc),a1          ; 07744/       load the packed map picture
+        bsr.w   LoadFile                        ; 07748/     
+        move.l  #MFM_BUFFER,(MfmBuf).l
+""")
+    S.sub("        move.l  #MFM_BUFFER,$20(a0)             ; 0C54E/0C482  DSKPT = MFM buffer",
+          "        move.l  (MfmBuf).l,$20(a0)              ; 0C54E/0C482  DSKPT = MFM buffer")
+    S.sub("        lea.l   (MFM_BUFFER+$2).l,a3            ; 0C580/0C4B4",
+          "        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4\n        addq.l  #$2,a3")
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)
     print(f'{os.path.relpath(OUT, ROOT)}: {S.s.count(chr(10))} lines; {n} references out of reach made longer')

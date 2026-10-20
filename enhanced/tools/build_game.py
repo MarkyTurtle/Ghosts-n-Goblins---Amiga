@@ -169,6 +169,15 @@ def build(extra_defs=()):
               ("the 512K effects package fits its area", os.path.getsize(sfx) <= syms['SFX_AREA']),
               ("the text strip is after the buffers and holds 28 characters",
                syms['TEXT_STRIP'] >= syms['SCREEN_0'] + 3 * 47120 and syms['STRIP_MAX'] >= 28)]
+    import struct as _st
+    _d = open(prog, 'rb').read()
+    _files = [_st.unpack_from('>L', _d, syms[f'FileLevel{n}'] + 4 - 0x80)[0] for n in range(7)]
+    _load_top = syms['LEVEL_FILE'] + max(-(-n // 0x18A8) * 0x18A8 for n in _files)
+    checks.append((f'the level files load (whole tracks, up to ${_load_top:X}) below LoadFile\'s MFM buffer '
+                   f'(${syms["MFM_BUFFER"]:X}-${syms["LEVEL_GFX_LIMIT"]:X})',
+                   _load_top <= syms['MFM_BUFFER'] and syms['MFM_BUFFER'] + 0x3200 <= syms['LEVEL_GFX_LIMIT']))
+    checks.append(('the progress map and its MFM buffer stay in the first screen (the map is unpacked above it)',
+                   syms['PM_MFM'] + 0x3200 <= syms['SCREEN_1']))
     top = level_data_top(prog, syms)
     checks.append((f'the level data (file, BOB sets, masks; worst ${top:X}) ends below LEVEL_GFX_LIMIT',
                    top <= syms['LEVEL_GFX_LIMIT']))

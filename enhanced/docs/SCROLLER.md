@@ -455,6 +455,30 @@ it is finished with; the supervisor stack comes down from `$80000`, 318 bytes de
 the emulator). The level tables now start at `CLEAR_AREA+$B40` and `LEVEL_GFX_LIMIT` is
 `$7FB00`: the fullest stage (2) leaves 23,232 bytes free without pre-masking (20,222 before).
 
+**The old save areas (24 KB).** Before the screens the original had the small BOBs' load
+buffer (`BOB_GFX_A`) and two `$3000`-byte background save areas, with `LoadFile`'s MFM buffer
+inside them. The scroller restores the background from its pristine buffer and saves nothing,
+so the rest was only needed while loading. A trace of every `LoadFile` on 512K (start-up, every
+level start and restart, the progress map) showed where else those buffers can go:
+
+* the small BOBs' file loads into the screens right after the enemy sets' file
+  (`SMALLBOB_LOAD`, `SCREEN_0+$1D478`); `LoadLevel` and `BuildLevelMasks` build the level's
+  sets from both files there, before anything is drawn. `LoadLevel` now turns the bitplane
+  DMA off before this load instead of after it;
+* the MFM buffer goes to the top of the level area, below `LEVEL_TOP` (`$7FB00`): nothing there
+  is in use while a level loads (its tile and table files load far below it, `build_game.py`
+  checks; its sets and pre-masked images are copied in after the loads);
+* the progress map, though, is loaded after the level (before each level and after a life is
+  lost), when the level area is full. Its packed file and, for that load, the MFM buffer go into
+  the first screen (`PM_LOAD`, `PM_MFM`; `LoadFile` takes the MFM buffer from `MfmBuf`): the
+  bitplane DMA is still off then, and the map is unpacked into a higher screen (the lower of
+  `g_ScreenSpare1/2`, `SCREEN_1` at the lowest).
+
+`GNG_OVERRUN=1` also fills the MFM buffer with `$EE` at every load in `game.py`.
+
+The screens, the scroller's storage, the HUD and the level area all move down `$6000`: the
+fullest stage (2) leaves 47,782 bytes free without pre-masking (23,232 before).
+
 With the smaller program the memory map moved down, and the slow / fast RAM music needed a new
 order: the effects package's area now comes first after the program (`SFX_AREA`), and
 `LoadSound` runs right after `ReadProfile`, so that the 1MB music package, loaded over the

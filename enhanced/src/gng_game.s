@@ -4513,9 +4513,9 @@ LevelSmallBobMask:
 LoadLevel:
         btst    #PF_CACHE,(Profile).l           ; cache: the graphics are already in memory
         bne.b   ll_cached                       
-        lea.l   FileSmallBobs(pc),a1            ; 0682C/     
+        move.w  #DMAF_RASTER,(CUSTOM+$96).l     ; bitplane DMA off while loading (first now: the small
+        lea.l   FileSmallBobs(pc),a1            ; BOBs load into the screens too)
         bsr.w   LoadFile                        ; 06830/     
-        move.w  #DMAF_RASTER,$96(a0)            ; 06834/       disable copper DMA while loading
         lea.l   FileEnemyBobs(pc),a1            ; 0683A/     
         bsr.w   LoadFile                        ; 0683E/     
 ll_cached:
@@ -4549,7 +4549,7 @@ ll_sets:
         lea.l   g_SmallBobSets(a6),a0           ; 06888/068E2
         lea.l   SmallBobSetSizes(pc),a3         ; 0688C/068E6
         lea.l   SmallBobSetOffsets(pc),a4       ; 06890/068EA
-        lea.l   (BOB_GFX_A).l,a5                ; 06894/068EE
+        lea.l   (SMALLBOB_LOAD).l,a5            ; 06894/068EE
         btst    #PF_CACHE,(Profile).l           
         beq.b   ll_small                        
         lea.l   (SMALLBOB_CACHE).l,a5           ; the masked small sets
@@ -6026,8 +6026,10 @@ pm_nomus:
         lea.l   (PROGRESS_MAP_CACHE).l,a0       ; 1MB: the map from the cache
         bra.b   pm_have                         
 pm_load:
+        move.l  #PM_MFM,(MfmBuf).l              ; (the level area is in use now: MFM buffer in the first screen)
         lea.l   FileProgressMap(pc),a1          ; 07744/       load the packed map picture
         bsr.w   LoadFile                        ; 07748/     
+        move.l  #MFM_BUFFER,(MfmBuf).l
         moveq   #$0,d0                          ; 0774C/     
         lea.l   FileProgressMap(pc),a0          ; 0774E/     
         movea.l (a0),a0                         ; 07752/     
@@ -6713,7 +6715,7 @@ LevelFileIndex:
 FileTable:
 	FENTRY	SCREEN_0,$05400,33                     ; tracks 33-36: Arthur's sprite frames
 FileSmallBobs:
-	FENTRY	BOB_GFX_A,$00D20,37                    ; track 37: small item / scenery BOBs
+	FENTRY	SMALLBOB_LOAD,$00D20,37                ; track 37: small item / scenery BOBs (into the screens, after the enemy sets)
 FileEnemyBobs:
 	FENTRY	SCREEN_0,$1D042,38                     ; tracks 38-56: enemy BOB sets
 FileItemGfx2:
@@ -6725,7 +6727,7 @@ FileItemGfx:
 FileFont:
 	FENTRY	SCREEN_0,$01840,61                     ; track 61: font
 FileProgressMap:
-	FENTRY	BOB_GFX_A,$01D5C,62                    ; tracks 62-63: progress map (RLE)
+	FENTRY	PM_LOAD,$01D5C,62                      ; tracks 62-63: progress map (RLE; into the first screen)
 FileMusic:
 	FENTRY	MUSIC_FILE,$07D64,126                  ; tracks 126-131: sound driver and effects (512K)
 FileCopyrightScreen:
@@ -6837,6 +6839,8 @@ LoadLevelTables:
         jsr     (LoadFile).l
         movem.l (a7)+,d0-d7/a0-a6
         rts
+MfmBuf:
+        dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
 FileTables:
 	FENTRY	LEVEL_TABLES,TBLLEN0,TBLTRK0
 	FENTRY	LEVEL_TABLES,TBLLEN1,TBLTRK1
@@ -14384,7 +14388,7 @@ WaitDiskReady:
 ;---------------------------------------------------------------------------
 ReadTrackDMA:
         bsr.b   WaitDiskReady                   ; 0C54C/0C480
-        move.l  #MFM_BUFFER,$20(a0)             ; 0C54E/0C482  DSKPT = MFM buffer
+        move.l  (MfmBuf).l,$20(a0)              ; 0C54E/0C482  DSKPT = MFM buffer
         move.w  #$9900,$24(a0)                  ; 0C556/0C48A  DSKLEN written twice to start DMA ($1900 words)
         move.w  #$9900,$24(a0)                  ; 0C55C/0C490
 l_0C562:
@@ -14408,7 +14412,8 @@ StepOut:	; (no references found - unused/debug code)
 ; MFM decode into a5 (handles a partial last long); out d1 = stored checksum, d4 = computed, d2 = track number
 ;---------------------------------------------------------------------------
 DecodeTrack:
-        lea.l   (MFM_BUFFER+$2).l,a3            ; 0C580/0C4B4
+        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4
+        addq.l  #$2,a3
         movea.l a5,a4                           ; 0C586/0C4BA
         move.l  #$55555555,d3                   ; 0C588/0C4BC
         move.w  (a3)+,d2                        ; 0C58E/0C4C2

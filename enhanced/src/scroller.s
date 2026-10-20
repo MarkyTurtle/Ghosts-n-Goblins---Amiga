@@ -745,7 +745,7 @@ PrFast:         movem.l d0-d7/a0-a5,-(a7)
 ESHOT_LEN       equ     $1234                   ; enemy shots
 ITEM_LEN        equ     $1AC2+$EA6              ; items, weapons, effects (ITEM_GFX_BUF, ITEM_GFX2_BUF)
 ITEMS_GFX_LEN   equ     ESHOT_LEN+ITEM_LEN      ; region 1: contiguous in memory from ESHOT_GFX_BUF
-LEVEL_GFX_LIMIT equ     $7FB00                  ; the level data's end: up to the bootblock's machine
+LEVEL_GFX_LIMIT equ     LEVEL_TOP               ; the level data's end ($7FB00): up to the bootblock's machine
                                                 ; description (copied by EnhInit, so free after it, as is
                                                 ; the loader above it); the supervisor stack comes down
                                                 ; from $80000 (318 bytes deep at most, measured). The
@@ -809,7 +809,7 @@ GfxPriority:    dc.b    $40,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,12,$41
 
 ; BuildLevelMasks - LoadLevel, after BuildFrameTable (whose copies of the level's sets are
 ; replaced: every set of the level is marked 1 until it is placed): the sets are taken again from the files still in memory (enemy sets at
-; SCREEN_0, small sets at BOB_GFX_A) and laid out as above.
+; SCREEN_0, small sets at SMALLBOB_LOAD) and laid out as above.
 BuildLevelMasks:
                 clr.w   StripLen                ; (the text strip is made again)
                 btst    #PF_CACHE,(Profile).l
@@ -875,7 +875,7 @@ BuildLevelMasks:
                 lea     (SmallBobSetSizes).l,a0
                 lea     (SmallBobSetOffsets).l,a1
                 lea     (CacheSizesSmallBobs).l,a3
-                lea     (BOB_GFX_A).l,a2
+                lea     (SMALLBOB_LOAD).l,a2
 .set:           add.w   d0,d0
                 moveq   #0,d2
                 move.w  (a0,d0.w),d2            ; d2 = size
@@ -967,7 +967,7 @@ BuildLevelMasks:
                 lea     g_SmallBobSets(a6),a4
                 lea     (SmallBobSetSizes).l,a0
                 lea     (SmallBobSetOffsets).l,a1
-                lea     (BOB_GFX_A).l,a2
+                lea     (SMALLBOB_LOAD).l,a2
                 moveq   #10-1,d7
                 bsr.w   .copy
                 move.l  a5,d1

@@ -86,6 +86,8 @@ LoadLevelTables:
         jsr     (LoadFile).l
         movem.l (a7)+,d0-d7/a0-a6
         rts
+MfmBuf:
+        dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
 FileTables:
 	FENTRY	LEVEL_TABLES,TBLLEN0,TBLTRK0
 	FENTRY	LEVEL_TABLES,TBLLEN1,TBLTRK1
