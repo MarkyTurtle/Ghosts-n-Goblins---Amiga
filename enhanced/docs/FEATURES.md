@@ -215,7 +215,7 @@ symbols (`viewer_syms.i`, written by `build_game.py`).
 |---|---|
 | (none) | the game: `gng_game.adf` |
 | `--raster` | the timing build: the background colour shows each stage of a frame - grey logic, red scroller edges and restores, orange text, blue BOBs, yellow copper list, green waiting for the display, black idle (`gng_game_raster.adf`) |
-| `--nasty-wait` | blitter priority only while the CPU waits for the blitter (to be measured; `gng_game_nastywait.adf`) |
+| `--nasty-wait` | blitter priority only while the CPU waits for the blitter (an experiment, not pursued: little to gain; `gng_game_nastywait.adf`) |
 | `--music-rate N/D` | the 512K music package at another quality (`--music-rate 1`: full quality) |
 
 `make_game.py` writes `src/gng_game.s` from the root `gng_main.s` (both original programs); run

@@ -735,8 +735,10 @@ camera climbs at up to 4 px a frame and falls at 4-10, a new row every 4-8 frame
 **Cheat key (testing).** On the title and high-score screens, **C** turns the game's own cheat
 (`g_CheatOn`, the one entering `)!(` on the high-score table sets: lives never decrease, no harm
 once the armour is gone) on or off, and shows the title again with `CHEAT ON` under the key
-lines while it is on (`EnhCheatKey`, `EnhShowCheat`). It stays set until switched off or the
-machine is reset; a high-score entry other than `)!(` clears it, as in the original.
+lines while it is on. It stays set until switched off or the machine is reset; a high-score
+entry other than `)!(` clears it, as in the original. (Since the title menu, `EnhMenu` handles
+the C key, and the cheat shows as the test page's `CHEAT OFF` / `ON` item instead of a line on
+the title.)
 
 **Look-ahead column (`ScrPrepare`).** A frame that crossed a tile column drew the whole new
 column at once: about 15 tile blits into the pristine buffer and 15 tile copies into the display
@@ -756,7 +758,7 @@ before the crossing. Blitter words in the crossing frame and the next two, stage
 6,724 on average; stage 6: 13,601 -> 11,515; the 99th-percentile frame: 4,635 -> 3,840 and
 5,620 -> 4,880 words. Pictures unchanged on all seven stages (512K and 1MB).
 
-**Blitter priority while waiting (`--nasty-wait`, to be measured).** The original sets BLTPRI
+**Blitter priority while waiting (`--nasty-wait`; not pursued: little to gain).** The original sets BLTPRI
 ("blitter nasty") once at start-up and never clears it. With all code and data in chip RAM, the
 CPU then cannot fetch an instruction while a blit runs, so the work between blits (the next BOB's
 clipping and addresses, the copper list and the logic after the last blit) never runs alongside
