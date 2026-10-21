@@ -7,6 +7,9 @@
 > [`main`](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/tree/main); the rest of this README describes that disassembly, which this
 > branch builds on.
 
+**Building from the source:** what to install and how to build and test both versions, on
+Windows and Linux - [`docs/BUILDING.md`](docs/BUILDING.md).
+
 | File | What it is |
 |---|---|
 | `gng_main.s` | Main program, **both builds** from one source: the 512K build (tracks 110-125, runs at `$80`) and, with `-DBUILD_1MB=1`, the expanded-memory (1MB) build (tracks 17-32, position independent, assembled at org 0). ~26,000 lines; the ~190 places where the builds differ are `ifd BUILD_1MB` / `else` blocks |
@@ -18,7 +21,7 @@
 | `sound/` | Sound driver and music/sfx data: annotated sources, samples, renders (`sound/SOUND.md`) |
 | `render/` | Scripts that render levels, enemy BOBs and Arthur's sprites from the disk data; output in `render/out/`, including `worldmap_cells.png` (the whole world map with every cell number) |
 | `disk/` | **Every file loaded from the disk** (`disk/files/`), the file table (`disk/FILES.md`) and a track-by-track disk map (`disk/DISKMAP.md`). `tools/disk/mkdisk.py` builds a playable disk image from them (see *Making a disk image*) |
-| `docs/` | `HOW_IT_WORKS.md` (a guided tour with diagrams: interrupts, the state machine, a frame, objects, spawning, drawing, level data), `GLOBALS.md` (every global, the memory map, object slot and per-type fields), `XREF.md` (which routines use each global, routine and table), `SPAWNS.md` (every level's spawn zones and scripts, decoded), `TODO.md` (planned enhancements: a shared file directory and own loader, automatic disk layout, corkscrew scrolling with a pristine buffer, zx0 / per-level files / caching / music on 512K, further space savings, emulator tests), sprite/BOB flipping spreadsheet |
+| `docs/` | `BUILDING.md` (what to install and how to build, on Windows and Linux), `HOW_IT_WORKS.md` (a guided tour with diagrams: interrupts, the state machine, a frame, objects, spawning, drawing, level data), `GLOBALS.md` (every global, the memory map, object slot and per-type fields), `XREF.md` (which routines use each global, routine and table), `SPAWNS.md` (every level's spawn zones and scripts, decoded), `TODO.md` (planned enhancements: a shared file directory and own loader, automatic disk layout, corkscrew scrolling with a pristine buffer, zx0 / per-level files / caching / music on 512K, further space savings, emulator tests), sprite/BOB flipping spreadsheet |
 | `bin/tracks/` | All 131 decoded tracks (6,312 bytes each) used by the render scripts |
 | `bin/main_1mb.bin` | The expanded-memory build (tracks 17-32) |
 | `enhanced/` | (this branch, `enhanced/main`) **The enhanced game**: one program for every Amiga made from this source, with an incremental scroller, 50 fps drawing, music on every machine, an AmigaDOS disk (bootable from any drive), two-button joysticks, a file cache on expanded machines, a title menu and a test page (sound, input, sprite and - with 1MB of chip RAM - BOB tests); its tools and tests (the whole game in an emulator, side by side with the original). Documentation: `enhanced/docs/README.md` (features, memory and disk layouts, data formats) |

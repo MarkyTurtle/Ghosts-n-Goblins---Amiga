@@ -227,7 +227,8 @@ symbols (`viewer_syms.i`, written by `build_game.py`).
 Ready-made disks (the game and the timing build) are attached to each [release](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/releases);
 v1.0 is built from `enhanced/main` at the tag `V1.0`.
 
-`enhanced/tools/build_game.py` (needs vasm, `vasmm68k_mot`) makes `enhanced/build/gng_game.adf`:
+`enhanced/tools/build_game.py` (needs vasm, `vasmm68k_mot`, and Python: what to install, on Windows
+and Linux, is in [`docs/BUILDING.md`](../../docs/BUILDING.md)) makes `enhanced/build/gng_game.adf`:
 
 | Option | Builds |
 |---|---|

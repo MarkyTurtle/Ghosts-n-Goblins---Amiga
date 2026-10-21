@@ -14,7 +14,8 @@ Elsewhere: `../../docs/TODO.md` (what is done, what is left, with measurements),
 `../../sound/SOUND.md` (the sound driver and its data).
 
 Build and check (needs [vasm](http://sun.hasenbraten.de/vasm/) as `vasmm68k_mot`, Python 3 with
-`unicorn`, `numpy`, `Pillow`, and `scipy` for the music package):
+`unicorn`, `numpy`, `Pillow`, and `scipy` for the music package; installing them on Windows and
+Linux: [`../../docs/BUILDING.md`](../../docs/BUILDING.md)):
 
 ```
 cd enhanced/tools
