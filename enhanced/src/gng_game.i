@@ -673,7 +673,7 @@ PD_TurnRate         	equ	$23	; reload for PD_TurnWait (slower turns further away
 PD_Fine             	equ	$30	; 1 = halve the turn wait again (param 1)
 PD_Shot             	equ	$31	; 1 = has fired its one shot
 PD_Legs             	equ	$32	; hunting legs left (4)
-PD_Turn             	equ	$33	; turn mode 0-3: which way it turns (DevilTurnModes)
+PD_Turn             	equ	$33	; turn mode 0-3: which way it turns (PetiteDevilTurnModes)
 PD_EarlyShot        	equ	$34	; 0 = may fire as it arrives (PetiteDevilArriveShot)
 PD_ShotTime         	equ	$35	; frames before it may fire (64-95)
 PD_Time             	equ	$36	; frames left of the current leg
