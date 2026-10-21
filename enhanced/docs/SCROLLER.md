@@ -1,4 +1,4 @@
-# Incremental scroller (enhanced build, branch `enhanced/scroll`)
+# Incremental scroller (enhanced build, branch `enhanced/main`; named `enhanced/scroll` until October 2026)
 
 > **The development log.** This file records how the enhanced game was made, step by step, with
 > the measurements and tests of each step; the earlier sections describe builds that came before

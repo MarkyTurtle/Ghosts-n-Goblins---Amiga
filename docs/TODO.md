@@ -33,7 +33,7 @@ decided against, kept for the record with the reason.
 **Display and drawing**
 - [x] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
       redraw only the new edge instead of the whole screen; no freezes when falling (3).
-      Integrated into both programs (512K and 1MB) on branch `enhanced/scroll`, with a disk image;
+      Integrated into both programs (512K and 1MB) on branch `enhanced/main`, with a disk image;
       tested in the emulator side by side with the originals, and in WinUAE (A500, A500 + 512K,
       A500+, A600, A1200)
 - [x] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
@@ -215,7 +215,7 @@ would be opt-in.
 **Goal:** replace the full-redraw scrolling with incremental scrolling, to cut memory use and,
 more importantly, the scrolling cost.
 
-**Integrated (branch `enhanced/scroll`, `enhanced/docs/SCROLLER.md`).** The scroller, the
+**Integrated (branch `enhanced/main`, `enhanced/docs/SCROLLER.md`).** The scroller, the
 pristine buffer and the BOBs now run in the 512K game (a module loaded from its own track plus
 in-place patches), with a disk image to try. The first prototype's findings:
 
@@ -618,7 +618,7 @@ on `main` now assembles both programs: 21,580 lines of code shared, about 640 51
 
 **Plan**
 
-* **Bootblock: describe the machine.** *Done on `enhanced/scroll`: `enhanced/src/boot_patches.s`
+* **Bootblock: describe the machine.** *Done on `enhanced/main`: `enhanced/src/boot_patches.s`
   leaves a 32-byte description at `$7FB00` (layout in `enhanced/docs/SCROLLER.md`), the title
   screen shows it; tested on six fake memory lists, and since in WinUAE.* Kickstart is still running when the bootblock starts, so
   instead of guessing it can walk exec's memory list (`ExecBase->MemList`: each MemHeader gives
@@ -649,7 +649,7 @@ on `main` now assembles both programs: 21,580 lines of code shared, about 640 51
 * **Disk:** one main program instead of two (about 100 KB less), loaded where the bootblock
   chose; the 1MB music package and the 512K effects package both stay, picked by profile.
 * **Order:** *One source for both builds: done (on `main`, `tools/merge_src.py`; both programs
-  byte-identical). One program for every machine: done on `enhanced/scroll` without the
+  byte-identical). One program for every machine: done on `enhanced/main` without the
   scroller (`enhanced/src/gng_game.s`, profiles from the machine description; tested against
   both originals; see `enhanced/docs/SCROLLER.md`, One program for every machine). Slow / fast
   RAM since used too: the program moves there, and the file cache.* Next the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), into

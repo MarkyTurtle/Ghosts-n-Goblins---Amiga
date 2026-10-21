@@ -7,7 +7,7 @@ enemies, timings and scoring - is the original's: in the emulator the enhanced g
 original program are run side by side with the same input and stay in the same game state
 every frame (*Testing*, below).
 
-This branch is `enhanced/scroll`. Where things are:
+This branch is `enhanced/main`. Where things are:
 
 | Document | |
 |---|---|
