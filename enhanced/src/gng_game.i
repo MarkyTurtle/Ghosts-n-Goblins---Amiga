@@ -386,7 +386,11 @@ FID_MUSIC512        	equ	28	; the music for 512K (sound/gng_music_512k.s)
 	ifnd	MUSIC512_LEN		; (its length: build_game.py)
 MUSIC512_LEN        	equ	0
 	endc
-FID_COUNT           	equ	29
+FID_VIEWER          	equ	29	; the BOB viewer (bobviewer.s), loaded with 1MB of chip RAM
+	ifnd	VIEWER_LEN		; (its length: build_game.py)
+VIEWER_LEN          	equ	0
+	endc
+FID_COUNT           	equ	30
 SMALLBOB_LOAD       	equ	SCREEN_0+$1D478	; the small BOBs' file (track 37): in the screens, after the enemy sets'
                     			; file; both stay there until LoadLevel has built the level's
                     			; sets from them (BuildFrameTable, BuildLevelMasks), the screens drawn after
@@ -755,6 +759,8 @@ MITEM_GFX_END       	equ	MITEM_GFX2_BUF+2*$EA6	; end of the upper chip RAM used
 	ifgt	MITEM_GFX_END-$100000
 	fail	"the upper chip RAM caches do not fit below $100000"
 	endc
+VIEWER_ORG          	equ	(MITEM_GFX_END+255)/256*256	; the BOB viewer (FID_VIEWER, bobviewer.s): assembled
+                    			; for here, after the caches; loaded by CacheGraphics
 
 ; the joystick's second button (port 2, pin 9: POTGO's OUTRY / DATRY, POTINP's DATRY)
 POTGO_B2            	equ	$C000	; POTGO: pin 9 an output, driven high (a pressed button pulls it low)

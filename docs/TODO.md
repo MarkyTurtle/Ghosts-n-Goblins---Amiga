@@ -118,8 +118,10 @@ decided against, kept for the record with the reason.
 - [x] A sprite test on the test page (8): Arthur's 42 sprite frames and their mirrored copies;
       the enemies' BOB sets are not shown (on 512K only the level's sets exist, and BOBs are drawn
       by the play loop)
-- [ ] (A BOB viewer for the sprite test: it would load a level's graphics into the title screen
-      and draw them with the scroller's BOB drawing)
+- [x] A BOB viewer on the test page (`BOB TEST`), on machines with 1MB of chip RAM or more only:
+      every cached, pre-masked BOB strip drawn with `ScrDrawBob`; its own file (`FID_VIEWER`)
+      loaded after the caches (branch `enhanced/testmenu`). Not on 512K chip machines (with or
+      without an expansion): their BOB graphics are only the level's
 - [x] An input test on the test page, as on an arcade machine (8): the joystick's directions and
       both buttons lit while held, and the last key's raw code
 

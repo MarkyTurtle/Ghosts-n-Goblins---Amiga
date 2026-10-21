@@ -226,7 +226,10 @@ EnhSetBitplanePtrs:
 
 ;------------------------------------------------------------------------------
 EnhShowBackBuffer:
-                bsr.w   TextFlush               ; text not drawn yet goes in before it is shown
+                cmpi.b  #PAGE_BOBS,(MenuPage).l ; the BOB test: its strip (bobviewer.s: ViewDraw)
+                bne.b   .nobob
+                jsr     (VIEWER_ORG+8).l
+.nobob:         bsr.w   TextFlush               ; text not drawn yet goes in before it is shown
                 RASTER  $0F0                    ; green: waiting for the copper interrupt
                 lea     CUSTOM,a0
                 movea.l DrawRec(pc),a1
@@ -1143,7 +1146,10 @@ MakeMasks:
 ;                         the last key pressed (its raw code)
 ;   sprite test (PAGE_SPRITE): Arthur's sprite frames (left / right: the frame, fire: the
 ;                         mirrored copy) on screen, with the frame's number
-; The input and sprite tests go back to the test page with Esc, or with fire held 3 seconds.
+;   BOB test (PAGE_BOBS; 1MB of chip RAM or more only: the viewer file, bobviewer.s, is loaded
+;                         at VIEWER_ORG by CacheGraphics, ViewerOn): the cached BOB graphics,
+;                         left / right the strip, up / down scroll it
+; The input, sprite and BOB tests go back to the test page with Esc, or with fire held 3 seconds.
 ; F1 / F2 start a 1 / 2 player game at once, J switches the jump input, C the cheat (as
 ; before). Any change draws the title again (GS_TITLE from step 0: double-buffered, and its
 ; 400-frame time-out to the high scores starts again; only the title page has a time-out). On
@@ -1153,11 +1159,13 @@ PAGE_TITLE      equ     0
 PAGE_TEST       equ     1
 PAGE_INPUT      equ     2
 PAGE_SPRITE     equ     3
+PAGE_BOBS       equ     4
 MENU_ITEMS      equ     4               ; title page
-TEST_ITEMS      equ     6               ; test page: MUSIC, EFFECT, INPUT TEST, SPRITE TEST, CHEAT, EXIT
-TEST_INPUT      equ     2               ;   (the items' numbers)
-TEST_SPRITE     equ     3
-TEST_CHEAT      equ     4
+TEST_ITEMS      equ     7               ; test page: MUSIC, EFFECT, INPUT TEST, SPRITE TEST, BOB TEST,
+TEST_INPUT      equ     2               ;   CHEAT, EXIT - the items' numbers (BOB TEST only with
+TEST_SPRITE     equ     3               ;   ViewerOn: without it the items after it move up one)
+TEST_BOBS       equ     4
+TEST_CHEAT      equ     5
 TUNES           equ     15              ; tunes 0-14 (TestMusic -1: off)
 EFFECTS         equ     30              ; effects 0-29
 HOLD_EXIT       equ     150             ; frames of fire held that leave a test (3 s)
@@ -1178,6 +1186,8 @@ EnhMenu:
                 beq.w   .input
                 cmpi.b  #PAGE_SPRITE,d0
                 beq.w   .sprite
+                cmpi.b  #PAGE_BOBS,d0
+                beq.w   .bobs
                 move.b  g_RawKey(a6),d1
                 cmpi.b  #KEY_F1,d1
                 beq.w   .one
@@ -1196,6 +1206,9 @@ EnhMenu:
                 tst.b   (MenuPage).l
                 beq.w   .main
                 moveq   #TEST_ITEMS,d4
+                tst.b   (ViewerOn).l
+                bne.b   .main
+                subq.w  #1,d4                   ; (no BOB TEST)
 .main:          move.b  (a0),d1
                 btst    #8,d2                   ; up
                 beq.w   .down
@@ -1225,7 +1238,8 @@ EnhMenu:
                 move.b  #PAGE_TEST,(MenuPage).l ; TEST MENU
                 clr.b   (a0)
                 bra.w   .redraw
-.testpg:        tst.b   d1
+.testpg:        bsr.w   .tid                    ; the item's number as if BOB TEST were there
+                tst.b   d1
                 beq.w   .music
                 cmpi.b  #1,d1
                 beq.w   .effect
@@ -1237,6 +1251,8 @@ EnhMenu:
                 beq.w   .toinput
                 cmpi.b  #TEST_SPRITE,d1
                 beq.w   .tosprite
+                cmpi.b  #TEST_BOBS,d1
+                beq.w   .tobobs
                 bsr.w   StopMusic               ; EXIT: the music off,
                 move.b  #3,(a0)                 ; back on TEST MENU
 .title:         clr.b   (MenuPage).l
@@ -1271,6 +1287,8 @@ EnhMenu:
                 clr.b   (InputKeyShown).l
                 bra.w   .test
 .tosprite:      move.b  #PAGE_SPRITE,(MenuPage).l
+                bra.w   .test
+.tobobs:        move.b  #PAGE_BOBS,(MenuPage).l
 .test:          clr.w   (HoldTime).l
                 bra.w   .redraw
 .one:           clr.b   g_TwoPlayer(a6)
@@ -1318,10 +1336,26 @@ EnhMenu:
                 bpl.w   .none
                 not.b   (SprMirror).l
                 bra.w   .redraw
+;- the BOB test: the viewer takes the joystick (bobviewer.s); back with Esc or fire held
+.bobs:          bsr.w   .leave
+                bne.w   .back
+                bsr.w   .edges
+                beq.w   .none
+                jsr     (VIEWER_ORG).l          ; ViewInput -> d0 = 1: changed
+                tst.b   d0
+                bne.w   .redraw
+                bra.w   .none
 .back:          move.b  #PAGE_TEST,(MenuPage).l ; back to the test page, on the test left
                 clr.w   (HoldTime).l
                 bra.w   .redraw
 
+; d1 = a test page item -> d1 = its number as if BOB TEST were there (TEST_*)
+.tid:           tst.b   (ViewerOn).l
+                bne.b   .tid1
+                cmpi.b  #TEST_BOBS,d1
+                bcs.b   .tid1
+                addq.b  #1,d1
+.tid1:          rts
 ; d2 = the joystick bits newly pressed (b0 down, b1 right, b8 up, b9 left, b15 fire); Z if none
 .edges:         move.w  g_JoyPrev(a6),d2
                 not.w   d2
@@ -1458,6 +1492,8 @@ EnhTitleText:
                 beq.w   .test
                 cmpi.b  #PAGE_INPUT,d0
                 beq.w   .input
+                cmpi.b  #PAGE_BOBS,d0
+                beq.w   .bobs
                 bra.w   .sprite
 .titlepg:       bsr.w   .credcol
                 lea     TxtCreditProgram,a3
@@ -1473,6 +1509,7 @@ EnhTitleText:
                 moveq   #$68,d2
                 jsr     PrintString
                 move.w  #$80,(ItemRow).l
+                move.w  #4,(ItemStep).l         ; (16 lines apart)
                 lea     TxtMenu1(pc),a1
                 moveq   #0,d6                   ; item
                 bsr.w   .item
@@ -1494,7 +1531,8 @@ EnhTitleText:
 .test:          lea     TxtMenuTest(pc),a3
                 bsr.w   .heading
                 bsr.w   EnhShowMachine          ; the memory, at $58
-                move.w  #$70,(ItemRow).l
+                move.w  #$6C,(ItemRow).l
+                move.w  #3,(ItemStep).l         ; (seven items: 12 lines apart, see .item)
                 moveq   #0,d6
                 lea     TxtMusicItem(pc),a1     ; MUSIC  OFF / nn
                 lea     TxtOff(pc),a2
@@ -1510,7 +1548,11 @@ EnhTitleText:
                 bsr.w   .item
                 lea     TxtSpriteTest(pc),a1
                 bsr.w   .item
-                lea     TxtCheatItem(pc),a1
+                tst.b   (ViewerOn).l
+                beq.b   .nobobs
+                lea     TxtBobTest(pc),a1
+                bsr.w   .item
+.nobobs:        lea     TxtCheatItem(pc),a1
                 lea     TxtOff(pc),a2
                 tst.b   g_CheatOn(a6)
                 beq.w   .ch
@@ -1550,6 +1592,21 @@ EnhTitleText:
 .nokey:         lea     TxtNone(pc),a2
                 moveq   #0,d5
 .keyl:          bsr.w   .compose
+                move.w  #$B8,d2
+                bsr.w   .line
+                lea     TxtLeave(pc),a3
+                moveq   #0,d5
+                move.w  #$C4,d2
+                bsr.w   .line
+                bra.w   .out
+.bobs:          lea     TxtBobTest(pc),a3       ; the BOB test: its name, the strip (bobviewer.s:
+                bsr.w   .heading                ; ViewText; the strip is drawn by ViewDraw), the keys
+                jsr     (VIEWER_ORG+4).l
+                st      d5
+                moveq   #$58,d2
+                bsr.w   .line
+                lea     TxtBobKeys(pc),a3
+                moveq   #0,d5
                 move.w  #$B8,d2
                 bsr.w   .line
                 lea     TxtLeave(pc),a3
@@ -1639,8 +1696,9 @@ EnhTitleText:
                 move.b  #' ',(a3)+
                 move.b  #'<',(a3)+
 .i4:            clr.b   (a3)
-                move.w  d6,d2
-                lsl.w   #4,d2
+                move.w  d6,d2                   ; row: ItemRow + d6 x (ItemStep x 4)
+                mulu.w  (ItemStep).l,d2
+                lsl.w   #2,d2
                 add.w   (ItemRow).l,d2
                 addq.w  #1,d6
                 lea     (OptText).l,a3
@@ -1717,6 +1775,8 @@ TxtSpriteTest:  dc.b    'SPRITE TEST',0
 TxtFrame:       dc.b    'ARTHUR FRAME ',0
 TxtMirrored:    dc.b    ' MIRRORED',0
 TxtSpriteKeys:  dc.b    'left/right frame  fire mirror',0
+TxtBobTest:     dc.b    'BOB TEST',0
+TxtBobKeys:     dc.b    'left/right strip  up/down scroll',0
 TxtCheatItem:   dc.b    'CHEAT ',0
 TxtOff:         dc.b    'OFF',0
 TxtOn:          dc.b    'ON',0
@@ -1730,8 +1790,10 @@ InputKey:       dc.b    0                       ; the input test: the last key's
 InputKeyShown:  dc.b    0                       ;   ... and the one the page shows
 SprFrame:       dc.b    0                       ; the sprite test: Arthur's frame ...
 SprMirror:      dc.b    0                       ; ... and its mirrored copy
+ViewerOn:       dc.b    0                       ; the BOB viewer is loaded (1MB of chip RAM: CacheGraphics)
                 even
-ItemRow:        dc.w    0                       ; the row of a page's first item
+ItemRow:        dc.w    0                       ; the row of a page's first item ...
+ItemStep:       dc.w    4                       ; ... and the lines between items / 4
 InputShown:     dc.w    0                       ; the input test: the state the page shows
 HoldTime:       dc.w    0                       ; frames fire has been held (a test's exit)
 NumText:        dcb.b   4,0                     ; a number, made up

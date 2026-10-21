@@ -870,6 +870,31 @@ held to go back), `StopMusic` also checked with the driver in upper chip RAM (1M
 (the program moved). The emulator draws no sprites, so Arthur's place was checked from his
 sprite control words (an overlay in a test script).
 
+### The BOB viewer (1MB of chip RAM or more)
+
+`BOB TEST` (`PAGE_BOBS`) shows the 59 BOB strips the 1MB profile caches in upper chip RAM
+(`ENEMY_GFX_CACHE`, `SMALLBOB_CACHE`, `MESHOT_GFX_BUF`, `MITEM_GFX_BUF`, `MITEM_GFX2_BUF`, with
+their sizes from the `CacheSizes*` tables). The code is a file of its own (`src/bobviewer.s`,
+`FID_VIEWER`), loaded by `CacheGraphics` at `VIEWER_ORG` (the next 256-byte boundary after
+`MITEM_GFX_END`), which sets `ViewerOn`; `EnhMenu` and `EnhTitleText` leave the item out when it
+is clear, so a 512K machine has the same six items as before. The program calls the viewer
+through three branches at its start: `+0` input (newly pressed bits -> draw again?), `+4` its
+line of text, `+8` the drawing, called from `EnhShowBackBuffer` before `TextFlush`: the buffer
+being drawn is brought to the camera (`EnsureDraw`), its restore list emptied (nothing else is
+drawn on the title) and a window of up to 64 lines of the strip drawn with `ScrDrawBob` (one
+pre-masked blit) between the text lines. The test page's items are now 12 lines apart
+(`ItemStep`) and start at `ItemRow` = `$6C` to fit seven.
+
+`build_game.py` assembles the program, writes its symbols as `viewer_syms.i`, assembles the
+viewer against them, then assembles the program again with `VIEWER_LEN` and checks that no
+symbol moved; it checks the viewer ends below `$FE800` (Kickstart 1.3's top of 1MB chip RAM).
+The viewer is loaded on every `PF_CACHE` machine, whatever is chosen on the menu (530 bytes,
+one more file at start-up).
+
+*Testing*: `test_menu.py` checks that 512K has no viewer, and on a 1MB machine that it is
+loaded, its page opens, the strips step and wrap round, the window is drawn differently for a
+different strip and when scrolled, up scrolls back and Esc goes back to the test page.
+
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,

@@ -3751,7 +3751,7 @@ StartGame:
         move.b  #$1f,g_TextShadow(a6)           ; 0600A/06064
         move.b  #$1b,g_TextInk(a6)              ; 06010/0606A
         move.b  #$5,g_TextPaper(a6)             ; 06016/06070
-        lea.l   TxtPlayer(pc),a3                ; 0601C/06076
+        lea.l   (TxtPlayer).l,a3                ; 0601C/06076
         moveq   #$1,d1                          ; 06020/0607A
         moveq   #$0,d2                          ; 06022/0607C
         bsr.w   PrintString                     ; 06024/0607E
@@ -3766,7 +3766,7 @@ StartGame:
         move.b  #$1f,g_TextShadow(a6)           ; 06040/0609A
         move.b  #$1b,g_TextInk(a6)              ; 06046/060A0
         move.b  #$5,g_TextPaper(a6)             ; 0604C/060A6
-        lea.l   TxtPlayer(pc),a3                ; 06052/060AC
+        lea.l   (TxtPlayer).l,a3                ; 06052/060AC
         moveq   #$17,d1                         ; 06056/060B0
         moveq   #$0,d2                          ; 06058/060B2
         bsr.w   PrintString                     ; 0605A/060B4
@@ -3780,7 +3780,7 @@ l_06070:
         move.b  #$1f,g_TextShadow(a6)           ; 06070/060CA
         move.b  #$1,g_TextInk(a6)               ; 06076/060D0
         move.b  #$18,g_TextPaper(a6)            ; 0607C/060D6
-        lea.l   TxtTopScore(pc),a3              ; 06082/060DC
+        lea.l   (TxtTopScore).l,a3              ; 06082/060DC
         moveq   #$b,d1                          ; 06086/060E0
         moveq   #$0,d2                          ; 06088/060E2
         bsr.w   PrintString                     ; 0608A/060E4
@@ -3892,7 +3892,7 @@ l_0614A:
         beq.w   l_0621E                         ; 06190/061EA
         cmp.w   #$3e,d5                         ; 06194/061EE  space
         beq.w   l_06238                         ; 06198/061F2
-        lea.l   NameGridLetters(pc),a0          ; 0619C/061F6
+        lea.l   (NameGridLetters).l,a0          ; 0619C/061F6
         move.b  (a0,d5.w),d0                    ; 061A0/061FA
 l_061A4:
         move.w  g_ArthurAux(a6),d1              ; 061A4/061FE  three letters already?
@@ -3949,7 +3949,7 @@ snd70_go:
         beq.b   snd70_512                       
         move    (a7)+,ccr                       
 l1m_0626C:
-        bsr.w   PlayMusic                       ;      /0626C
+        jsr     (PlayMusic).l                       ;      /0626C
         bra.w   snd70_end                       
 snd70_512:
         move    (a7)+,ccr                       
@@ -6677,7 +6677,8 @@ FileRelocs:
 ;   LoadFile          a file by its id, with the 4489_byteloader (FileDir: the disk's file table)
 ;   IrqLevel1 / 3     the interrupt entries that give the handlers their a6
 ;   EnhRelocate       the program's move to expansion memory (ApplyRelocs)
-;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx)
+;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx),
+;                     and the test page's BOB viewer loaded (bobviewer.s, at VIEWER_ORG)
 ; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
 ; (MACHINE_INFO). With 1MB or more of chip RAM (any chip RAM above $80000: Kickstart 1.3 keeps the
@@ -6771,6 +6772,8 @@ LoadLevelTables:
         rts
 FileMusic512:
 	FENTRY	MUSIC_FILE,MUSIC512_LEN,FID_MUSIC512    ; the music for 512K (sound/gng_music_512k.s)
+FileViewer:
+	FENTRY	VIEWER_ORG,VIEWER_LEN,FID_VIEWER        ; the BOB viewer (1MB of chip RAM: CacheGraphics)
 MfmBuf:
         dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
 
@@ -7015,6 +7018,9 @@ CacheGraphics:
         bsr.w   BuildMaskedGfx
         move.l  #MITEM_GFX_BUF,(ItemGfxPtr).l
         move.l  #MESHOT_GFX_BUF,(EShotGfxPtr).l
+        lea.l   (FileViewer).l,a1               ; the test page's BOB viewer (bobviewer.s): only here
+        bsr.w   LoadFile
+        st.b    (ViewerOn).l
         lea.l   (FileProgressMap).l,a1          ; keep the packed progress map
         bsr.w   LoadFile
         lea.l   (FileProgressMap).l,a2

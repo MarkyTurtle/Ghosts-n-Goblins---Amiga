@@ -161,14 +161,21 @@ description), then:
 | `EFFECT nn` | the sound effects: left / right choose (00-29), fire plays it |
 | `INPUT TEST` | an arcade-style switch test: `UP`, `DOWN`, `LEFT`, `RIGHT`, `FIRE`, `FIRE 2` (port 2) lit while held, and `KEY $nn`: the raw code of the last key pressed |
 | `SPRITE TEST` | Arthur on screen in each of his 42 sprite frames (left / right) and, for frames 0-39, their mirrored copies (fire), with the frame's number |
+| `BOB TEST` | (1MB of chip RAM or more only) the BOB viewer: every cached BOB strip (39 enemy, 10 small-BOB, 3 enemy-shot, 7 item / weapon strips) drawn pre-masked with one blit, as in the game; left / right choose the strip, up / down scroll it 16 lines at a time; shows the group, number, size and first line |
 | `CHEAT OFF` / `ON` | the original's own cheat (lives never decrease, no harm once the armour is gone - what typing `)!(` as a high-score name turns on) |
 | `EXIT` | back to the title (the music stopped) |
 
-The input and sprite tests go back to the test page with Esc or with fire held for 3 seconds.
-The tests' pages are drawn again when what they show changes, so the input test follows the
-joystick within a few frames. Only Arthur's sprites are shown: the enemies' BOBs exist only for
-the level being played (on 512K) and are drawn by the game's play loop, so a BOB viewer would
-have to load a level's graphics into the title screen.
+The input and sprite tests go back to the test page with Esc or with fire held for 3 seconds
+(the BOB test with Esc). The tests' pages are drawn again when what they show changes, so the
+input test follows the joystick within a few frames.
+
+**BOB viewer** (`src/bobviewer.s`, file `FID_VIEWER`). Only machines with 1MB of chip RAM or
+more (`PF_CACHE`) keep every BOB graphic in chip RAM, pre-masked; there the viewer (530 bytes)
+is loaded at start-up after the caches (`VIEWER_ORG`) and `BOB TEST` appears on the test page
+(`ViewerOn`). On 512K of chip RAM - with or without slow / fast expansion - the enemies' BOBs
+exist only for the level being played, so the item is not shown and nothing is loaded. The
+program carries only the hooks (296 bytes); the viewer is assembled against the program's
+symbols (`viewer_syms.i`, written by `build_game.py`).
 
 ## Fixes
 

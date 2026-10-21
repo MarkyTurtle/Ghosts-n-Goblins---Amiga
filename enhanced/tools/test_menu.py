@@ -8,6 +8,9 @@ saved state of the title screen:
     cheat, EXIT goes back;
   the title goes on to the high scores after 400 frames, where fire goes back to the title
   (it does not start a game).
+On a 1MB machine (the BOB viewer, bobviewer.s, loaded with the graphics caches): the test page
+has BOB TEST; right / left choose the strip (wrapping round), down / up scroll it, the strip is
+drawn into the window, Esc goes back. On 512K the viewer is not loaded (no BOB TEST).
 
   python3 test_menu.py        (after build_game.py)"""
 import copy, struct, sys
@@ -43,6 +46,7 @@ def main():
         nonlocal ok
         ok &= bool(good)
         print(f'  {"ok  " if good else "FAIL"} {what}')
+    check('512K: no BOB viewer (ViewerOn 0)', var('ViewerOn') == 0)
     load(); press('', True)
     check('fire on PLAYER 1 START: a 1 player game', playing() and not g('g_TwoPlayer'))
     load(); press('D'); press('', True)
@@ -112,7 +116,47 @@ def main():
     check('the title goes on to the high scores', g('g_GameState') == 2)
     press('', True)
     check('fire on the high scores: the title, no game', g('g_GameState') == 1 and not var('MenuPage'))
+    ok &= viewer()
     print('all as expected' if ok else 'FAILED')
+    return ok
+
+
+def viewer():
+    """The BOB viewer on a 1MB machine."""
+    (name, regions, vb, attn), build = compare_game.MACHINES['1mb']
+    m = game((regions, vb, attn))
+    m.boot()
+    for _ in range(40): m.frame()
+    def press(joy='', fire=False, wait=20):
+        m.frame(joy, fire); m.frame(joy, fire)
+        for _ in range(wait): m.frame()
+    var = lambda k: m.r8(m.L[k])
+    word = lambda k: m.r16(m.L[k])
+    ok = True
+    def check(what, good):
+        nonlocal ok
+        ok &= bool(good)
+        print(f'  {"ok  " if good else "FAIL"} 1MB: {what}')
+    check(f'the BOB viewer loaded (ViewerOn ${var("ViewerOn"):02X})', var('ViewerOn') == 0xFF)
+    press('U'); press('', True)
+    for _ in range(4): press('D')
+    press('', True)
+    check('BOB TEST: its page (item 4)', var('MenuPage') == 4)
+    win = lambda im: im[60:170, 80:240].tobytes()          # the window, about
+    a = win(m.render())
+    press('R'); press('R')
+    b = win(m.render())
+    check(f'right twice: strip {word("ViewSel")}, drawn differently', word('ViewSel') == 2 and a != b)
+    press('L'); press('L'); press('L')
+    check(f'left past 0 goes round to the last strip ({word("ViewSel")})', word('ViewSel') == 58)
+    press('R'); press('D'); press('D')
+    t = word('ViewTop'); c = win(m.render())
+    check(f'down twice scrolls the strip (line {t}), drawn differently', t == 32 and c != a)
+    press('U')
+    check(f'up scrolls back ({word("ViewTop")})', word('ViewTop') == 16)
+    m.w8(m.G['g_RawKey'], 0x45)
+    for _ in range(30): m.frame()
+    check('Esc: back to the test page on BOB TEST', var('MenuPage') == 1 and var('MenuItem') == 4)
     return ok
 
 
