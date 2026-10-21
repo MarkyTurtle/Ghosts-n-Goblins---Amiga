@@ -52,6 +52,8 @@ vasmm68k_mot -Fbin -m68000 -no-opt -o boot.bin gng_boot.s                     ; 
 * **Test page tests**: a sound test (every tune and effect), an arcade-style input test, a
   sprite test (Arthur's frames and mirrored copies) and, with 1MB of chip RAM or more, a BOB
   viewer of every cached BOB strip.
+* **Less loading**: only each level's enemy sets are read, and machines with memory to spare
+  keep the files they have read (a file cache), so a level loads again without the disk.
 * Memory freed for all this: per-level map tables, joined gaps, the old background save areas
   and dead code removed. An original bug fixed (`MapTileAt` reading the program's code as map
   cells for an object far below a level).
@@ -73,6 +75,7 @@ merged into `enhanced/scroll`. They are all fully merged and kept for the record
 | `enhanced/titlemenu` | the title menu and its test page | `enhanced/joystick` |
 | `enhanced/musicquality` | the 512K music package at 3/4 of the tunes' sample rate (`build_game.py --music-rate` for others) | `enhanced/scroll` (with the above merged) |
 | `enhanced/testmenu` | the test page's sound, input and sprite tests, and the BOB viewer (1MB of chip RAM or more) | `enhanced/scroll` (with the above merged) |
+| `enhanced/memory` | loading less: only the level's enemy sets, and a file cache in expansion memory (each file read from the disk once) | `enhanced/scroll` (with `enhanced/musicquality` merged) |
 
 New features go on a new branch from `enhanced/scroll` in the same way. The `docs/TODO.md` on
 `main` is the plan as it stood before the enhanced work; see the one on `enhanced/scroll`.
