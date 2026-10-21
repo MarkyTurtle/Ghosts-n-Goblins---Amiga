@@ -3505,13 +3505,6 @@ l_05D24:
         jsr     EnhInit                         ; the scroller's records (and the machine description)
         lea.l   FileCopyrightScreen(pc),a1      ; 05D32/05D88
         bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68
-        btst    #PF_CACHE,(Profile).l           ; the 1MB program loads level 0 here, so the title
-        beq.b   st_lv0late                      ; shows the level behind it; the 512K one after InitHardware
-        moveq   #0,d0                           ; level 0's map tables (the title shows level 0)
-        jsr     LoadLevelTables
-        lea.l   FileLevel0(pc),a1               
-        bsr.w   LoadFile                        
-st_lv0late:
         lea.l   CopperTemplate(pc),a0           ; 05D3A/05D98
         lea.l   (COPPER_INIT).l,a1              ; 05D3E/05D9C
         move.w  #$5f,d0                         ; 05D44/05DA2
@@ -3580,8 +3573,6 @@ l_05E08:
         move.l  #$bbb0888,(a1)+                 ; 05E20/05E7E
         bsr.w   ClearHudArea                    ; 05E26/05E84  clear screen area
         bsr.w   InitHardware                    ; 05E2A/05E88  InitHardware: copper, DMA, interrupts, CIA keyboard
-        btst    #PF_CACHE,(Profile).l           
-        bne.b   l_05E36                         ; (loaded before)
         moveq   #0,d0                           ; level 0's map tables (the title shows level 0)
         jsr     LoadLevelTables
         lea.l   FileLevel0(pc),a1               ; 05E2E/     
@@ -4485,10 +4476,11 @@ LevelSmallBobMask:
 ; [1MB] so BuildFrameTable points the frame tables into the cache (BobSetOffsetsCached) instead.
 ;---------------------------------------------------------------------------
 LoadLevel:
+        jsr     EnhDisplayOff                   ; bitplanes off (in the vertical blank) while loading: the
+                                                ; small BOBs and the progress map go into the screens
         btst    #PF_CACHE,(Profile).l           ; cache: the graphics are already in memory
-        bne.b   ll_cached                       
-        move.w  #DMAF_RASTER,(CUSTOM+$96).l     ; bitplane DMA off while loading (first now: the small
-        lea.l   FileSmallBobs(pc),a1            ; BOBs load into the screens too)
+        bne.b   ll_cached
+        lea.l   FileSmallBobs(pc),a1
         bsr.w   LoadFile                        ; 06830/     
         jsr     LoadEnemySets                   ; only the level's sets of the enemy graphics file (0683A: all of it)
 ll_cached:
@@ -4785,6 +4777,7 @@ l_06B4A:
         clr.b   $1b(a2)                         ; 06B82/06BE0
         lea.l   $3c(a2),a2                      ; 06B86/06BE4
         dbra    d7,l_06B4A                      ; 06B8A/06BE8
+        jsr     EnhDisplayOff                   ; the map is shown from the buffers drawn into now
         clr.b   g_RedrawPending(a6)             ; 06B8E/06BEC  draw and show both buffers
         bsr.w   RedrawScreen                    ; 06B92/06BF0
         bsr.w   SwapScreens                     ; 06B96/06BF4
@@ -4797,6 +4790,7 @@ l_06B4A:
         bsr.w   ArthurSpritePos                 ; 06BB2/06C10
         bsr.w   SetBitplanePtrs                 ; 06BB6/06C14
         bsr.w   ShowBackBuffer                  ; 06BBA/06C18
+        jsr     EnhDisplayOn                    ; the level's list in place: bitplanes on (vertical blank)
         move.b  #$1f,g_TextShadow(a6)           ; 06BBE/06C1C
         move.b  #$d,g_TextInk(a6)               ; 06BC4/06C22
         move.b  #$6,g_TextPaper(a6)             ; 06BCA/06C28
@@ -5784,7 +5778,7 @@ snd88_end:
         bsr.w   ArthurSpritePos                 ; 074E0/0754C
         bsr.w   SetBitplanePtrs                 ; 074E4/07550
         bsr.w   ShowBackBuffer                  ; 074E8/07554
-        move.w  #DMAF_SETCLR|DMAF_RASTER,CUSTOM+DMACON; 074EC/       bitplane DMA on
+        jsr     EnhDisplayOn                    ; 074EC: bitplane DMA on (in the vertical blank)
         clr.b   g_RedrawPending(a6)             ; 074F4/07558
         bsr.w   RedrawScreen                    ; 074F8/0755C
         bsr.w   SwapScreens                     ; 074FC/07560
@@ -5989,6 +5983,7 @@ ProgressMap:
         cmpi.b  #$1,g_SubState3(a6)             ; 07736/0779E
         beq.w   ProgressMap_Scroll              ; 0773C/077A4
         bhi.w   ProgressMap_Wait                ; 07740/077A8
+        jsr     EnhDisplayOff                   ; unpacked into the scroller's buffers: not on show
         btst    #PF_CACHE,(Profile).l           
         beq.b   pm_load                         
         lea.l   (PROGRESS_MAP_CACHE).l,a0       ; 1MB: the map from the cache
@@ -6091,7 +6086,7 @@ ProgressMapMarkers:
 ProgressMap_Scroll:
         bsr.w   SetMapBitplanePtrs              ; 07848/078B0
         bsr.w   ArthurSpritePos                 ; 0784C/078B4
-        move.w  #DMAF_SETCLR|DMAF_RASTER,CUSTOM+DMACON; 07850/     
+        jsr     EnhDisplayOn                    ; 07850: bitplanes on, in the vertical blank (the map's list in place)
         addq.w  #$1,g_GameFrame(a6)             ; 07858/078B8  drives the marker flash
         addq.w  #$1,g_ScrollFineX(a6)           ; 0785C/078BC  scroll 1 px a frame up to 144 px
         cmpi.w  #$90,g_ScrollFineX(a6)          ; 07860/078C0
@@ -10691,7 +10686,7 @@ l_0A2B6:
         moveq   #$20,d4                         ; 0A2C4/0A328
         lea.l   g_BobSets+32(a6),a1             ; 0A2C6/0A32A
         movea.l (a1),a1                         ; 0A2CA/0A32E
-        lea.l   BobFrameDescsUnicorn(pc),a2     ; 0A2CC/0A330
+        lea.l   (BobFrameDescsUnicorn).l,a2     ; 0A2CC/0A330
         adda.w  (a2),a2                         ; 0A2D0/0A334
         moveq   #$0,d0                          ; 0A2D2/0A336
         move.b  O_Frame(a5),d0                  ; 0A2D4/0A338

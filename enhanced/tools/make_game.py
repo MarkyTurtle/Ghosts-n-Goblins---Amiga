@@ -185,11 +185,11 @@ def hand_edits(S, V1):
         bsr.w   LoadFile                        ; 05D2E/05D7A  load music/sfx player (tracks 126-131) -> $28E54
 """, '')
     S.sub("        bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68\n",
-          "        bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68\n"
-          + I('btst    #PF_CACHE,(Profile).l', 'the 1MB program loads level 0 here, so the title') + '\n'
-          + I('beq.b   st_lv0late', 'shows the level behind it; the 512K one after InitHardware') + '\n'
-          + I('lea.l   FileLevel0(pc),a1') + '\n' + I('bsr.w   LoadFile') + '\nst_lv0late:\n')
-    S.rep(66, I('btst    #PF_CACHE,(Profile).l') + '\n' + I('bne.b   l_05E36', '(loaded before)') + '\n{5K}')
+          "        bsr.w   LoadFile                        ; 05D36/05D94  load FAST copyright warning screen (tracks 82-83, RLE packed) -> $4DC68\n")
+    # level 0 loads while the copyright screen shows, on every machine (the 512K program's place):
+    # the original 1MB program loaded it before, into the loading picture's memory while the
+    # picture was still on show
+    S.rep(66, '{5K}')
     S.rep(96, I('movea.l (MusicPlayerPtr).l,a1') + '\n' + I('move.l  a1,(VEC_SPURIOUS).w', 'vector $60 = the sound driver loaded (LoadSound)') + '\n')
     S.rep(68, '{5K}'); S.rep(117, '{5K}')         # patched by ReadProfile
     # --- the odd-frame test --------------------------------------------------------------
@@ -461,6 +461,60 @@ def routine_notes(S):
         S.sub(f'\n{name}:\n', '\n;' + '-' * 75 + '\n; ' + text + '\n;' + '-' * 75 + f'\n{name}:\n')
 
 
+def display_transitions(S):
+    """Clean changes of display. The bitplanes are switched off and on only in the vertical
+    blank (EnhDisplayOff / EnhDisplayOn, scroller.s), and the display is off while the screens it shows are rewritten: from LoadLevel (the progress map is unpacked into
+    the scroller's display buffers, the 1MB program kept the old level on show) until the map's
+    copper list is in place, and from SetupLevel's drawing of the level (into the same buffers,
+    while the map was still shown) until its copper list is in place."""
+    def sub(old, new):                # (the generated lines may end in blanks)
+        pat = re.compile(''.join(re.escape(l.rstrip()) + r'[ \t]*\n' for l in old.split('\n')[:-1]))
+        assert len(pat.findall(S.s)) == 1, old[:70]
+        S.s = pat.sub(lambda m: new, S.s)
+    # LoadLevel: the display off (in the vertical blank) on every machine
+    sub("""LoadLevel:
+        btst    #PF_CACHE,(Profile).l           ; cache: the graphics are already in memory
+        bne.b   ll_cached
+        move.w  #DMAF_RASTER,(CUSTOM+$96).l     ; bitplane DMA off while loading (first now: the small
+        lea.l   FileSmallBobs(pc),a1            ; BOBs load into the screens too)
+""", """LoadLevel:
+        jsr     EnhDisplayOff                   ; bitplanes off (in the vertical blank) while loading: the
+                                                ; small BOBs and the progress map go into the screens
+        btst    #PF_CACHE,(Profile).l           ; cache: the graphics are already in memory
+        bne.b   ll_cached
+        lea.l   FileSmallBobs(pc),a1
+""")
+    # the progress map: off while it is unpacked (LoadLevel came first; after a lost life too), on
+    # once its copper list is in place
+    sub("""ProgressMap:
+        cmpi.b  #$1,g_SubState3(a6)             ; 07736/0779E
+        beq.w   ProgressMap_Scroll              ; 0773C/077A4
+        bhi.w   ProgressMap_Wait                ; 07740/077A8
+""", """ProgressMap:
+        cmpi.b  #$1,g_SubState3(a6)             ; 07736/0779E
+        beq.w   ProgressMap_Scroll              ; 0773C/077A4
+        bhi.w   ProgressMap_Wait                ; 07740/077A8
+        jsr     EnhDisplayOff                   ; unpacked into the scroller's buffers: not on show
+""")
+    sub("        move.w  #DMAF_SETCLR|DMAF_RASTER,CUSTOM+DMACON; 07850/     \n",
+          "        jsr     EnhDisplayOn                    ; 07850: bitplanes on, in the vertical blank (the map's list in place)\n")
+    # SetupLevel: off while the level is drawn into the buffers the map is shown from, on once the
+    # level's copper list is in place
+    sub("""        clr.b   g_RedrawPending(a6)             ; 06B8E/06BEC  draw and show both buffers
+""", """        jsr     EnhDisplayOff                   ; the map is shown from the buffers drawn into now
+        clr.b   g_RedrawPending(a6)             ; 06B8E/06BEC  draw and show both buffers
+""")
+    sub("""        bsr.w   ShowBackBuffer                  ; 06BBA/06C18
+        move.b  #$1f,g_TextShadow(a6)           ; 06BBE/06C1C
+""", """        bsr.w   ShowBackBuffer                  ; 06BBA/06C18
+        jsr     EnhDisplayOn                    ; the level's list in place: bitplanes on (vertical blank)
+        move.b  #$1f,g_TextShadow(a6)           ; 06BBE/06C1C
+""")
+    # the opening scene: on in the vertical blank, not halfway down a frame
+    sub("        move.w  #DMAF_SETCLR|DMAF_RASTER,CUSTOM+DMACON; 074EC/       bitplane DMA on\n",
+          "        jsr     EnhDisplayOn                    ; 074EC: bitplane DMA on (in the vertical blank)\n")
+
+
 def two_buttons(S):
     """two-button joysticks: the second button (port 2's pin 9, read on POTINP) is bit 14 of
     g_Joy. With JumpButton set (the title's J key) it jumps and up only climbs ladders, as on
@@ -556,7 +610,7 @@ def main():
         lea.l   LevelFileIndex(pc),a1           ; 06842/06898
 """)
     n = len(re.findall(r'\n        lea\.l   FileLevel0\(pc\),a1', S.s))
-    assert n == 2, n                  # Start loads level 0's tile file (1MB early, 512K later): its tables too
+    assert n == 1, n                  # Start loads level 0's tile file (with the copyright screen on): its tables too
     ins = I('moveq   #0,d0', "level 0's map tables (the title shows level 0)") + '\n        jsr     LoadLevelTables\n'
     S.s = re.sub(r'\n(        lea\.l   FileLevel0\(pc\),a1)', lambda m: '\n' + ins + m.group(1), S.s)
     # the original's load buffer BOB_GFX_A is gone (gng_game.i): the small BOBs' file loads into the
@@ -595,6 +649,7 @@ def main():
     S.sub("        bsr.w   ReadProfile                     ; what machine this is (Profile)\n",
           "        bsr.w   ReadProfile                     ; what machine this is (Profile)\n"
           + I('jsr     CacheInit', "the file cache's memory, if any (make_game_support.s)") + '\n')
+    display_transitions(S)
     routine_notes(S)
     dead = drop_dead_code(S)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
