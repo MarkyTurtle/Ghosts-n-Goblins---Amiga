@@ -733,9 +733,11 @@ PD_PathSeg          	equ	$28	; current path segment
 
 ; ---- One program for every machine (enhanced branch) ----------------------------------
 BUILD_ONE           	equ	1	; (scroll.s: absolute addresses, BOB drawing chosen at run time)
-MACHINE_INFO        	equ	$7FB00	; the bootblock's machine description (32 bytes, 'GNGM'):
+MACHINE_INFO        	equ	$7FB00	; the bootblock's machine description (36 bytes, 'GNGM'):
 MI_MAGIC            	equ	0	;   'GNGM'
+MI_VERSION          	equ	4	;   version.b: 2 (boot_4489.s); 1: an older bootblock (no drive)
 MI_CHIP_UPPER       	equ	12	;   end of chip RAM (+8 start, +12 end)
+MI_DRIVE            	equ	32	;   (version 2) the drive booted from, long: 0-3 (DF0-DF3)
 PF_CACHE            	equ	0	; Profile bits: 1MB+ of chip RAM - caches in the upper 512K
 PF_MUSIC            	equ	1	;   the 1MB music package is loaded
 PF_EVERY            	equ	2	;   draw every frame (no odd-frame test)

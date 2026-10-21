@@ -13,8 +13,8 @@ cylinder, 5,632 bytes, as the byteloader counts them (disk offset / 5,632).
 |---|---:|---|
 | `$00000` | 1,024 | the bootblock (`src/boot_4489.s`): `'DOS',0`, checksum, root block 880, then the code |
 | `$00400` | 256 | the file table (`FT_OFFSET`) |
-| `$00600` | 791,226 | the files, one after another, in file id order |
-| $C18BA | 108,358 | free |
+| `$00600` | 791,282 | the files, one after another, in file id order |
+| $C18F2 | 108,302 | free |
 
 **The file table** (at `FT_OFFSET` = `$400`; `gng_game.i` `FT_*`, written by `build_game.py`,
 read by the bootblock and, once, by the game's `LoadFile` into `FileDir`):
@@ -36,36 +36,36 @@ and the file id; `build_game.py` checks every record's length against its file.
 
 | Id | Name | Contents | Disk offset | Bytes | Tracks | Loaded to (512K) | Loaded by: when |
 |---|---|---|---|---:|---|---|---|
-| 0 | `FID_MAIN` | the program: code, tables, globals (`gng_game.s`) | $00600 | 77,600 | 0-14 | `$80` (bootblock) | bootblock: boot |
-| 1 | `FID_LOADPIC` | the loading picture: 256 x 516 HAM6 interlaced | $13520 | 99,072 | 14-31 | `$60000` (bootblock) | bootblock: boot |
-| 2 | `FID_ARTHUR` | Arthur's 42 sprite frames (staged, then copied to `ARTHUR_SPR_GFX`) | $2B820 | 21,504 | 31-35 | `SCREEN_0` ($342B4) | `Start`: start-up |
-| 3 | `FID_SMALLBOBS` | the 10 small item / scenery BOB images | $30C20 | 3,360 | 35-36 | `SMALLBOB_LOAD` ($5172C) | `LoadLevel` (`CacheGraphics` with 1MB): each level start (1MB: once) |
-| 4 | `FID_ENEMYBOBS` | the 21 enemy BOB sets | $31940 | 118,850 | 36-57 | `SCREEN_0` ($342B4) | `LoadEnemySets`: the level's sets only (`CacheGraphics` with 1MB: all): each level start (1MB: once) |
-| 5 | `FID_ITEMS2` | weapon / effect BOBs, the tail of the item block | $4E982 | 3,750 | 57-57 | `ITEM_GFX2_BUF` ($27B3E) | `Start`: start-up |
-| 6 | `FID_ESHOTS` | enemy shot BOBs | $4F828 | 4,660 | 57-58 | `ESHOT_GFX_BUF` ($24E48) | `Start`: start-up |
-| 7 | `FID_ITEMS` | weapon / pickup / effect BOBs | $50A5C | 6,850 | 58-59 | `ITEM_GFX_BUF` ($2607C) | `Start`: start-up |
-| 8 | `FID_FONT` | the font (every other byte used: to `MASK_BUF`) | $5251E | 6,208 | 59-60 | `SCREEN_0` ($342B4) | `Start`: start-up |
-| 9 | `FID_PROGMAP` | the progress map picture (RLE) | $53D5E | 7,516 | 60-62 | `PM_LOAD` ($342B4) | `ProgressMap`: before a level, after a life is lost (1MB: kept) |
-| 10 | `FID_MUSIC1M` | the 1MB sound package: driver, 15 tunes, 30 effects | $55ABA | 111,508 | 62-82 | `MUSIC1M_FILE` ($80000) | `LoadSound`: start-up (1MB chip, or the program moved) |
-| 11 | `FID_COPYRIGHT` | the copyright warning screen (RLE) | $70E4E | 9,726 | 82-83 | `SCREEN_2` ($4AAB4) | `Start`: start-up |
-| 12 | `FID_LEVEL0` | stage 1's (level 0) tiles | $7344C | 29,760 | 83-89 | `LEVEL_FILE` ($5F334) | `Start` (level 0), `LoadLevel`: start-up and each level start |
-| 13 | `FID_LEVEL0+1` | stage 2's (level 1) tiles | $7A88C | 49,440 | 89-97 | `LEVEL_FILE` ($5F334) | `Start` (level 0), `LoadLevel`: start-up and each level start |
-| 14 | `FID_LEVEL0+2` | stage 3's (level 2) tiles | $869AC | 21,600 | 97-101 | `LEVEL_FILE` ($5F334) | `Start` (level 0), `LoadLevel`: start-up and each level start |
-| 15 | `FID_LEVEL0+3` | stage 4's (level 3) tiles | $8BE0C | 18,560 | 101-105 | `LEVEL_FILE` ($5F334) | `Start` (level 0), `LoadLevel`: start-up and each level start |
-| 16 | `FID_LEVEL0+4` | stage 5's (level 4) tiles | $9068C | 10,080 | 105-106 | `LEVEL_FILE` ($5F334) | `Start` (level 0), `LoadLevel`: start-up and each level start |
-| 17 | `FID_LEVEL0+5` | stage 6's (level 5) tiles | $92DEC | 10,720 | 106-108 | `LEVEL_FILE` ($5F334) | `Start` (level 0), `LoadLevel`: start-up and each level start |
-| 18 | `FID_LEVEL0+6` | stage 7's (level 6) tiles | $957CC | 6,560 | 108-109 | `LEVEL_FILE` ($5F334) | `Start` (level 0), `LoadLevel`: start-up and each level start |
-| 19 | `FID_SFX` | the 512K effects package: driver, 30 effects | $9716C | 32,100 | 109-115 | `MUSIC_FILE` ($145B8) | `LoadSound`: start-up (no machine description) |
-| 20 | `FID_RELOCS` | the relocation tables: the program's and the 1MB package's addresses | $9EED0 | 788 | 115-115 | after the moved program | `EnhRelocate`: start-up (the program moves) |
-| 21 | `FID_TABLES0` | stage 1's (level 0) map tables: cell slots, BlockTiles, CellTiles | $9F1E4 | 11,584 | 115-117 | `LEVEL_TABLES` ($5B4F4) | `LoadLevelTables`: start-up (level 0) and each level start |
-| 22 | `FID_TABLES0+1` | stage 2's (level 1) map tables: cell slots, BlockTiles, CellTiles | $A1F24 | 15,936 | 117-120 | `LEVEL_TABLES` ($5B4F4) | `LoadLevelTables`: start-up (level 0) and each level start |
-| 23 | `FID_TABLES0+2` | stage 3's (level 2) map tables: cell slots, BlockTiles, CellTiles | $A5D64 | 13,632 | 120-123 | `LEVEL_TABLES` ($5B4F4) | `LoadLevelTables`: start-up (level 0) and each level start |
-| 24 | `FID_TABLES0+3` | stage 4's (level 3) map tables: cell slots, BlockTiles, CellTiles | $A92A4 | 9,792 | 123-124 | `LEVEL_TABLES` ($5B4F4) | `LoadLevelTables`: start-up (level 0) and each level start |
-| 25 | `FID_TABLES0+4` | stage 5's (level 4) map tables: cell slots, BlockTiles, CellTiles | $AB8E4 | 9,024 | 124-126 | `LEVEL_TABLES` ($5B4F4) | `LoadLevelTables`: start-up (level 0) and each level start |
-| 26 | `FID_TABLES0+5` | stage 6's (level 5) map tables: cell slots, BlockTiles, CellTiles | $ADC24 | 8,000 | 126-127 | `LEVEL_TABLES` ($5B4F4) | `LoadLevelTables`: start-up (level 0) and each level start |
-| 27 | `FID_TABLES0+6` | stage 7's (level 6) map tables: cell slots, BlockTiles, CellTiles | $AFB64 | 5,184 | 127-128 | `LEVEL_TABLES` ($5B4F4) | `LoadLevelTables`: start-up (level 0) and each level start |
-| 28 | `FID_MUSIC512` | the 512K music package: the 512K effects and the 1MB tunes (3/4 rate) | $B0FA4 | 67,332 | 128-140 | `MUSIC_FILE` ($145B8) | `LoadSound`: start-up (plain 512K) |
-| 29 | `FID_VIEWER` | the test page's BOB viewer (`bobviewer.s`) | $C16A8 | 530 | 140-140 | `VIEWER_ORG` ($E0500) | `CacheGraphics`: start-up (1MB of chip RAM or more) |
+| 0 | `FID_MAIN` | the program: code, tables, globals (`gng_game.s`) | $00600 | 77,650 | 0-14 | `$80` (bootblock) | bootblock: boot |
+| 1 | `FID_LOADPIC` | the loading picture: 256 x 516 HAM6 interlaced | $13552 | 99,072 | 14-31 | `$60000` (bootblock) | bootblock: boot |
+| 2 | `FID_ARTHUR` | Arthur's 42 sprite frames (staged, then copied to `ARTHUR_SPR_GFX`) | $2B852 | 21,504 | 31-35 | `SCREEN_0` ($342E6) | `Start`: start-up |
+| 3 | `FID_SMALLBOBS` | the 10 small item / scenery BOB images | $30C52 | 3,360 | 35-36 | `SMALLBOB_LOAD` ($5175E) | `LoadLevel` (`CacheGraphics` with 1MB): each level start (1MB: once) |
+| 4 | `FID_ENEMYBOBS` | the 21 enemy BOB sets | $31972 | 118,850 | 36-57 | `SCREEN_0` ($342E6) | `LoadEnemySets`: the level's sets only (`CacheGraphics` with 1MB: all): each level start (1MB: once) |
+| 5 | `FID_ITEMS2` | weapon / effect BOBs, the tail of the item block | $4E9B4 | 3,750 | 57-57 | `ITEM_GFX2_BUF` ($27B70) | `Start`: start-up |
+| 6 | `FID_ESHOTS` | enemy shot BOBs | $4F85A | 4,660 | 57-58 | `ESHOT_GFX_BUF` ($24E7A) | `Start`: start-up |
+| 7 | `FID_ITEMS` | weapon / pickup / effect BOBs | $50A8E | 6,850 | 58-59 | `ITEM_GFX_BUF` ($260AE) | `Start`: start-up |
+| 8 | `FID_FONT` | the font (every other byte used: to `MASK_BUF`) | $52550 | 6,208 | 59-60 | `SCREEN_0` ($342E6) | `Start`: start-up |
+| 9 | `FID_PROGMAP` | the progress map picture (RLE) | $53D90 | 7,516 | 60-62 | `PM_LOAD` ($342E6) | `ProgressMap`: before a level, after a life is lost (1MB: kept) |
+| 10 | `FID_MUSIC1M` | the 1MB sound package: driver, 15 tunes, 30 effects | $55AEC | 111,508 | 62-82 | `MUSIC1M_FILE` ($80000) | `LoadSound`: start-up (1MB chip, or the program moved) |
+| 11 | `FID_COPYRIGHT` | the copyright warning screen (RLE) | $70E80 | 9,726 | 82-83 | `SCREEN_2` ($4AAE6) | `Start`: start-up |
+| 12 | `FID_LEVEL0` | stage 1's (level 0) tiles | $7347E | 29,760 | 83-89 | `LEVEL_FILE` ($5F366) | `Start` (level 0), `LoadLevel`: start-up and each level start |
+| 13 | `FID_LEVEL0+1` | stage 2's (level 1) tiles | $7A8BE | 49,440 | 89-97 | `LEVEL_FILE` ($5F366) | `Start` (level 0), `LoadLevel`: start-up and each level start |
+| 14 | `FID_LEVEL0+2` | stage 3's (level 2) tiles | $869DE | 21,600 | 97-101 | `LEVEL_FILE` ($5F366) | `Start` (level 0), `LoadLevel`: start-up and each level start |
+| 15 | `FID_LEVEL0+3` | stage 4's (level 3) tiles | $8BE3E | 18,560 | 101-105 | `LEVEL_FILE` ($5F366) | `Start` (level 0), `LoadLevel`: start-up and each level start |
+| 16 | `FID_LEVEL0+4` | stage 5's (level 4) tiles | $906BE | 10,080 | 105-106 | `LEVEL_FILE` ($5F366) | `Start` (level 0), `LoadLevel`: start-up and each level start |
+| 17 | `FID_LEVEL0+5` | stage 6's (level 5) tiles | $92E1E | 10,720 | 106-108 | `LEVEL_FILE` ($5F366) | `Start` (level 0), `LoadLevel`: start-up and each level start |
+| 18 | `FID_LEVEL0+6` | stage 7's (level 6) tiles | $957FE | 6,560 | 108-109 | `LEVEL_FILE` ($5F366) | `Start` (level 0), `LoadLevel`: start-up and each level start |
+| 19 | `FID_SFX` | the 512K effects package: driver, 30 effects | $9719E | 32,100 | 109-115 | `MUSIC_FILE` ($145EA) | `LoadSound`: start-up (no machine description) |
+| 20 | `FID_RELOCS` | the relocation tables: the program's and the 1MB package's addresses | $9EF02 | 794 | 115-115 | after the moved program | `EnhRelocate`: start-up (the program moves) |
+| 21 | `FID_TABLES0` | stage 1's (level 0) map tables: cell slots, BlockTiles, CellTiles | $9F21C | 11,584 | 115-117 | `LEVEL_TABLES` ($5B526) | `LoadLevelTables`: start-up (level 0) and each level start |
+| 22 | `FID_TABLES0+1` | stage 2's (level 1) map tables: cell slots, BlockTiles, CellTiles | $A1F5C | 15,936 | 117-120 | `LEVEL_TABLES` ($5B526) | `LoadLevelTables`: start-up (level 0) and each level start |
+| 23 | `FID_TABLES0+2` | stage 3's (level 2) map tables: cell slots, BlockTiles, CellTiles | $A5D9C | 13,632 | 120-123 | `LEVEL_TABLES` ($5B526) | `LoadLevelTables`: start-up (level 0) and each level start |
+| 24 | `FID_TABLES0+3` | stage 4's (level 3) map tables: cell slots, BlockTiles, CellTiles | $A92DC | 9,792 | 123-124 | `LEVEL_TABLES` ($5B526) | `LoadLevelTables`: start-up (level 0) and each level start |
+| 25 | `FID_TABLES0+4` | stage 5's (level 4) map tables: cell slots, BlockTiles, CellTiles | $AB91C | 9,024 | 124-126 | `LEVEL_TABLES` ($5B526) | `LoadLevelTables`: start-up (level 0) and each level start |
+| 26 | `FID_TABLES0+5` | stage 6's (level 5) map tables: cell slots, BlockTiles, CellTiles | $ADC5C | 8,000 | 126-127 | `LEVEL_TABLES` ($5B526) | `LoadLevelTables`: start-up (level 0) and each level start |
+| 27 | `FID_TABLES0+6` | stage 7's (level 6) map tables: cell slots, BlockTiles, CellTiles | $AFB9C | 5,184 | 127-128 | `LEVEL_TABLES` ($5B526) | `LoadLevelTables`: start-up (level 0) and each level start |
+| 28 | `FID_MUSIC512` | the 512K music package: the 512K effects and the 1MB tunes (3/4 rate) | $B0FDC | 67,332 | 128-140 | `MUSIC_FILE` ($145EA) | `LoadSound`: start-up (plain 512K) |
+| 29 | `FID_VIEWER` | the test page's BOB viewer (`bobviewer.s`) | $C16E0 | 530 | 140-140 | `VIEWER_ORG` ($E0500) | `CacheGraphics`: start-up (1MB of chip RAM or more) |
 
 The formats of the files are in `FORMATS.md`. A level start reads only its own sets from the
 enemy graphics file (`LoadEnemySets`: pieces of the file, `LoadOffset`), and on an expanded
@@ -82,10 +82,15 @@ included (the game's interrupt handlers set `a6` themselves: `IrqLevel1` / `IrqL
 
 **Booting** (`src/boot_4489.s`). Kickstart loads the bootblock and calls it with `a6` = ExecBase:
 1. `MemDetect` walks exec's memory list and writes the machine description (`MACHINE_INFO`,
-   `$7FB00`; see `FORMATS.md`) - chip RAM, slow RAM, fast RAM, PAL / NTSC, CPU;
+   `$7FB00`; see `FORMATS.md`) - chip RAM, slow RAM, fast RAM, PAL / NTSC, CPU - and the drive
+   it was booted from: it opens `trackdisk.device`'s units 3 to 0 (an IORequest on the stack)
+   until one is the boot IORequest's unit (`IO_UNIT`), DF0 if none is. Kickstart 1.3 boots only
+   from DF0; 2.0 and later from any drive (the early startup menu). Every load reads that drive,
+   in the bootblock and in the game (`LoadDisk`: `BootDrive`);
 2. it takes the machine over (interrupts and DMA off, the original bootblock's fade);
-3. it copies its loader to `$7FB20` and runs it there: the file table to `$7F000` (MFM buffer at
-   `$7C000`), the loading picture (file 1) to `$60000`, shown with its own copper lists and
-   level 3 interrupt (HAM, interlaced), then the program (file 0) to `$80`;
+3. it copies its loader to `$7FB24` and runs it there: the file table to `$7F000` (MFM buffer at
+   `$7C000`), the loading picture (file 1) to `$60000`, shown with its own copper lists (the
+   second one, for the other field, made from the first after the loader) and level 3 interrupt
+   (HAM, interlaced), then the program (file 0) to `$80`;
 4. `$4.w` = `$80`, and it enters the program at `$A0` (`ProgramEntry`), as the original did.
 A failed read is tried again; after 8 failures COLOR00 turns red while it keeps trying.

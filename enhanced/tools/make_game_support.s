@@ -277,6 +277,8 @@ CacheRec:       dc.l    0,0             ; a file record for loading a whole file
 ; FT_OFFSET (boot_4489.s; build_game.py writes it): read once into FileDir, then each file is
 ; loaded from its offset by the 4489_byteloader (ByteLoader), the exact number of bytes. A
 ; failed load is tried again until it works (after 8 failures COLOR00 shows red).
+; Every load reads the drive the game was booted from (BootDrive: the bootblock's machine
+; description, version 2, read at the first load; DF0 with an older one or none).
 ; The byteloader uses a6, so the interrupt handlers load a6 themselves (IrqLevel1/3).
 ;---------------------------------------------------------------------------
 LoadDisk:
@@ -288,6 +290,16 @@ LoadDisk:
         lea.l   (FileDir).l,a2
         cmpi.l  #'GNGF',(a2)                    ; the file table, the first time
         beq.b   lf_dir
+        lea.l   (MACHINE_INFO).l,a0             ; and the drive booted from: the bootblock's
+        moveq   #0,d0                           ; description (version 2), still intact at the
+        cmpi.l  #'GNGM',MI_MAGIC(a0)            ; first load; DF0 without one
+        bne.b   lf_drive
+        cmpi.b  #2,MI_VERSION(a0)
+        bcs.b   lf_drive
+        move.l  MI_DRIVE(a0),d0
+        andi.w  #3,d0
+lf_drive:
+        move.l  d0,(BootDrive).l
         movem.l d4-d5/a5,-(a7)
         moveq   #0,d0
         move.w  #FT_OFFSET,d0
@@ -313,7 +325,7 @@ lf_load:                                        ; d0 = offset, d1 = length, a0 =
         moveq   #0,d6
 lf_try:
         movem.l d0-d1/d6/a0/a5,-(a7)
-        moveq   #0,d2                           ; DF0
+        move.l  (BootDrive).l,d2                ; the drive booted from (LoadDisk's first load)
         movea.l (MfmBuf).l,a1
         bsr.w   ByteLoader
         move.l  d0,d7
@@ -331,6 +343,8 @@ FileDir:
         dcb.b   FT_SIZE,0                       ; the disk's file table (LoadFile)
 LoadOffset:
         dc.l    0                               ; LoadFile: where in the file to start (normally 0)
+BootDrive:
+        dc.l    0                               ; the drive the disk is read from: 0-3 (DF0-DF3)
 
 ;---------------------------------------------------------------------------
 ; LoadEnemySets - LoadLevel (no PF_CACHE): the level's BOB sets (LevelBobSetMask) from the

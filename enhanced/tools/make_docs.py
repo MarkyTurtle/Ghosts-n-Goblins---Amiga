@@ -137,11 +137,16 @@ included (the game's interrupt handlers set `a6` themselves: `IrqLevel1` / `IrqL
 
 **Booting** (`src/boot_4489.s`). Kickstart loads the bootblock and calls it with `a6` = ExecBase:
 1. `MemDetect` walks exec's memory list and writes the machine description (`MACHINE_INFO`,
-   `$7FB00`; see `FORMATS.md`) - chip RAM, slow RAM, fast RAM, PAL / NTSC, CPU;
+   `$7FB00`; see `FORMATS.md`) - chip RAM, slow RAM, fast RAM, PAL / NTSC, CPU - and the drive
+   it was booted from: it opens `trackdisk.device`'s units 3 to 0 (an IORequest on the stack)
+   until one is the boot IORequest's unit (`IO_UNIT`), DF0 if none is. Kickstart 1.3 boots only
+   from DF0; 2.0 and later from any drive (the early startup menu). Every load reads that drive,
+   in the bootblock and in the game (`LoadDisk`: `BootDrive`);
 2. it takes the machine over (interrupts and DMA off, the original bootblock's fade);
-3. it copies its loader to `$7FB20` and runs it there: the file table to `$7F000` (MFM buffer at
-   `$7C000`), the loading picture (file 1) to `$60000`, shown with its own copper lists and
-   level 3 interrupt (HAM, interlaced), then the program (file 0) to `$80`;
+3. it copies its loader to `$7FB24` and runs it there: the file table to `$7F000` (MFM buffer at
+   `$7C000`), the loading picture (file 1) to `$60000`, shown with its own copper lists (the
+   second one, for the other field, made from the first after the loader) and level 3 interrupt
+   (HAM, interlaced), then the program (file 0) to `$80`;
 4. `$4.w` = `$80`, and it enters the program at `$A0` (`ProgramEntry`), as the original did.
 A failed read is tried again; after 8 failures COLOR00 turns red while it keeps trying.
 """
@@ -190,8 +195,8 @@ def write_memory(S):
         (S['LEVEL_TABLES'], S['LEVEL_TABLES_END'], '`LEVEL_TABLES`', f'the level\'s map tables (`LoadLevelTables`: slots, BlockTiles, CellTiles; {S["TBL_SLOTS"]} slots)'),
         (S['LEVEL_FILE'], S['MFM_BUFFER'], '`LEVEL_FILE`', "the level's tile file, then its BOB sets (`BuildFrameTable`), their one-plane masks and pre-masked copies (`BuildLevelMasks`), up to `LEVEL_GFX_LIMIT`"),
         (S['MFM_BUFFER'], S['LEVEL_TOP'], '`MFM_BUFFER`', 'the byteloader\'s MFM buffer while a file loads (the top of the level area, also used by pre-masked images once the loads are done)'),
-        (S['MACHINE_INFO'], S['MACHINE_INFO'] + 32, '`MACHINE_INFO`', 'the bootblock\'s machine description (copied at start-up)'),
-        (S['MACHINE_INFO'] + 32, 0x80000, '', 'the bootblock\'s loader while booting; then the supervisor stack, growing down from `$80000` (about 320 bytes deep at most)'),
+        (S['MACHINE_INFO'], S['MACHINE_INFO'] + (S['MI_DRIVE'] + 4), '`MACHINE_INFO`', 'the bootblock\'s machine description (copied at start-up; the drive read at the first load)'),
+        (S['MACHINE_INFO'] + (S['MI_DRIVE'] + 4), 0x80000, '', 'the bootblock\'s loader while booting; then the supervisor stack, growing down from `$80000` (about 320 bytes deep at most)'),
     ]
     upper = [
         (S['MUSIC1M_FILE'], S['PROGRESS_MAP_CACHE'], '`MUSIC1M_FILE`', 'the 1MB sound package (full quality, the 1MB effects)'),

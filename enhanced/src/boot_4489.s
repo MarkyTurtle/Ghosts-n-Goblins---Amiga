@@ -14,7 +14,10 @@
 ; As the original bootblock (gng_boot.s), from which the take-over, the fade and the
 ; loading picture's display come:
 ;   1. MemDetect (while Kickstart's structures are intact; a6 = ExecBase): the machine
-;      description at MACHINE_INFO for the game (as src/boot_patches.s; test_bootinfo.py)
+;      description at MACHINE_INFO for the game (as src/boot_patches.s; test_bootinfo.py),
+;      version 2: with the drive booted from (MI_DRIVE), found by opening trackdisk.device's
+;      units until one is the boot IORequest's. Every load, here and in the game, reads that
+;      drive (Kickstart 1.3 boots only from DF0; 2.0 and later from any drive)
 ;   2. take over: interrupts and DMA off, supervisor mode, stack at $80000
 ;   3. copy the loader to LOADER ($7FB20) and run it there
 ;   4. fade COLOR00 out, read the file table, load the loading picture (file 1) to $60000
@@ -26,7 +29,8 @@
 ;==============================================================================
 
 MACHINE_INFO    equ     $7FB00
-LOADER          equ     $7FB20                  ; the loader runs here: after the machine description, below the stack
+MI_DRIVE        equ     32                      ; (version 2) the drive booted from, long
+LOADER          equ     $7FB24                  ; the loader runs here: after the machine description, below the stack
 MFM_BUF         equ     $7C000                  ; $1760 words, to $7EEC0
 FILE_TABLE      equ     $7F000                  ; the file table read from the disk ($200)
 PICTURE         equ     $60000
@@ -42,10 +46,31 @@ FT_ENTRIES      equ     16
 	dc.l	880                             ; root block (no filesystem: NDOS)
 
 ;------------------------------------------------------------------------------
-; Kickstart calls here with a6 = ExecBase (a1 = the boot IORequest, not used).
+; Kickstart calls here with a6 = ExecBase and a1 = the boot IORequest (trackdisk.device, the
+; unit booted from).
 BootEntry:
-        bsr.w   MemDetect                       ; (at $0C: test_bootinfo.py runs it to $12)
-        nop
+        movem.l $14(a1),a4-a5                   ; IO_DEVICE, IO_UNIT: the boot drive's unit
+        bsr.w   MemDetect
+; the drive booted from: trackdisk.device's units 3 .. 0 opened in turn (an IORequest on the
+; stack) until one is the boot IORequest's unit (DF0 if none is). Never closed: the machine is
+; taken over next. Kickstart 1.3 boots only from DF0; later ones from any drive.
+        movea.l $a(a4),a4                       ; the device's name (ln_Name)
+        lea     -$30(a7),a7
+        movea.l a7,a3
+        moveq   #3,d7
+.unit:          movea.l a4,a0
+        movea.l a3,a1
+        move.l  d7,d0
+        moveq   #0,d1
+        jsr     -$1bc(a6)                       ; OpenDevice
+        tst.b   d0
+        bne.b   .next
+        cmpa.l  $18(a3),a5                      ; IO_UNIT: the one booted from?
+        beq.b   .found
+.next:          dbra    d7,.unit
+        moveq   #0,d7
+.found:         move.l  d7,MACHINE_INFO+MI_DRIVE
+        lea     $dff000,a0
         move.w  #$7fff,$9a(a0)                  ; INTENA: all off
         move.w  #$7fff,$96(a0)                  ; DMACON: all off
         lea     .super(pc),a1                   ; privilege violation -> the next instruction
@@ -61,15 +86,15 @@ BootEntry:
         jmp     (a3)
 
 ;------------------------------------------------------------------------------
-; MemDetect - the machine description (see src/boot_patches.s for its layout). Returns
-; with a0 = $DFF000.
+; MemDetect - the machine description (see src/boot_patches.s for its layout; version 2 adds
+; the drive booted from at +32, MI_DRIVE: BootEntry writes it).
 MemDetect:      lea     MACHINE_INFO,a2
                 movea.l a2,a1
-                moveq   #7,d0
+                moveq   #8,d0                   ; (36 bytes)
 .clr:           clr.l   (a1)+
                 dbra    d0,.clr
                 move.l  #'GNGM',(a2)+
-                addq.b  #1,(a2)+                ; version 1
+                addq.b  #2,(a2)+                ; version 2
                 move.b  $212(a6),(a2)+          ; VBlankFrequency
                 move.w  $128(a6),(a2)+          ; AttnFlags
                 lea     $142(a6),a3             ; MemList (lh_Head first)
@@ -88,8 +113,7 @@ MemDetect:      lea     MACHINE_INFO,a2
 .fast:          addq.l  #8,a1                   ; fast slot
 .store:         movem.l d0-d1,(a1)              ; (the last region of each kind is kept)
                 bra.b   .next
-.done:          lea     $dff000,a0
-                rts
+.done:          rts
 
 ;------------------------------------------------------------------------------
 ; The loader, run at LOADER. a0 = $DFF000.
@@ -120,7 +144,7 @@ Loader:
         dbra    d0,.pal
         move.w  #$200,$96(a0)
         move.w  #$6804,$100(a0)                 ; 6 planes, HAM, interlaced
-        move.w  #$0,$102(a0)
+        clr.w   $102(a0)
         move.w  #$24,$104(a0)
         move.w  #$15e,$108(a0)
         move.w  #$15e,$10a(a0)
@@ -130,8 +154,15 @@ Loader:
         move.w  #$2ea1,$90(a0)
         lea     CopperA(pc),a3
         move.l  a3,$80(a0)
-        lea     CopperB(pc),a3
-        move.l  a3,$84(a0)
+        lea     LoaderEnd(pc),a4                ; CopperB, made after the loader: CopperA with
+        move.l  a4,$84(a0)                      ; each plane one line (192 bytes) on
+        moveq   #5,d0
+.cb:            move.l  (a3)+,(a4)+             ; BPLxPTH as it is
+        move.l  (a3)+,d1
+        addi.w  #$c0,d1                         ; BPLxPTL + 192
+        move.l  d1,(a4)+
+        dbra    d0,.cb
+        move.l  (a3),(a4)                       ; the end
         move.w  $88(a0),d0
         lea     Level3(pc),a3
         move.l  a3,$6c.w
@@ -148,7 +179,7 @@ Loader:
 ; LoadIt - d0 = offset, d1 = length, a0 = destination: the byteloader, tried until it works
 LoadIt:         moveq   #0,d6                   ; failures
 .try:           movem.l d0-d1/d6/a0,-(a7)
-        moveq   #0,d2                           ; DF0
+        move.l  MACHINE_INFO+MI_DRIVE,d2        ; the drive booted from
         lea     MFM_BUF,a1
         bsr.w   ByteLoader
         move.l  d0,d7
@@ -173,14 +204,11 @@ Level3:         move.l  a0,-(a7)                ; the original's: acknowledge, a
 
 ; the loading picture's two copper lists (interlace: the level 3 interrupt shows CopperA on a
 ; long field, CopperB on a short one): the 6 bitplane pointers of the picture at $60000 - a
-; line's plane rows are 32 bytes apart, and CopperB starts one line (192 bytes) on: the other field
+; line's plane rows are 32 bytes apart. CopperB, the other field, starts one line (192 bytes)
+; on: the loader makes it from this one, after its own end (LoaderEnd in the copy)
 CopperA:        dc.w    $00E0,$0006,$00E2,$0000,$00E4,$0006,$00E6,$0020
         dc.w    $00E8,$0006,$00EA,$0040,$00EC,$0006,$00EE,$0060
         dc.w    $00F0,$0006,$00F2,$0080,$00F4,$0006,$00F6,$00A0
-        dc.w    $FFFF,$FFFE
-CopperB:        dc.w    $00E0,$0006,$00E2,$00C0,$00E4,$0006,$00E6,$00E0
-        dc.w    $00E8,$0006,$00EA,$0100,$00EC,$0006,$00EE,$0120
-        dc.w    $00F0,$0006,$00F2,$0140,$00F4,$0006,$00F6,$0160
         dc.w    $FFFF,$FFFE
 ; the loading picture's 16 colours (the original bootblock's, at its $382)
 Palette:        dc.w    $0000,$0FFF,$0002,$0003,$0501,$0227,$0467,$0838

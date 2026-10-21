@@ -138,7 +138,13 @@ the music. Now:
 enhanced one is a standard 880K disk (11 sectors of 512 bytes a track) with a file table, read
 with the [4489_byteloader](https://github.com/MarkyTurtle/4489_byteloader). The bootblock
 (`src/boot_4489.s`) surveys the memory, shows the loading picture and loads the program; the
-game's `LoadFile` reads any file by its id. Files load with interrupts running, so the game's
+game's `LoadFile` reads any file by its id.
+
+**Boot from any drive.** The bootblock finds the drive it was booted from (it opens
+`trackdisk.device`'s units until one is the boot IORequest's) and passes it on in the machine
+description; every load, the bootblock's and the game's, reads that drive. Kickstart 1.3 boots
+only from DF0; with 2.0 and later the disk can be booted from DF1-DF3 (the early startup menu:
+both mouse buttons held at power-on). Tried in WinUAE on an A500+ (2.04), an A600 and an A1200. Files load with interrupts running, so the game's
 interrupt handlers set up their own `a6` (`IrqLevel1`, `IrqLevel3`).
 
 ## Loading
@@ -244,7 +250,8 @@ All in a 68000 emulator (Unicorn) with a model of the blitter, copper, display a
 |---|---|
 | `compare_game.py` | the enhanced game against the original program, same input (random play, `--teleport` to jump the camera), game state and picture every frame; `--machine 512k / 1mb / ks13 / slow / fast`; `--disk`: reading the disk image with the byteloader |
 | `check_game.py` | each frame shown against the original's display code drawing the same state |
-| `test_boot4489.py` | the bootblock from Kickstart's call to the program's entry (`--random-start`) |
+| `test_boot4489.py` | the bootblock from Kickstart's call to the program's entry (`--random-start`): booted from DF0, DF1, DF3 and from another device's unit |
+| `test_drive.py` | the game's loads from the drive booted from (DF0, DF1), on 512K, 512K + slow and 1MB |
 | `test_bootinfo.py` | the machine description on seven memory configurations |
 | `test_jump.py` | the two jump inputs: open ground, at a ladder, on it |
 | `test_menu.py` | the title menu, the test page and its sound, input, sprite and (1MB) BOB tests |

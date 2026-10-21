@@ -974,6 +974,34 @@ off while the map is unpacked and the level drawn, on again on the map and in pl
 in the vertical blank, and the loading picture untouched up to `InitHardware` (on 1MB it was
 overwritten before).
 
+### Boot from any drive (made on branch `enhanced/bootdrive`, merged; tried in WinUAE)
+
+Tried in WinUAE: booted from the second drive on an A500+ (Kickstart 2.04), an A600 and an
+A1200, and played; an A500 with Kickstart 1.3 boots only from DF0, as expected.
+
+Kickstart calls the bootblock with `a1` = the boot IORequest, whose `IO_UNIT` is the unit of
+`trackdisk.device` it booted from; the unit structure does not say which drive it is. So the
+bootblock opens the device's units 3, 2, 1, 0 in turn (an IORequest on its stack, the name from
+the boot IORequest's device) until one gives the same unit, DF0 if none does (booted from some
+other device); the units are never closed - the machine is taken over next. The drive goes into
+the machine description, now version 2 and 36 bytes (`MI_DRIVE`, +32; the loader moves to
+`$7FB24`), and every load reads it: the bootblock's (`LoadIt`) and the game's (`LoadDisk` takes
+it from the description at its first load, into `BootDrive`, as the description is not safe
+later; the program moved to an expansion takes the copy with it). An older description
+(version 1) or none means DF0.
+
+The bootblock had 28 bytes free; the 50 this takes came from making the loading picture's second
+copper list at run time (the first one with each plane one line on, after the loader: 24 bytes
+less), a `clr.w` and the `nop` after `MemDetect`'s call. It is 1,016 bytes now.
+
+*Testing*: `tools/test_boot4489.py` boots the disk with exec's `OpenDevice` stubbed (it knows
+which drives are connected) and the floppy (`tools/floppy.py`, now any of DF0-DF3: the other
+drives are empty and give no data) in the drive booted from: DF0, DF1, DF3, and a unit of
+another device (DF0). `tools/test_drive.py` runs the game from the disk in DF0 and in DF1 (the
+description saying so) on 512K, 512K + slow RAM (the program moved) and 1MB, to level 2: the same
+track reads and the same level data either way. With the disk in DF1 and the game reading DF0
+nothing loads (the floppy model refuses, as a real empty drive would).
+
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
@@ -994,6 +1022,7 @@ overwritten before).
 * `tools/test_menu.py`: the title menu.
 * `tools/test_cache.py`: the file cache and the level's enemy sets.
 * `tools/test_display.py`: changes of display (the bitplanes in the vertical blank).
+* `tools/test_drive.py`: the game's loads from the drive booted from.
 
 ```
 cd enhanced/tools
