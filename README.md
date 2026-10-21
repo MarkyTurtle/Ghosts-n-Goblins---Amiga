@@ -5,7 +5,8 @@
 > boots from any drive, two-button joysticks, a title menu with sound, input, sprite and BOB
 > tests, and one program that makes the most of whatever memory the machine has - is on the
 > **[`enhanced/main`](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/tree/enhanced/main)** branch. Start with its
-> [feature list](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/blob/enhanced/main/enhanced/docs/FEATURES.md).
+> [feature list](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/blob/enhanced/main/enhanced/docs/FEATURES.md), or download the disk
+> image (ADF) to play it from the **[latest release](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/releases/latest)**.
 >
 > This branch, `main`, is the original game: an annotated disassembly that reassembles
 > byte-identical to the original disk.
