@@ -172,21 +172,25 @@ to move. Two tables, one after the other - the program's, then the 1MB sound pac
 `ApplyRelocs` walks a table adding the distance the image moved to each long (`EnhRelocate`
 for the program copied to the expansion; `LoadSound` for the 1MB package loaded to `$80`).
 
-### Machine description (`MACHINE_INFO`, `$7FB00`, 32 bytes, written by the bootblock)
+### Machine description (`MACHINE_INFO`, `$7FB00`, 36 bytes, written by the bootblock)
 
 | Offset | Size | |
 |---|---|---|
 | 0 | 4 | `'GNGM'` |
-| 4 | 1 | version (1) |
+| 4 | 1 | version (2; 1: the earlier bootblocks, 32 bytes with no drive) |
 | 5 | 1 | `VBlankFrequency` (50 PAL / 60 NTSC) |
 | 6 | 2 | `AttnFlags` (the CPU / FPU bits) |
 | 8 | 4 + 4 | chip RAM: lower, upper end (512K: `$80000`; 1MB: `$100000`; Kickstart 1.3 with 1MB lists `$FE800`) |
 | 16 | 4 + 4 | slow RAM (`$C00000`-`$DBFFFF`): lower, upper (0: none) |
 | 24 | 4 + 4 | fast RAM (any other region; the last one exec lists): lower, upper (0: none) |
+| 32 | 4 | (version 2) the drive booted from: 0-3 (DF0-DF3) |
 
 The bootblock's `MemDetect` reads exec's memory list (Kickstart calls a bootblock with `a6` =
 ExecBase); the program copies it at start-up (`EnhInit`, to `EnhMachine`) and `ReadProfile`
-decides the profile from it. `tools/test_bootinfo.py` checks it on seven machines.
+decides the profile from it; `LoadDisk` takes the drive from it at its first load (`BootDrive`),
+before anything can overwrite it. `tools/test_bootinfo.py` checks the memory survey on seven
+machines (the original bootblock patched, version 1), `tools/test_boot4489.py` the disk's
+bootblock (version 2, with the drive).
 
 ### File record (`FENTRY`, in the program)
 

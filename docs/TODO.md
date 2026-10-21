@@ -60,7 +60,9 @@ decided against, kept for the record with the reason.
 **Disk**
 - [x] An AmigaDOS-format disk (880K ADF) with a file table, loaded with the 4489_byteloader
       by the bootblock and the game (made on branch `enhanced/byteloader`, merged)
-- [ ] Boot from any drive (the boot IORequest's unit) and load from it (5)
+- [x] Boot from any drive (the boot IORequest's unit) and load from it (5): the bootblock finds
+      the unit and passes it on in the machine description (version 2); the bootblock's and the
+      game's loads read it (branch `enhanced/bootdrive`)
 
 **Memory**
 - [x] Per-level map tables: each level's `BlockTiles` / `CellTiles` entries in a file of its

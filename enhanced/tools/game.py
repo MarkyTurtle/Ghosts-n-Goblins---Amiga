@@ -55,7 +55,8 @@ OVERRUN = os.environ.get('GNG_OVERRUN') == '1'
 class GameRun(Amiga):
     """build: '512k' or '1mb'; binfile: the main program (default: the original); extra_files:
     {track: path} for files LoadFile reads that are not in disk/files (the modules)"""
-    def __init__(self, binfile=None, extra_files=None, build='512k', machine=None, listing=None, by_id=False, disk=None):
+    def __init__(self, binfile=None, extra_files=None, build='512k', machine=None, listing=None, by_id=False, disk=None,
+                 drive=None):
         cfg = self.cfg = BUILDS[build]
         super().__init__(os.path.join(ROOT, BUILDS['512k']['orig']))
         big = machine and any(end > 0x80000 and attr & 2 for attr, start, end in machine[0])
@@ -73,6 +74,9 @@ class GameRun(Amiga):
         if machine:                            # the enhanced bootblock's machine description:
             import test_bootinfo                # its own code, run on a fake exec memory list
             self.u.mem_write(test_bootinfo.MACHINE_INFO, test_bootinfo.run(*machine))
+            if drive is not None:               # as the one program's bootblock (boot_4489.s): version 2,
+                self.w8(test_bootinfo.MACHINE_INFO + 4, 2)                  # with the drive booted from
+                self.w32(test_bootinfo.MACHINE_INFO + 32, drive)
             for attr, start, end in machine[0]:          # expansion memory
                 if not attr & 2:
                     self.u.mem_map(start & ~0xFFF, (end - (start & ~0xFFF) + 0xFFF) & ~0xFFF)
@@ -113,7 +117,7 @@ class GameRun(Amiga):
         if disk:                               # disk: an ADF the program's own LoadFile reads (the
             import floppy                       # byteloader, through tools/floppy.py)
             span = lambda Ls: (Ls['ByteLoader'], Ls['ByteLoader'] + 0x186)
-            self.floppy = floppy.Floppy(self, open(disk, 'rb').read(),
+            self.floppy = floppy.Floppy(self, open(disk, 'rb').read(), unit=drive or 0,
                                         timing_ranges=[span(L)] + ([span(self.L0)] if self.reloc else []))
         else:
             self._stub_loadfile(L['LoadFile'])
@@ -237,17 +241,18 @@ def relocation(machine, listing):
     return 0
 
 
-def game(machine=None, disk=False):
+def game(machine=None, disk=False, drive=None):
     """the one program for every machine (build_game.py), on a machine as in
     test_bootinfo.MACHINES (regions, vblank, attnflags); None: no machine description.
-    disk: its loads read the disk image through the byteloader (tools/floppy.py), not stubbed"""
+    disk: its loads read the disk image through the byteloader (tools/floppy.py), not stubbed;
+    drive: the disk in that drive (0-3) and the description saying it was booted from there"""
     import build_game
     d = build_game.OUT
     files = build_game.disk_files(os.path.join(d, 'game.bin'), os.path.join(d, 'sfx.bin'),
                                   os.path.join(d, 'music.bin'), os.path.join(d, 'relocs.bin'), d)
     run = GameRun(os.path.join(d, 'game.bin'), {fid: path for fid, (name, path) in enumerate(files)}, '512k',
                   machine, listing=os.path.join(d, 'game.lst'), by_id=True,
-                  disk=os.path.join(d, '..', 'gng_game.adf') if disk else None)
+                  disk=os.path.join(d, '..', 'gng_game.adf') if disk else None, drive=drive)
     # the BOB viewer's labels (its own file, assembled for VIEWER_ORG in chip RAM: not moved)
     lst = os.path.join(d, 'viewer.lst')
     if os.path.exists(lst):

@@ -1,8 +1,9 @@
-"""A floppy drive (DF0) with an AmigaDOS-format disk (ADF) for the Unicorn harness, enough for
-the 4489_byteloader (src/byteloader.i): the drive lines on the CIAs, disk DMA, the DSKBLK
-interrupt request, and VHPOSR moving while the loader times itself.
+"""A floppy drive (DF0, or DF1-DF3: unit) with an AmigaDOS-format disk (ADF) for the Unicorn
+harness, enough for the 4489_byteloader (src/byteloader.i): the drive lines on the CIAs, disk
+DMA, the DSKBLK interrupt request, and VHPOSR moving while the loader times itself.
 
-  CIA-B PRB ($BFD100), written: /MTR (bit 7, latched when /SEL0 goes low), /SEL0 (bit 3),
+  CIA-B PRB ($BFD100), written: /MTR (bit 7, latched when the drive's /SELn goes low), /SEL0-3
+      (bits 3-6: the drive answers to its own; the other drives are empty),
       /SIDE (bit 2: 0 = upper head), DIR (bit 1: 1 = out, towards cylinder 0), /STEP (bit 0:
       a step when it goes low)
   CIA-A PRA ($BFE001), read: /RDY (bit 5: the motor is on), /TRK0 (bit 4), /WPRO (bit 3),
@@ -67,8 +68,9 @@ def _clock_from(words, prev):
 
 
 class Floppy:
-    def __init__(self, owner, adf, timing_ranges=(), random_start=False, seed=1):
+    def __init__(self, owner, adf, timing_ranges=(), random_start=False, seed=1, unit=0):
         self.m, self.u = owner, owner.u
+        self.unit = unit                       # the drive: DF0-DF3 (/SELn = bit 3 + n)
         self.adf = adf
         self.cyl, self.side, self.sel, self.motor, self.prb = 0, 0, False, False, 0xFF
         self.ranges = list(timing_ranges)
@@ -97,8 +99,8 @@ class Floppy:
     # ---- hooks
     def _prb(self, uc, acc, addr, size, value, ud):
         v = value & 0xFF
-        sel = not v & 0x08
-        if sel and not self.sel: self.motor = not v & 0x80      # latched as DF0 is selected
+        sel = not v & (0x08 << self.unit)
+        if sel and not self.sel: self.motor = not v & 0x80      # latched as the drive is selected
         if sel and self.prb & 0x01 and not v & 0x01:           # /STEP goes low
             self.cyl = max(0, self.cyl - 1) if v & 0x02 else min(79, self.cyl + 1)
         self.sel, self.side, self.prb = sel, 0 if v & 0x04 else 1, v
@@ -115,6 +117,8 @@ class Floppy:
         if not v & 0x8000: self.armed = False; return
         if not self.armed: self.armed = True; return
         self.armed = False
+        if not (self.sel and self.motor):                    # another drive (empty), or ours
+            return                                           # not spinning: no data, no DSKBLK
         n, ptr = v & 0x3FFF, self.m.r32(0xDFF020) & 0x1FFFFE
         w = self.track(self.cyl * 2 + self.side)
         s = self.rnd.randrange(11) if self.random_start else 0
