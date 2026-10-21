@@ -24,26 +24,26 @@ everything from there moves when the program's size changes. Names are the equat
 | From | To | Bytes | Name | Contents |
 |---|---|---:|---|---|
 | $00000 | $00080 | 128 | vectors | the 68000 exception vectors (`CrashReset` for the CPU exceptions; level 1 / 3 autovectors `IrqLevel1` / `IrqLevel3`; `$60`: the sound driver's entry) |
-| $00080 | $12DFA | 77,178 | program | the program: code and tables (`gng_game.s`), entered at `$A0` |
-| $12DFA | $14586 | 6,028 | `GLOBALS` | the globals block and the object slots (`a6`; `docs/GLOBALS.md`) |
-| $14586 | $24C96 | 67,344 | `MUSIC_FILE` | the sound package (`SFX_AREA` bytes): see the machines below |
-| $24C96 | $24E16 | 384 | `COPPER_INIT` | copper lists: the template and the progress map's list (`COPPER_MAP`); the playfield lists are in the scroller's storage |
-| $24E16 | $2604A | 4,660 | `ESHOT_GFX_BUF` | enemy shot BOBs (file `FID_ESHOTS`) |
-| $2604A | $27B0C | 6,850 | `ITEM_GFX_BUF` | weapon / pickup / effect BOBs (`FID_ITEMS`) ... |
-| $27B0C | $289B2 | 3,750 | `ITEM_GFX2_BUF` | ... and their tail (`FID_ITEMS2`) |
-| $289B2 | $32DB2 | 41,984 | `ARTHUR_SPR_GFX` | Arthur's sprite frames: four banks `$2900` apart, one per hardware sprite (0 + 1: the left 16 pixels, an attached pair; 2 + 3: the right), each the 42 frames of `$80` bytes (`SPR_GFX_A*`) then mirrored copies of frames 0-39 (`SPR_GFX_B*`), built at start-up |
-| $32DB2 | $339D2 | 3,104 | `MASK_BUF` | the font (3,104 bytes: 194 characters of 16 bytes) |
-| $339D2 | $34002 | 1,584 | `SPRITE*_DATA` | the HUD's hardware sprite data (weapon icon, lives) |
-| $34002 | $34282 | 640 | `MASK_LINE_BUF` | a BOB mask line buffer (only for an image with no mask) |
-| $34282 | $3FA92 | 47,120 | `SCREEN_0` | the scroller's **pristine buffer** (47,120 bytes: the background, tiles and scenery). While a level loads: the enemy sets' file (`SCREEN_0`), the small BOBs (`SMALLBOB_LOAD`, $516FA), the progress map file and MFM buffer (`PM_LOAD`, `PM_MFM`) |
-| $3FA92 | $4B2A2 | 47,120 | + `BUF_SIZE` | **display buffer A** |
-| $4B2A2 | $56AB2 | 47,120 | + 2 x `BUF_SIZE` | **display buffer B** (A and B: one drawn while the other is shown) |
-| $56AB2 | $58E1A | 9,064 |  | between levels: the progress map's picture (`SCREEN_2` = $4AA82 .. + `$DA40`); in play: the text strip (`TEXT_STRIP`, $584C2) |
-| $58E1A | $5A974 | 7,002 | `SCROLL_STORE` | the scroller's storage: buffer records, playfield copper lists, restore lists, text queue, glyph cache, the machine description's copy |
-| $5A974 | $5A982 | 14 | | (not used) |
-| $5A982 | $5B4C2 | 2,880 | `CLEAR_AREA` | the HUD's 16 lines of 5 planes |
-| $5B4C2 | $5F302 | 15,936 | `LEVEL_TABLES` | the level's map tables (`LoadLevelTables`: slots, BlockTiles, CellTiles; 49 slots) |
-| $5F302 | $7CC40 | 121,150 | `LEVEL_FILE` | the level's tile file, then its BOB sets (`BuildFrameTable`), their one-plane masks and pre-masked copies (`BuildLevelMasks`), up to `LEVEL_GFX_LIMIT` |
+| $00080 | $12E2C | 77,228 | program | the program: code and tables (`gng_game.s`), entered at `$A0` |
+| $12E2C | $145B8 | 6,028 | `GLOBALS` | the globals block and the object slots (`a6`; `docs/GLOBALS.md`) |
+| $145B8 | $24CC8 | 67,344 | `MUSIC_FILE` | the sound package (`SFX_AREA` bytes): see the machines below |
+| $24CC8 | $24E48 | 384 | `COPPER_INIT` | copper lists: the template and the progress map's list (`COPPER_MAP`); the playfield lists are in the scroller's storage |
+| $24E48 | $2607C | 4,660 | `ESHOT_GFX_BUF` | enemy shot BOBs (file `FID_ESHOTS`) |
+| $2607C | $27B3E | 6,850 | `ITEM_GFX_BUF` | weapon / pickup / effect BOBs (`FID_ITEMS`) ... |
+| $27B3E | $289E4 | 3,750 | `ITEM_GFX2_BUF` | ... and their tail (`FID_ITEMS2`) |
+| $289E4 | $32DE4 | 41,984 | `ARTHUR_SPR_GFX` | Arthur's sprite frames: four banks `$2900` apart, one per hardware sprite (0 + 1: the left 16 pixels, an attached pair; 2 + 3: the right), each the 42 frames of `$80` bytes (`SPR_GFX_A*`) then mirrored copies of frames 0-39 (`SPR_GFX_B*`), built at start-up |
+| $32DE4 | $33A04 | 3,104 | `MASK_BUF` | the font (3,104 bytes: 194 characters of 16 bytes) |
+| $33A04 | $34034 | 1,584 | `SPRITE*_DATA` | the HUD's hardware sprite data (weapon icon, lives) |
+| $34034 | $342B4 | 640 | `MASK_LINE_BUF` | a BOB mask line buffer (only for an image with no mask) |
+| $342B4 | $3FAC4 | 47,120 | `SCREEN_0` | the scroller's **pristine buffer** (47,120 bytes: the background, tiles and scenery). While a level loads: the enemy sets' file (`SCREEN_0`), the small BOBs (`SMALLBOB_LOAD`, $5172C), the progress map file and MFM buffer (`PM_LOAD`, `PM_MFM`) |
+| $3FAC4 | $4B2D4 | 47,120 | + `BUF_SIZE` | **display buffer A** |
+| $4B2D4 | $56AE4 | 47,120 | + 2 x `BUF_SIZE` | **display buffer B** (A and B: one drawn while the other is shown) |
+| $56AE4 | $58E4C | 9,064 |  | between levels: the progress map's picture (`SCREEN_2` = $4AAB4 .. + `$DA40`); in play: the text strip (`TEXT_STRIP`, $584F4) |
+| $58E4C | $5A9A6 | 7,002 | `SCROLL_STORE` | the scroller's storage: buffer records, playfield copper lists, restore lists, text queue, glyph cache, the machine description's copy |
+| $5A9A6 | $5A9B4 | 14 | | (not used) |
+| $5A9B4 | $5B4F4 | 2,880 | `CLEAR_AREA` | the HUD's 16 lines of 5 planes |
+| $5B4F4 | $5F334 | 15,936 | `LEVEL_TABLES` | the level's map tables (`LoadLevelTables`: slots, BlockTiles, CellTiles; 49 slots) |
+| $5F334 | $7CC40 | 121,100 | `LEVEL_FILE` | the level's tile file, then its BOB sets (`BuildFrameTable`), their one-plane masks and pre-masked copies (`BuildLevelMasks`), up to `LEVEL_GFX_LIMIT` |
 | $7CC40 | $7FB00 | 11,968 | `MFM_BUFFER` | the byteloader's MFM buffer while a file loads (the top of the level area, also used by pre-masked images once the loads are done) |
 | $7FB00 | $7FB20 | 32 | `MACHINE_INFO` | the bootblock's machine description (copied at start-up) |
 | $7FB20 | $80000 | 1,248 |  | the bootblock's loader while booting; then the supervisor stack, growing down from `$80000` (about 320 bytes deep at most) |
@@ -58,18 +58,18 @@ music came from.
 tile file, its BOB sets (`BuildFrameTable` copies them out of the enemy sets' file), then their
 masks: `BuildLevelMasks` makes a pre-masked copy (one blit to draw) of as many images as fit below
 `LEVEL_GFX_LIMIT` (`$7FB00`), in the order of `GfxPriority`, and one-plane masks (5 blits) for the
-rest. With no image pre-masked the fullest stage's data would end at $7CB04
-(12,284 bytes free). This build (`build_game.py` prints the same):
+rest. With no image pre-masked the fullest stage's data would end at $7CB36
+(12,234 bytes free). This build (`build_game.py` prints the same):
 
 | Stage | Data ends | Bytes left | Still drawn with 5 blits |
 |---|---|---:|---|
-| 1 | $7F7BE | 834 | items/weapons, set 0, set 11, set 6, set 8, set 5 |
-| 2 | $7F96E | 402 | items/weapons, set 20, set 17, set 4, set 2, set 10, set 8, set 5 |
-| 3 | $7F4C2 | 1,598 | set 5 |
-| 4 | $79E6A | 23,702 | nothing |
-| 5 | $7F026 | 2,778 | set 5 |
-| 6 | $7EB32 | 4,046 | set 10, set 6, set 8, set 5 |
-| 7 | $73FF6 | 47,882 | nothing |
+| 1 | $7F7F0 | 784 | items/weapons, set 0, set 11, set 6, set 8, set 5 |
+| 2 | $7F9A0 | 352 | items/weapons, set 20, set 17, set 4, set 2, set 10, set 8, set 5 |
+| 3 | $7F4F4 | 1,548 | set 5 |
+| 4 | $79E9C | 23,652 | nothing |
+| 5 | $7F058 | 2,728 | set 5 |
+| 6 | $7EB64 | 3,996 | set 10, set 6, set 8, set 5 |
+| 7 | $74028 | 47,832 | nothing |
 
 On 1MB machines the level area holds only the tables and the tile file: the graphics are drawn
 from the upper chip RAM caches.
@@ -98,9 +98,9 @@ machine: the first levels played of the 220 KB). With 1MB of chip RAM the sound 
 ## Expansion memory: the program moved (512K chip + slow / fast RAM)
 
 With 512K of chip RAM and an expansion with room, `Start` first copies the program (from `$80`
-to `MAP_LOW`: code, tables and globals, 83,208 bytes) to the expansion - the last
+to `MAP_LOW`: code, tables and globals, 83,256 bytes) to the expansion - the last
 fast RAM region if one has room, else the last slow RAM region, on a 256-byte boundary - loads
-the relocation file (780 bytes) after it, adds the distance to every address in
+the relocation file (788 bytes) after it, adds the distance to every address in
 the copy and starts again there. Only the CPU reads the program, so the memory map (everything
 from `MAP_LOW`, above) stays in chip RAM where it is. The chip RAM from `$80` then holds the 1MB
 sound package (`MUSICB_FILE`), whose own addresses are moved too.
@@ -111,8 +111,8 @@ in all) are kept after their first load, and later loads copy them from there.
 
 | Machine | Program copy | Its end | Relocations end | Region end | Free after it (the cache) |
 |---|---|---|---|---|---:|
-| A500 512K chip + 512K slow | $C00100 | $C14608 | $C14914 | $C80000 | 440,044 |
-| A500 + 1.5MB slow + 2MB fast | $200100 | $214608 | $214914 | $400000 | 2,012,908 |
+| A500 512K chip + 512K slow | $C00100 | $C14638 | $C1494C | $C80000 | 439,988 |
+| A500 + 1.5MB slow + 2MB fast | $200100 | $214638 | $21494C | $400000 | 2,012,852 |
 
 ## Other machines
 

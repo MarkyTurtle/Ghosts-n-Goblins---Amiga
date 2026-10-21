@@ -206,6 +206,15 @@ symbols (`viewer_syms.i`, written by `build_game.py`).
   skips twice the lines it should; the scroller's drawing does it right).
 * Disk errors are retried until the read succeeds; after 8 failures the background turns red
   while it keeps trying.
+* **Clean changes of display** (`EnhDisplayOff` / `EnhDisplayOn`, `display_transitions` in
+  `make_game.py`). The bitplanes are switched off and on only in the vertical blank, and are off
+  while the screens they would show are rewritten: the progress map is unpacked into the
+  scroller's display buffers, and the next level is drawn into them while the map is on show.
+  Before, the change from a level to the map and back showed a frame or two of half-built
+  screen (and on 512K the display was cut off halfway down a frame).
+* **The loading picture stays whole**: level 1's tile file loads once the copyright screen is up
+  on every machine. The 1MB program loaded it earlier (as the original 1MB program did), into the
+  loading picture's memory while the picture was still on show.
 
 ## Builds
 
@@ -240,6 +249,7 @@ All in a 68000 emulator (Unicorn) with a model of the blitter, copper, display a
 | `test_jump.py` | the two jump inputs: open ground, at a ladder, on it |
 | `test_menu.py` | the title menu, the test page and its sound, input, sprite and (1MB) BOB tests |
 | `test_cache.py` | the file cache and the level's enemy sets, from the disk image on each machine |
+| `test_display.py` | changes of display: the bitplanes switched in the vertical blank, off while the map is unpacked and the level drawn; the loading picture untouched while shown |
 | `check_harness.py` | the harness's display emulation against the level pictures (`render/out/`) |
 | `sound/tools/check_music_512k.py` | the 512K music package against the original packages |
 

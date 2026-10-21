@@ -944,6 +944,36 @@ A500+ and Kickstart 1.3 with 1MB (starting from the title, level 1's files load 
 second time from the cache), and the comparisons with the loads stubbed (`game.py` honours
 `LoadOffset`) on every stage.
 
+### Changes of display (made on branch `enhanced/display`, merged; tried in WinUAE)
+
+Tried in WinUAE: the change from a level to the progress map and back showed a glitch, and on
+machines with 1MB of chip RAM the loading picture was overwritten just before the copyright
+screen. Both came from screens being written while they were on show:
+
+* The progress map is unpacked into `SCREEN_2`, which lies in the scroller's display buffers A
+  and B. On 1MB the display stayed on through `LoadLevel`, so the level on show turned into the
+  map being built; on 512K `LoadLevel` turned the bitplanes off at once, wherever the beam was
+  (a frame cut in two). `SetupLevel` then draws the level into the same buffers while the map is
+  still shown from them.
+* The 1MB program loaded level 1's tile file before the copyright screen (the original 1MB
+  program's order), to `LEVEL_FILE` (`$5F302`), the first 26 KB of it over the loading picture
+  (`$60000`-`$78300`), which was still being shown.
+
+Now `EnhDisplayOff` / `EnhDisplayOn` (`scroller.s`) switch the bitplanes only in the vertical
+blank (the beam above line `$2C` or from `$125`), and do nothing when they are already off / on.
+They are off from `LoadLevel` (every machine) and at the start of the progress map (after a life
+lost, `LoadLevel` does not come first) until the map scrolls with its copper list in place, and
+from `SetupLevel`'s drawing until the level's copper list is in place (after its second
+`ShowBackBuffer`); the opening scene's switch on is in the vertical blank too. Level 1 loads
+after `InitHardware` (the copyright screen up) on every machine. The sprites and colours are
+left as they were (as the original, the marker and the HUD sprites stay on the blank screen).
+
+*Testing*: `tools/test_display.py` on 512K and 1MB (the beam moving on at every read of
+`VPOSR`): a game started, a life lost to the timer, the map and the level again - the bitplanes
+off while the map is unpacked and the level drawn, on again on the map and in play, every switch
+in the vertical blank, and the loading picture untouched up to `InitHardware` (on 1MB it was
+overwritten before).
+
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
@@ -963,6 +993,7 @@ second time from the cache), and the comparisons with the loads stubbed (`game.p
 * `tools/test_jump.py`: the two-button joystick settings (jump on up or on button 2).
 * `tools/test_menu.py`: the title menu.
 * `tools/test_cache.py`: the file cache and the level's enemy sets.
+* `tools/test_display.py`: changes of display (the bitplanes in the vertical blank).
 
 ```
 cd enhanced/tools
