@@ -32,6 +32,9 @@ decided against, kept for the record with the reason.
       Integrated into both programs (512K and 1MB) on branch `enhanced/scroll`, with a disk image;
       tested in the emulator side by side with the originals. Still to do: real-machine timing (WinUAE)
 - [x] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
+- [x] Clean changes of display between a level and the progress map (bitplanes off while the
+      screens are rebuilt, switched in the vertical blank), and the loading picture no longer
+      overwritten on 1MB before the copyright screen (branch `enhanced/display`, merged; tried in WinUAE)
 - [x] Raster-time debug build (COLOR00 per stage), then drawing every frame (50 fps instead of
       the game's 25) on the 512K program too: 50 fps on an A500 except in busy scenes (25 fps
       there); see `enhanced/docs/SCROLLER.md`, *Frame rate*

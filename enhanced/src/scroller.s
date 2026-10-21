@@ -225,6 +225,39 @@ EnhSetBitplanePtrs:
                 rts
 
 ;------------------------------------------------------------------------------
+; EnhDisplayOff / EnhDisplayOn - the bitplanes off / on, only in the vertical blank (the beam
+; above or below the display window), so no frame is shown cut in two. Off around a change of
+; display whose screens are rewritten while they would be on show (the progress map unpacked
+; into the scroller's buffers, the level drawn into them while the map is shown); on once the
+; new copper list is in place. Each does nothing if the bitplanes are already off / on. The
+; sprites and the colours are left as they are. Keep every register.
+;------------------------------------------------------------------------------
+EnhDisplayOff:  btst    #0,CUSTOM+$002          ; DMACONR bit 8: bitplanes on?
+                beq.b   .out
+                bsr.b   WaitBlank
+                move.w  #$0100,CUSTOM+$096      ; DMACON: bitplanes off
+.out:           rts
+
+EnhDisplayOn:   btst    #0,CUSTOM+$002
+                bne.b   .out
+                bsr.b   WaitBlank
+                move.w  #$8100,CUSTOM+$096      ; DMACON: bitplanes on
+.out:           rts
+
+; WaitBlank - until the beam is on a line above the display ($00-$2B) or below it ($125 on,
+; PAL; an NTSC frame ends before, so it waits for the top there)
+WaitBlank:      move.l  d0,-(a7)
+.wait:          move.l  CUSTOM+$004,d0          ; VPOSR, VHPOSR: bit 16 V8, bits 15-8 V7-V0
+                lsr.l   #8,d0
+                andi.w  #$1FF,d0
+                cmpi.w  #$2C,d0
+                bcs.b   .out
+                cmpi.w  #$125,d0
+                bcs.b   .wait
+.out:           move.l  (a7)+,d0
+                rts
+
+;------------------------------------------------------------------------------
 EnhShowBackBuffer:
                 cmpi.b  #PAGE_BOBS,(MenuPage).l ; the BOB test: its strip (bobviewer.s: ViewDraw)
                 bne.b   .nobob

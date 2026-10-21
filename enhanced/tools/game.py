@@ -92,6 +92,15 @@ class GameRun(Amiga):
             self.L = L = {k: v + self.reloc if 0x80 <= v < top else v for k, v in L.items()}
             self.entry_orig = self.L0['ProgramEntry']
         self.entry, self.idle = L['ProgramEntry'], L['IdleLoop']
+        # EnhDisplayOff / On wait for the vertical blank (WaitBlank). The harness's VPOSR / VHPOSR
+        # keep the last value the byteloader's timing left, which may be a line in the display, so
+        # the beam is put at the top as the wait starts (test_display.py moves it itself instead:
+        # beam_reset = False)
+        self.beam_reset = True
+        if 'WaitBlank' in L:
+            def blank(uc, addr, size, ud):
+                if self.beam_reset: self.w32(CUSTOM+0x04, 0)
+            self.u.hook_add(UC_HOOK_CODE, blank, begin=L['WaitBlank'], end=L['WaitBlank'])
         self.copyright_wait = L[copyright_wait(build)]
         self.redraw_entry = L['RedrawEntry']           # ... and its idle loop (bra.b *): the first $60FE
         o = self.redraw_entry - self.reloc - cfg['load']

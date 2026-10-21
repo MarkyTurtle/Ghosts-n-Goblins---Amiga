@@ -735,8 +735,10 @@ camera climbs at up to 4 px a frame and falls at 4-10, a new row every 4-8 frame
 **Cheat key (testing).** On the title and high-score screens, **C** turns the game's own cheat
 (`g_CheatOn`, the one entering `)!(` on the high-score table sets: lives never decrease, no harm
 once the armour is gone) on or off, and shows the title again with `CHEAT ON` under the key
-lines while it is on (`EnhCheatKey`, `EnhShowCheat`). It stays set until switched off or the
-machine is reset; a high-score entry other than `)!(` clears it, as in the original.
+lines while it is on. It stays set until switched off or the machine is reset; a high-score
+entry other than `)!(` clears it, as in the original. (Since the title menu, `EnhMenu` handles
+the C key, and the cheat shows as the test page's `CHEAT OFF` / `ON` item instead of a line on
+the title.)
 
 **Look-ahead column (`ScrPrepare`).** A frame that crossed a tile column drew the whole new
 column at once: about 15 tile blits into the pristine buffer and 15 tile copies into the display
@@ -756,7 +758,7 @@ before the crossing. Blitter words in the crossing frame and the next two, stage
 6,724 on average; stage 6: 13,601 -> 11,515; the 99th-percentile frame: 4,635 -> 3,840 and
 5,620 -> 4,880 words. Pictures unchanged on all seven stages (512K and 1MB).
 
-**Blitter priority while waiting (`--nasty-wait`, to be measured).** The original sets BLTPRI
+**Blitter priority while waiting (`--nasty-wait`; not pursued: little to gain).** The original sets BLTPRI
 ("blitter nasty") once at start-up and never clears it. With all code and data in chip RAM, the
 CPU then cannot fetch an instruction while a blit runs, so the work between blits (the next BOB's
 clipping and addresses, the copper list and the logic after the last blit) never runs alongside
@@ -942,6 +944,36 @@ A500+ and Kickstart 1.3 with 1MB (starting from the title, level 1's files load 
 second time from the cache), and the comparisons with the loads stubbed (`game.py` honours
 `LoadOffset`) on every stage.
 
+### Changes of display (made on branch `enhanced/display`, merged; tried in WinUAE)
+
+Tried in WinUAE: the change from a level to the progress map and back showed a glitch, and on
+machines with 1MB of chip RAM the loading picture was overwritten just before the copyright
+screen. Both came from screens being written while they were on show:
+
+* The progress map is unpacked into `SCREEN_2`, which lies in the scroller's display buffers A
+  and B. On 1MB the display stayed on through `LoadLevel`, so the level on show turned into the
+  map being built; on 512K `LoadLevel` turned the bitplanes off at once, wherever the beam was
+  (a frame cut in two). `SetupLevel` then draws the level into the same buffers while the map is
+  still shown from them.
+* The 1MB program loaded level 1's tile file before the copyright screen (the original 1MB
+  program's order), to `LEVEL_FILE` (`$5F302`), the first 26 KB of it over the loading picture
+  (`$60000`-`$78300`), which was still being shown.
+
+Now `EnhDisplayOff` / `EnhDisplayOn` (`scroller.s`) switch the bitplanes only in the vertical
+blank (the beam above line `$2C` or from `$125`), and do nothing when they are already off / on.
+They are off from `LoadLevel` (every machine) and at the start of the progress map (after a life
+lost, `LoadLevel` does not come first) until the map scrolls with its copper list in place, and
+from `SetupLevel`'s drawing until the level's copper list is in place (after its second
+`ShowBackBuffer`); the opening scene's switch on is in the vertical blank too. Level 1 loads
+after `InitHardware` (the copyright screen up) on every machine. The sprites and colours are
+left as they were (as the original, the marker and the HUD sprites stay on the blank screen).
+
+*Testing*: `tools/test_display.py` on 512K and 1MB (the beam moving on at every read of
+`VPOSR`): a game started, a life lost to the timer, the map and the level again - the bitplanes
+off while the map is unpacked and the level drawn, on again on the map and in play, every switch
+in the vertical blank, and the loading picture untouched up to `InitHardware` (on 1MB it was
+overwritten before).
+
 ### Boot from any drive (made on branch `enhanced/bootdrive`)
 
 Kickstart calls the bootblock with `a1` = the boot IORequest, whose `IO_UNIT` is the unit of
@@ -986,6 +1018,7 @@ nothing loads (the floppy model refuses, as a real empty drive would).
 * `tools/test_jump.py`: the two-button joystick settings (jump on up or on button 2).
 * `tools/test_menu.py`: the title menu.
 * `tools/test_cache.py`: the file cache and the level's enemy sets.
+* `tools/test_display.py`: changes of display (the bitplanes in the vertical blank).
 * `tools/test_drive.py`: the game's loads from the drive booted from.
 
 ```

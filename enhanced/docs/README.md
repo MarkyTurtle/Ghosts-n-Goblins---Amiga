@@ -22,5 +22,5 @@ python3 make_game.py            # src/gng_game.s from ../../gng_main.s (after ch
 python3 build_game.py           # ../build/gng_game.adf  (--raster, --nasty-wait, --music-rate N/D)
 python3 make_docs.py            # ../docs/DISK.md, MEMORY.md
 python3 compare_game.py 2500 2 --machine 512k --level 1 --teleport 150   # against the original
-python3 test_menu.py; python3 test_jump.py; python3 test_boot4489.py
+python3 test_menu.py; python3 test_jump.py; python3 test_cache.py; python3 test_boot4489.py
 ```
