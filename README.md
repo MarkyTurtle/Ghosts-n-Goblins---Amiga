@@ -45,7 +45,7 @@ vasmm68k_mot -Fbin -m68000 -no-opt -o boot.bin gng_boot.s                     ; 
 * **Music on every machine**, including a plain 512K A500 (the 1MB tunes added to the 512K
   effects; on 512K the tunes' samples are at 3/4 of their rate to leave memory for pre-masking).
 * **A standard AmigaDOS-format disk** (880K ADF) with a file table, loaded with the
-  4489_byteloader.
+  4489_byteloader, from whichever drive it was booted from.
 * **Two-button joysticks** (jump on the second button, or on up as the original).
 * **A title menu** (1 or 2 players, the input setting, and a test page with the memory found
   and the cheat) instead of the original's instructions.
@@ -77,6 +77,7 @@ merged into `enhanced/scroll`. They are all fully merged and kept for the record
 | `enhanced/testmenu` | the test page's sound, input and sprite tests, and the BOB viewer (1MB of chip RAM or more) | `enhanced/scroll` (with the above merged) |
 | `enhanced/memory` | loading less: only the level's enemy sets, and a file cache in expansion memory (each file read from the disk once) | `enhanced/scroll` (with `enhanced/musicquality` merged) |
 | `enhanced/display` | clean changes of display between a level and the progress map; the loading picture kept whole on 1MB machines | `enhanced/scroll` (with the above merged) |
+| `enhanced/bootdrive` | boot from any drive (Kickstart 2.0 and later): every load reads the drive booted from | `enhanced/scroll` (with the above merged) |
 
 New features go on a new branch from `enhanced/scroll` in the same way. The `docs/TODO.md` on
 `main` is the plan as it stood before the enhanced work; see the one on `enhanced/scroll`.
