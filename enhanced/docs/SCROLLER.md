@@ -895,6 +895,52 @@ one more file at start-up).
 loaded, its page opens, the strips step and wrap round, the window is drawn differently for a
 different strip and when scrolled, up scrolls back and Esc goes back to the test page.
 
+### Loading less, and the file cache (made on branch `enhanced/memory`, merged)
+
+**A level's enemy sets only** (`LoadEnemySets`, `make_game_support.s`). Each level start read
+the whole enemy graphics file (118,850 bytes, 21 sets) into the screens, from which `LoadLevel`
+copies the level's sets (`LevelBobSetMask`). Now only those sets are read, each to its place
+in `SCREEN_0` as the whole file would put it (`BuildFrameTable` and `BuildLevelMasks` take them
+from there as before): 22-65 KB a level. `BobSetFileOrder` (made by `make_game.py`) lists the
+sets by their offset in the file; sets less than a track (5,632 bytes) apart load as one
+piece with the gap between them, as the disk is read in whole tracks anyway. `LoadFile` takes a
+starting point in the file from `LoadOffset` (normally 0). Separate per-level files would have
+needed about 330 KB of a disk with 111 KB free. Track reads at a level start (512K, from the disk
+image: the small BOBs, the enemy sets, the level's tables and tile file):
+
+| Level | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| before | 32 | 37 | 31 | 30 | 28 | 29 | 27 |
+| now | 24 | 28 | 23 | 15 | 20 | 21 | 11 |
+
+(The 1MB-chip machines load no enemy graphics at a level start: they are cached at start-up.)
+
+**The file cache** (`CacheInit`, called by `Start` after `ReadProfile`; `LoadFile`). On a machine
+with memory to spare, the files the game loads again and again are kept after their first
+load, and later loads copy them from there instead of reading the disk:
+
+| Machine | The cache's memory | Files kept |
+|---|---|---|
+| 512K chip + slow / fast RAM (the program moved, `EnhRelocate`) | the rest of that region, after the program and its relocation file (`RelocBase`, `RELOC_ROOM`): 431 KB with 512K of slow RAM, room for every file it keeps (341 KB) | the enemy graphics (the whole file, the first time a level needs any of it; `LoadEnemySets` then copies the level's sets from it), the small BOBs, the progress map, the levels' tile and table files |
+| 1MB of chip RAM or more (`PF_CACHE`) | the largest of: the chip RAM above the upper chip RAM caches and the BOB viewer (`VIEWER_ORG` + `VIEWER_LEN`: 126 KB on a 1MB machine, 120 KB under Kickstart 1.3, so the first levels played of the 220 KB), the slow RAM, the fast RAM (nothing else uses them then) | the levels' tile and table files (the graphics and the progress map are kept already) |
+| plain 512K | none | - |
+
+The old `LoadFile` is `LoadDisk`; the new `LoadFile` in front of it copies a kept file (or the
+piece `LoadOffset` asks for) to the destination, or, for a file the cache keeps (`CacheMask`)
+and has room for, loads the whole file into the cache first (`CacheTable`: where each is kept).
+Files are kept first come, first served while there is room; they never change, so nothing is
+ever thrown out. The byteloader decodes with the CPU, so the cache can be in slow or fast RAM.
+A level loaded again (or the progress map after a life is lost, on the moved program) then reads
+no track at all; the first start of each level still reads it once.
+
+*Testing*: `tools/test_cache.py` (from the disk image on each machine: the cache's memory, the
+track reads of a level's first load and of loading it again - none where the cache keeps the
+files, the same as the first time on 512K - and the level data the same after the second load).
+`compare_game.py --disk` stays in step on 512K, 512K + slow RAM, 512K + slow + fast RAM, a 1MB
+A500+ and Kickstart 1.3 with 1MB (starting from the title, level 1's files load twice: the
+second time from the cache), and the comparisons with the loads stubbed (`game.py` honours
+`LoadOffset`) on every stage.
+
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
@@ -914,6 +960,7 @@ different strip and when scrolled, up scrolls back and Esc goes back to the test
 * `src/boot_patches.s`: the bootblock's memory survey; `tools/test_bootinfo.py` tests it.
 * `tools/test_jump.py`: the two-button joystick settings (jump on up or on button 2).
 * `tools/test_menu.py`: the title menu.
+* `tools/test_cache.py`: the file cache and the level's enemy sets.
 * `tools/test_bobs.py`: BOBs, restores and scenery against the original's `DrawBobs` and
   `DrawSceneryOnRedraw`.
 

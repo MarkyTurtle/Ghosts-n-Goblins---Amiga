@@ -141,6 +141,26 @@ with the [4489_byteloader](https://github.com/MarkyTurtle/4489_byteloader). The 
 game's `LoadFile` reads any file by its id. Files load with interrupts running, so the game's
 interrupt handlers set up their own `a6` (`IrqLevel1`, `IrqLevel3`).
 
+## Loading
+
+**A level's enemy sets only** (`LoadEnemySets`). Each level start read the whole enemy graphics
+file (118 KB) to copy out the sets the level uses; now only those sets are read (22-65 KB), each
+to its place, sets less than a track apart as one piece (the disk is read in whole tracks
+anyway): 8-16 fewer track reads at a level start. `LoadFile` takes a starting point in a file
+from `LoadOffset`.
+
+**The file cache** (`CacheInit`, `LoadFile` in front of `LoadDisk`). On a machine with memory to
+spare, the files read again and again are kept after their first load and copied from memory
+afterwards; files are kept first come, first served while there is room (`MEMORY.md`):
+
+| Machine | Where | Files kept |
+|---|---|---|
+| 512K chip + slow / fast RAM (the program moved) | the rest of the expansion region (431 KB with 512K of slow RAM) | all of them: the enemy graphics, small BOBs, progress map, every level's tiles and tables (341 KB) |
+| 1MB of chip RAM or more | chip RAM above the graphics caches, or a slow / fast RAM region if larger | the levels' tile and table files (the graphics are cached already) |
+
+A level loaded again (a restart, a second game) then reads nothing from the disk; on an expanded
+A500 neither does the progress map after a life is lost.
+
 ## Controls and menu
 
 **Two-button joysticks** (`two_buttons` in `make_game.py`; `ArthurReadUpDown`). The second
@@ -218,7 +238,8 @@ All in a 68000 emulator (Unicorn) with a model of the blitter, copper, display a
 | `test_boot4489.py` | the bootblock from Kickstart's call to the program's entry (`--random-start`) |
 | `test_bootinfo.py` | the machine description on seven memory configurations |
 | `test_jump.py` | the two jump inputs: open ground, at a ladder, on it |
-| `test_menu.py` | the title menu, the test page and its sound, input and sprite tests |
+| `test_menu.py` | the title menu, the test page and its sound, input, sprite and (1MB) BOB tests |
+| `test_cache.py` | the file cache and the level's enemy sets, from the disk image on each machine |
 | `test_bobs.py`, `test_scroll.py`, `check_harness.py` | the scroller and BOB drawing against the original's (the first enhanced builds) |
 | `sound/tools/check_music_512k.py` | the 512K music package against the original packages |
 

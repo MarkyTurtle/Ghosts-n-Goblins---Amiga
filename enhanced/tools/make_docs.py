@@ -26,7 +26,7 @@ FILES = {
     'FID_LOADPIC': ('the loading picture: 256 x 516 HAM6 interlaced', 'bootblock', 'boot'),
     'FID_ARTHUR': ("Arthur's 42 sprite frames (staged, then copied to `ARTHUR_SPR_GFX`)", '`Start`', 'start-up'),
     'FID_SMALLBOBS': ('the 10 small item / scenery BOB images', '`LoadLevel` (`CacheGraphics` with 1MB)', 'each level start (1MB: once)'),
-    'FID_ENEMYBOBS': ('the 21 enemy BOB sets', '`LoadLevel` (`CacheGraphics` with 1MB)', 'each level start (1MB: once)'),
+    'FID_ENEMYBOBS': ('the 21 enemy BOB sets', '`LoadEnemySets`: the level\'s sets only (`CacheGraphics` with 1MB: all)', 'each level start (1MB: once)'),
     'FID_ITEMS2': ('weapon / effect BOBs, the tail of the item block', '`Start`', 'start-up'),
     'FID_ESHOTS': ('enemy shot BOBs', '`Start`', 'start-up'),
     'FID_ITEMS': ('weapon / pickup / effect BOBs', '`Start`', 'start-up'),
@@ -122,8 +122,10 @@ and the file id; `build_game.py` checks every record's length against its file.
 |---|---|---|---|---:|---|---|---|
 """ + '\n'.join(rows) + f"""
 
-The formats of the files are in `FORMATS.md`. With the file cache (expanded machines) and the
-level's enemy sets only, `LoadFile` reads less of them; see `FEATURES.md`.
+The formats of the files are in `FORMATS.md`. A level start reads only its own sets from the
+enemy graphics file (`LoadEnemySets`: pieces of the file, `LoadOffset`), and on an expanded
+machine the files read again and again come from the file cache after their first load
+(`FEATURES.md`, *Loading*).
 
 **Reading the disk.** The bootblock and the game both read files with the
 [4489_byteloader](https://github.com/MarkyTurtle/4489_byteloader) (`src/byteloader.i`): a file is
@@ -257,10 +259,13 @@ from the upper chip RAM caches.
 
 """ + '\n'.join(table(upper)) + f"""
 
-From {h(S['VIEWER_ORG'] + S['VIEWER_LEN'])} to the end of chip RAM: not used (`$100000` on a
-1MB A500+ / A600; Kickstart 1.3 keeps the top of a 1MB machine's chip RAM and lists it as ending
-at `$FE800`; `$200000` on an A1200). With 1MB of chip RAM the sound package area at `MUSIC_FILE`
-in the first 512K is not used either.
+From {h(S['VIEWER_ORG'] + S['VIEWER_LEN'])} to the end of chip RAM (`$100000` on a 1MB A500+ / A600;
+Kickstart 1.3 keeps the top of a 1MB machine's chip RAM and lists it as ending at `$FE800`;
+`$200000` on an A1200): the **file cache** (`CacheInit`), unless a slow or fast RAM region is
+larger - then the cache is there: the levels' tile and table files, kept after their first load
+while there is room ({kb(0x100000 - S['VIEWER_ORG'] - S['VIEWER_LEN'])} bytes on a 1MB
+machine: the first levels played of the 220 KB). With 1MB of chip RAM the sound package area at
+`MUSIC_FILE` in the first 512K is not used.
 
 ## Expansion memory: the program moved (512K chip + slow / fast RAM)
 
@@ -272,7 +277,11 @@ the copy and starts again there. Only the CPU reads the program, so the memory m
 from `MAP_LOW`, above) stays in chip RAM where it is. The chip RAM from `$80` then holds the 1MB
 sound package (`MUSICB_FILE`), whose own addresses are moved too.
 
-| Machine | Program copy | Its end | Relocations end | Region end | Free after it |
+The rest of the region is the **file cache** (`CacheInit`, `CachePtr`-`CacheEnd`): the enemy
+graphics file, the small BOBs, the progress map and every level's tile and table files (341 KB
+in all) are kept after their first load, and later loads copy them from there.
+
+| Machine | Program copy | Its end | Relocations end | Region end | Free after it (the cache) |
 |---|---|---|---|---|---:|
 """ + '\n'.join(moved) + """
 

@@ -49,7 +49,8 @@ HEADER = """; Ghosts'n Goblins (Elite, 1990, v3) - main program, ONE PROGRAM FOR
 ; BOB masks, playfield text and the title menu (scroller.s, scroll.s, included below); per-level
 ; map tables (LoadLevelTables); the program's move to expansion memory (EnhRelocate); the
 ; AmigaDOS-format disk read with the 4489_byteloader (LoadFile; IrqLevel1 / IrqLevel3 give the
-; interrupt handlers their a6); two-button joysticks (ArthurReadUpDown, the vertical blank's
+; interrupt handlers their a6), the level's enemy sets only (LoadEnemySets) and the file cache on
+; expanded machines (CacheInit, LoadFile); two-button joysticks (ArthurReadUpDown, the vertical blank's
 ; joystick read). The routines the scroller replaced keep their labels and jump into it. The
 ; memory map is in gng_game.i and enhanced/docs/MEMORY.md.
 ;
@@ -428,6 +429,22 @@ def title_menu(S):
           "        addq.b  #GS_TITLE,g_GameState(a6)       ; 05F24/05F7A\n")
 
 
+def enemy_sets(S):
+    """LoadLevel reads only the level's BOB sets from the enemy graphics file (LoadEnemySets,
+    make_game_support.s); BobSetFileOrder lists the sets by their offset in the file"""
+    S.sub("""        lea.l   FileEnemyBobs(pc),a1            ; 0683A/     
+        bsr.w   LoadFile                        ; 0683E/     
+""", I('jsr     LoadEnemySets', 'only the level\'s sets of the enemy graphics file (0683A: all of it)') + '\n')
+    def table(label, n, size):
+        m = re.search(label + r':\n((?:\tdc\.b\t[^\n]*\n)+)', S.s)
+        b = bytes(int(x, 16) for x in re.findall(r'\$([0-9A-F]{2})', m.group(1)))
+        return [int.from_bytes(b[size*i:size*i+size], 'big') for i in range(n)]
+    offs, sizes = table('BobSetOffsets', 21, 4), table('BobSetSizes', 21, 2)
+    order = sorted((i for i in range(21) if sizes[i]), key=lambda i: offs[i])
+    for a, b in zip(order, order[1:]): assert offs[a] + sizes[a] <= offs[b], (a, b)    # no overlaps
+    S.sub(";<<BOBSET_ORDER>>\n", '\tdc.b\t' + ','.join(f'{i}' for i in order) + ',$FF\t; the sets by their offset in the file\n')
+
+
 NOTES = {   # headers for routines the original's annotations left without one
     'StartGame': 'StartGame - CheckGameStart, after the players\' blocks are set: the HUD cleared, PLAYER 1 (and\n; PLAYER 2) and their scores, TOP SCORE, then on to the level (sub state 0: LoadLevel)',
     'DrawCopyright': 'DrawCopyright - the copyright and licence lines at the foot of the title and high-score\n; screens (rows $D0-$F8)',
@@ -524,7 +541,8 @@ def drop_dead_code(S):
 
 def main():
     """gng_main.s -> src/gng_game.s: the first pass, the hand edits, the loading changes, the
-    byteloader, the title menu, the two-button joystick, the dead code removed, then branches
+    byteloader, the title menu, the two-button joystick, the level's enemy sets only and the
+    file cache, the routine headers, the dead code removed, then branches
     out of reach widened (checked by assembling)"""
     src = open(os.path.join(ROOT, 'gng_main.s')).read()
     V1 = view(src.split('\n'), True)
@@ -573,6 +591,10 @@ def main():
           "        movea.l (MfmBuf).l,a3                   ; 0C580/0C4B4\n        addq.l  #$2,a3")
     byteloader(S)
     two_buttons(S)
+    enemy_sets(S)
+    S.sub("        bsr.w   ReadProfile                     ; what machine this is (Profile)\n",
+          "        bsr.w   ReadProfile                     ; what machine this is (Profile)\n"
+          + I('jsr     CacheInit', "the file cache's memory, if any (make_game_support.s)") + '\n')
     routine_notes(S)
     dead = drop_dead_code(S)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')

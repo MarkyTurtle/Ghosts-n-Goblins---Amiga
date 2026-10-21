@@ -7,7 +7,10 @@
 ;   ReadProfile       the machine (Profile) from the bootblock's description
 ;   LoadSound         the sound package for the machine
 ;   LoadLevelTables   a level's map tables file
-;   LoadFile          a file by its id, with the 4489_byteloader (FileDir: the disk's file table)
+;   LoadEnemySets     only the level's sets of the enemy graphics file (LoadOffset)
+;   CacheInit         the file cache's memory on an expanded machine
+;   LoadFile          a file by its id: from the file cache, or from the disk (LoadDisk, with the
+;                     4489_byteloader; FileDir: the disk's file table)
 ;   IrqLevel1 / 3     the interrupt entries that give the handlers their a6
 ;   EnhRelocate       the program's move to expansion memory (ApplyRelocs)
 ;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx),
@@ -111,15 +114,172 @@ MfmBuf:
         dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
 
 ;---------------------------------------------------------------------------
+; The file cache. On a machine with memory to spare, the files the game loads again and
+; again are kept after their first load, and later loads copy them from there instead of
+; reading the disk:
+;  * the program moved to slow / fast RAM (512K of chip RAM): the rest of that region, after
+;    the program and its relocation file: the enemy graphics (all of it, the first time a
+;    level needs any of it; LoadEnemySets then copies the level's sets), the small BOBs, the
+;    progress map, the levels' tile and table files;
+;  * 1MB of chip RAM or more (PF_CACHE: the graphics are cached already): the largest of the
+;    chip RAM above the upper chip RAM caches and the BOB viewer (VIEWER_ORG + VIEWER_LEN) and
+;    the slow and fast RAM regions, which nothing else uses then: the levels' tile and table
+;    files.
+; Files are kept first come, first served, as long as there is room (they never change).
+; CacheInit (Start, after ReadProfile) finds the memory; nothing is kept without a machine
+; description or on a plain 512K machine.
+;---------------------------------------------------------------------------
+CACHE_MOVED     equ     (1<<FID_SMALLBOBS)|(1<<FID_ENEMYBOBS)|(1<<FID_PROGMAP)|($7F<<FID_LEVEL0)|($7F<<FID_TABLES0)
+CACHE_CHIP      equ     ($7F<<FID_LEVEL0)|($7F<<FID_TABLES0)
+
+CacheInit:
+        movem.l d0-d6/a0-a1,-(a7)
+        clr.l   (CacheEnd).l
+        lea.l   (MACHINE_INFO).l,a0
+        cmpi.l  #'GNGM',MI_MAGIC(a0)
+        bne.b   .out
+        tst.b   (RelocDone).l
+        beq.b   .chip
+        move.l  (RelocBase).l,d0                ; moved: the copy's base ...
+        movem.l 24(a0),d1-d2                    ; ... in the fast RAM region, else the slow one
+        cmp.l   d1,d0
+        bcs.b   .slow
+        cmp.l   d2,d0
+        bcs.b   .region
+.slow:  move.l  20(a0),d2
+.region:
+        add.l   #RELOC_ROOM+3,d0                ; after the program and its relocation file
+        and.w   #-4,d0
+        move.l  #CACHE_MOVED,d3
+        bra.b   .set
+.chip:  btst    #PF_CACHE,(Profile).l
+        beq.b   .out
+        move.l  #VIEWER_ORG+VIEWER_LEN,d0       ; chip RAM above the upper caches and the viewer ...
+        move.l  MI_CHIP_UPPER(a0),d2
+        movem.l 16(a0),d1/d4                    ; ... or slow RAM ...
+        bsr.b   .bigger
+        movem.l 24(a0),d1/d4                    ; ... or fast RAM: the largest
+        bsr.b   .bigger
+        addq.l  #3,d0
+        and.w   #-4,d0
+        move.l  #CACHE_CHIP,d3
+.set:   cmp.l   d0,d2
+        bls.b   .out
+        move.l  d0,(CachePtr).l
+        move.l  d2,(CacheEnd).l
+        move.l  d3,(CacheMask).l
+.out:   movem.l (a7)+,d0-d6/a0-a1
+        rts
+.bigger:                                        ; d1-d4 a region (upper 0: none): if larger than d0-d2, it
+        tst.l   d4
+        beq.b   .keep
+        move.l  d4,d5
+        sub.l   d1,d5
+        move.l  d2,d6
+        sub.l   d0,d6
+        cmp.l   d6,d5
+        bls.b   .keep
+        move.l  d1,d0
+        move.l  d4,d2
+.keep:  rts
+
+;---------------------------------------------------------------------------
 ; LoadFile - a1 -> file record (FENTRY: dest.l, length.l, file id.w) -> a5 = the end of the
 ; loaded data, a0 = CUSTOM (as the original's track loader left them); other registers kept.
+; LoadOffset: start this far into the file (LoadEnemySets). A file in the cache (CacheTable)
+; is copied from there; a file the cache keeps (CacheMask) is loaded whole into the cache the
+; first time, if there is room, then copied; otherwise it is read from the disk (LoadDisk).
+;---------------------------------------------------------------------------
+LoadFile:
+        movem.l d0-d7/a1-a4/a6,-(a7)
+        tst.l   (CacheEnd).l
+        beq.b   lf_disk
+        moveq   #0,d4
+        move.w  8(a1),d4                        ; file id
+        move.l  (CacheMask).l,d0
+        btst    d4,d0
+        beq.b   lf_disk
+        lea.l   (CacheTable).l,a2
+        move.w  d4,d1
+        lsl.w   #2,d1
+        move.l  (a2,d1.w),d2                    ; in the cache?
+        bne.b   lf_copy
+        lea.l   (FileDir).l,a3                  ; no: the whole file, if there is room
+        cmpi.l  #'GNGF',(a3)
+        bne.b   lf_disk
+        move.w  d4,d0
+        lsl.w   #3,d0
+        move.l  FT_ENTRY+4(a3,d0.w),d3          ; its length
+        move.l  (CachePtr).l,d2
+        move.l  d3,d0
+        addq.l  #3,d0
+        and.w   #-4,d0
+        add.l   d2,d0
+        cmp.l   (CacheEnd).l,d0
+        bhi.b   lf_disk
+        move.l  d0,(CachePtr).l
+        move.l  d2,(a2,d1.w)
+        move.l  (LoadOffset).l,-(a7)
+        clr.l   (LoadOffset).l
+        movem.l d2/a1,-(a7)
+        lea.l   (CacheRec).l,a1
+        move.l  d2,(a1)
+        move.l  d3,4(a1)
+        move.w  d4,8(a1)
+        bsr.w   LoadDisk
+        movem.l (a7)+,d2/a1
+        move.l  (a7)+,(LoadOffset).l
+lf_copy:                                        ; d2 = the file in the cache
+        movea.l d2,a0
+        adda.l  (LoadOffset).l,a0
+        movea.l (a1),a5                         ; destination
+        move.l  4(a1),d5                        ; length
+        move.l  a0,d0
+        move.l  a5,d1
+        or.l    d1,d0
+        btst    #0,d0
+        bne.b   lf_bytes
+        move.l  d5,d0
+        lsr.l   #2,d0
+        bra.b   lf_lnext
+lf_long:
+        move.l  (a0)+,(a5)+
+lf_lnext:
+        subq.l  #1,d0
+        bcc.b   lf_long
+        moveq   #3,d0
+        and.l   d5,d0
+        bra.b   lf_bnext
+lf_bytes:
+        move.l  d5,d0
+        bra.b   lf_bnext
+lf_byte:
+        move.b  (a0)+,(a5)+
+lf_bnext:
+        subq.l  #1,d0
+        bcc.b   lf_byte
+        lea.l   CUSTOM,a0
+        movem.l (a7)+,d0-d7/a1-a4/a6
+        rts
+lf_disk:
+        movem.l (a7)+,d0-d7/a1-a4/a6
+        bra.w   LoadDisk
+CachePtr:       dc.l    0               ; the cache's free memory: from here ...
+CacheEnd:       dc.l    0               ; ... to here (0: no cache)
+CacheMask:      dc.l    0               ; the file ids it keeps
+CacheTable:     dcb.l   FID_COUNT,0     ; where each file is kept (0: not)
+CacheRec:       dc.l    0,0             ; a file record for loading a whole file into the cache
+                dc.w    0
+
+;---------------------------------------------------------------------------
+; LoadDisk - LoadFile from the disk.
 ; The disk is an ordinary AmigaDOS-format disk (11 sectors a track) with a file table at
 ; FT_OFFSET (boot_4489.s; build_game.py writes it): read once into FileDir, then each file is
 ; loaded from its offset by the 4489_byteloader (ByteLoader), the exact number of bytes. A
 ; failed load is tried again until it works (after 8 failures COLOR00 shows red).
 ; The byteloader uses a6, so the interrupt handlers load a6 themselves (IrqLevel1/3).
 ;---------------------------------------------------------------------------
-LoadFile:
+LoadDisk:
         movem.l d0-d7/a1-a4/a6,-(a7)
         movea.l (a1),a5                         ; destination
         move.l  4(a1),d5                        ; length
@@ -139,6 +299,7 @@ lf_dir:
         lea.l   (FileDir).l,a2                  ; (the byteloader keeps no registers)
         lsl.w   #$3,d4
         move.l  FT_ENTRY(a2,d4.w),d0            ; the file's offset on the disk
+        add.l   (LoadOffset).l,d0               ; (from this far into the file: LoadEnemySets)
         move.l  d5,d1
         movea.l a5,a0
         movem.l d5/a5,-(a7)
@@ -168,6 +329,75 @@ lf_ok:
         rts
 FileDir:
         dcb.b   FT_SIZE,0                       ; the disk's file table (LoadFile)
+LoadOffset:
+        dc.l    0                               ; LoadFile: where in the file to start (normally 0)
+
+;---------------------------------------------------------------------------
+; LoadEnemySets - LoadLevel (no PF_CACHE): the level's BOB sets (LevelBobSetMask) from the
+; enemy graphics file, each to its place in SCREEN_0 as the whole file would put it, without
+; the sets the level does not use: the whole file is 118,850 bytes, a level's sets 22-65 KB.
+; Sets less than a track (5,632 bytes) apart in the file load as one piece, the gap with them
+; (into its place: nothing else is there), as the disk reads whole tracks anyway
+; (BobSetFileOrder: the sets by their offset in the file, made by make_game.py).
+;---------------------------------------------------------------------------
+LoadEnemySets:
+        movem.l d0-d7/a0-a5,-(a7)
+        move.w  g_Level(a6),d0
+        lsl.w   #2,d0
+        lea.l   (LevelBobSetMask).l,a0
+        move.l  (a0,d0.w),d6                    ; the level's sets
+        lea.l   (BobSetFileOrder).l,a2
+        lea.l   (BobSetOffsets).l,a3
+        lea.l   (BobSetSizes).l,a4
+        moveq   #0,d2                           ; the piece: its offset in the file,
+        moveq   #0,d3                           ; its length (0: none yet)
+.next:  moveq   #0,d7
+        move.b  (a2)+,d7                        ; the next set in the file ($FF: the end)
+        bmi.b   .last
+        btst    d7,d6
+        beq.b   .next
+        move.w  d7,d0
+        add.w   d0,d0
+        moveq   #0,d1
+        move.w  (a4,d0.w),d1                    ; its size
+        beq.b   .next
+        add.w   d0,d0
+        move.l  (a3,d0.w),d0                    ; its offset
+        tst.l   d3
+        beq.b   .start
+        move.l  d0,d4
+        sub.l   d2,d4
+        sub.l   d3,d4                           ; the gap after the piece
+        cmp.l   #11*512,d4                      ; under a track: the piece grows to take it in
+        bcc.b   .flush
+        add.l   d4,d3
+        add.l   d1,d3
+        bra.b   .next
+.flush: bsr.b   .load
+.start: move.l  d0,d2
+        move.l  d1,d3
+        bra.b   .next
+.last:  tst.l   d3
+        beq.b   .done
+        bsr.b   .load
+.done:  movem.l (a7)+,d0-d7/a0-a5
+        rts
+.load:  movem.l d0-d1/a0-a2,-(a7)               ; the piece d2, d3 to SCREEN_0 + d2
+        lea.l   (EnemyPiece).l,a1
+        move.l  #SCREEN_0,(a1)
+        add.l   d2,(a1)
+        move.l  d3,4(a1)
+        move.l  d2,(LoadOffset).l
+        jsr     (LoadFile).l
+        clr.l   (LoadOffset).l
+        movem.l (a7)+,d0-d1/a0-a2
+        rts
+EnemyPiece:
+        dc.l    0,0                             ; a file record for a piece (destination, length)
+        dc.w    FID_ENEMYBOBS
+BobSetFileOrder:
+;<<BOBSET_ORDER>>
+        even
 ByteLoader:
 	include	"byteloader.i"
         even
@@ -262,6 +492,10 @@ er_copy:
         add.l   #RelocDone-IMAGE_BASE,d0
         movea.l d0,a0
         st.b    (a0)
+        move.l  d6,d0                           ; and where it is (CacheInit)
+        add.l   #RelocBase-IMAGE_BASE,d0
+        movea.l d0,a0
+        move.l  d6,(a0)
         addq.l  #4,a7                           ; (Start called this)
         add.l   #Start-IMAGE_BASE,d6
         movea.l d6,a0
@@ -300,6 +534,8 @@ ar_next:
 ar_done:
         rts
 
+RelocBase:
+        dc.l    0                               ; the moved copy's base (EnhRelocate)
 RelocDone:
         dc.b    0                               ; this is the copy (EnhRelocate)
         even

@@ -191,4 +191,6 @@ decides the profile from it. `tools/test_bootinfo.py` checks it on seven machine
 ### File record (`FENTRY`, in the program)
 
 dest.l (load address), length.l, file id.w - 10 bytes. `LoadFile` takes `a1` = a record and
-returns `a5` = the end of the loaded data and `a0` = `CUSTOM`, keeping the other registers.
+returns `a5` = the end of the loaded data and `a0` = `CUSTOM`, keeping the other registers. It
+starts `LoadOffset` bytes into the file (normally 0; `LoadEnemySets` reads pieces of the enemy
+graphics file this way).

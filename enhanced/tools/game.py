@@ -137,7 +137,8 @@ class GameRun(Amiga):
         def hook(uc, a, sz, ud):
             a1 = self.reg('a1')
             dest, length, track = self.r32(a1), self.r32(a1+4), self.r16(a1+8)
-            data = open(names[track], 'rb').read()[:length]
+            off = self.r32(self.L['LoadOffset']) if 'LoadOffset' in self.L else 0   # (a piece of a file)
+            data = open(names[track], 'rb').read()[off:off + length]
             if OVERRUN and 'MfmBuf' in self.L:          # the MFM buffer the disk DMA fills ($1900 words)
                 self.u.mem_write(self.r32(self.L['MfmBuf']), b'\xEE' * (0x2EC0 if self.by_id else 0x3200))
             self.u.mem_write(dest, data)
