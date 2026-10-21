@@ -1,5 +1,15 @@
 # Ghosts'n Goblins (Elite, 1990, v3) – annotated disassembly
 
+> **Looking for the enhanced version?** An enhanced version of the game - smooth 50 fps
+> scrolling, music on every Amiga including a plain 512K A500, a standard AmigaDOS disk that
+> boots from any drive, two-button joysticks, a title menu with sound, input, sprite and BOB
+> tests, and one program that makes the most of whatever memory the machine has - is on the
+> **[`enhanced/main`](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/tree/enhanced/main)** branch. Start with its
+> [feature list](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/blob/enhanced/main/enhanced/docs/FEATURES.md).
+>
+> This branch, `main`, is the original game: an annotated disassembly that reassembles
+> byte-identical to the original disk.
+
 | File | What it is |
 |---|---|
 | `gng_main.s` | Main program, **both builds** from one source: the 512K build (tracks 110-125, runs at `$80`) and, with `-DBUILD_1MB=1`, the expanded-memory (1MB) build (tracks 17-32, position independent, assembled at org 0). ~26,000 lines; the ~190 places where the builds differ are `ifd BUILD_1MB` / `else` blocks |
@@ -11,7 +21,7 @@
 | `sound/` | Sound driver and music/sfx data: annotated sources, samples, renders (`sound/SOUND.md`) |
 | `render/` | Scripts that render levels, enemy BOBs and Arthur's sprites from the disk data; output in `render/out/`, including `worldmap_cells.png` (the whole world map with every cell number) |
 | `disk/` | **Every file loaded from the disk** (`disk/files/`), the file table (`disk/FILES.md`) and a track-by-track disk map (`disk/DISKMAP.md`). `tools/disk/mkdisk.py` builds a playable disk image from them (see *Making a disk image*) |
-| `docs/` | `HOW_IT_WORKS.md` (a guided tour with diagrams: interrupts, the state machine, a frame, objects, spawning, drawing, level data), `GLOBALS.md` (every global, the memory map, object slot and per-type fields), `XREF.md` (which routines use each global, routine and table), `SPAWNS.md` (every level's spawn zones and scripts, decoded), `TODO.md` (planned enhancements as first written: a shared file directory and own loader, automatic disk layout, corkscrew scrolling with a pristine buffer, zx0 / per-level files / caching / music on 512K, further space savings, emulator tests; the current list is on `enhanced/scroll`, see *Branches*), sprite/BOB flipping spreadsheet |
+| `docs/` | `HOW_IT_WORKS.md` (a guided tour with diagrams: interrupts, the state machine, a frame, objects, spawning, drawing, level data), `GLOBALS.md` (every global, the memory map, object slot and per-type fields), `XREF.md` (which routines use each global, routine and table), `SPAWNS.md` (every level's spawn zones and scripts, decoded), `TODO.md` (planned enhancements as first written: a shared file directory and own loader, automatic disk layout, corkscrew scrolling with a pristine buffer, zx0 / per-level files / caching / music on 512K, further space savings, emulator tests; the current list is on `enhanced/main`, see *Branches*), sprite/BOB flipping spreadsheet |
 | `bin/tracks/` | All 131 decoded tracks (6,312 bytes each) used by the render scripts |
 | `bin/main_1mb.bin` | The expanded-memory build (tracks 17-32) |
 
@@ -30,7 +40,7 @@ vasmm68k_mot -Fbin -m68000 -no-opt -o boot.bin gng_boot.s                     ; 
 | Branch | What it holds |
 |---|---|
 | `main` | **The original game**: this annotated disassembly, which reassembles byte-identical to the original disk (above). Nothing here changes the game. |
-| `enhanced/scroll` | **The enhanced game** - the main enhancement branch, with every feature below merged in. Built from `main` (merged into it as `main` moved on); its own documentation is `enhanced/docs/SCROLLER.md`, and its `docs/TODO.md` is the up-to-date list of what is done and what is left. |
+| `enhanced/main` | **The enhanced game** - the main enhancement branch, with every feature below merged in. Built from `main` (merged into it as `main` moved on); its own documentation starts at `enhanced/docs/FEATURES.md` (the development log is `enhanced/docs/SCROLLER.md`), and its `docs/TODO.md` is the up-to-date list of what is done and what is left. |
 
 **What the enhanced game is** (`enhanced/src/gng_game.s`, made from `gng_main.s` by
 `enhanced/tools/make_game.py`; `enhanced/tools/build_game.py` builds `enhanced/build/gng_game.adf`):
@@ -64,23 +74,23 @@ machine), by the bootblock's and the features' own tests, and in WinUAE (A500, A
 A500+, A600, A1200).
 
 **The feature branches.** Each feature was made on a branch of its own, tried in WinUAE and then
-merged into `enhanced/scroll`. They are all fully merged and kept for the record; each holds
-`enhanced/scroll` as it was when that feature was finished:
+merged into `enhanced/main`. They are all fully merged and kept for the record; each holds
+`enhanced/main` as it was when that feature was finished:
 
 | Branch | Feature | Made from |
 |---|---|---|
-| `enhanced/byteloader` | the AmigaDOS-format disk and the 4489_byteloader (bootblock and game); the progress map's tune started when the map appears | `enhanced/scroll` |
+| `enhanced/byteloader` | the AmigaDOS-format disk and the 4489_byteloader (bootblock and game); the progress map's tune started when the map appears | `enhanced/main` |
 | `enhanced/music512` | music on a plain 512K A500: the combined package `sound/gng_music_512k.s` | `enhanced/byteloader` |
-| `enhanced/joystick` | two-button joysticks | `enhanced/scroll` (with the two above merged) |
+| `enhanced/joystick` | two-button joysticks | `enhanced/main` (with the two above merged) |
 | `enhanced/titlemenu` | the title menu and its test page | `enhanced/joystick` |
-| `enhanced/musicquality` | the 512K music package at 3/4 of the tunes' sample rate (`build_game.py --music-rate` for others) | `enhanced/scroll` (with the above merged) |
-| `enhanced/testmenu` | the test page's sound, input and sprite tests, and the BOB viewer (1MB of chip RAM or more) | `enhanced/scroll` (with the above merged) |
-| `enhanced/memory` | loading less: only the level's enemy sets, and a file cache in expansion memory (each file read from the disk once) | `enhanced/scroll` (with `enhanced/musicquality` merged) |
-| `enhanced/display` | clean changes of display between a level and the progress map; the loading picture kept whole on 1MB machines | `enhanced/scroll` (with the above merged) |
-| `enhanced/bootdrive` | boot from any drive (Kickstart 2.0 and later): every load reads the drive booted from | `enhanced/scroll` (with the above merged) |
+| `enhanced/musicquality` | the 512K music package at 3/4 of the tunes' sample rate (`build_game.py --music-rate` for others) | `enhanced/main` (with the above merged) |
+| `enhanced/testmenu` | the test page's sound, input and sprite tests, and the BOB viewer (1MB of chip RAM or more) | `enhanced/main` (with the above merged) |
+| `enhanced/memory` | loading less: only the level's enemy sets, and a file cache in expansion memory (each file read from the disk once) | `enhanced/main` (with `enhanced/musicquality` merged) |
+| `enhanced/display` | clean changes of display between a level and the progress map; the loading picture kept whole on 1MB machines | `enhanced/main` (with the above merged) |
+| `enhanced/bootdrive` | boot from any drive (Kickstart 2.0 and later): every load reads the drive booted from | `enhanced/main` (with the above merged) |
 
-New features go on a new branch from `enhanced/scroll` in the same way. The `docs/TODO.md` on
-`main` is the plan as it stood before the enhanced work; see the one on `enhanced/scroll`.
+New features go on a new branch from `enhanced/main` in the same way. (It was called `enhanced/scroll`, after the scroller the work started with, until it was renamed `enhanced/main` in October 2026.) The `docs/TODO.md` on
+`main` is the plan as it stood before the enhanced work; see the one on `enhanced/main`.
 
 ## Disk contents (see `disk/FILES.md` and `disk/DISKMAP.md`)
 

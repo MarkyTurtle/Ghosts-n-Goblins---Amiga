@@ -4,7 +4,7 @@ Ideas and planned work for an enhanced build, roughly in the order they build on
 enhanced build lives in a separate source tree; the byte-identical sources here stay as they are.
 
 **This is the plan as it stood before the enhanced work.** It was carried out on the
-`enhanced/scroll` branch, whose `docs/TODO.md` is the up-to-date list (every item there is now
+`enhanced/main` branch, whose `docs/TODO.md` is the up-to-date list (every item there is now
 done or closed); the unticked items here are left as they were.
 
 ## Summary of every optimisation discussed
@@ -22,7 +22,7 @@ Each line points to the item below with the details and measurements.
 **Display and drawing**
 - [ ] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
       redraw only the new edge instead of the whole screen; no freezes when falling (3).
-      Background part prototyped and tested on branch `enhanced/scroll` (interleaved, 141 KB)
+      Background part prototyped and tested on branch `enhanced/main` (interleaved, 141 KB)
 - [ ] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
 - [ ] BOB masks: one-plane masks (+20%, stored or built on demand into a small cache) on 512K;
       fully pre-masked graphics for one-blit BOBs on 1MB (3)
@@ -112,7 +112,7 @@ would be opt-in.
 **Goal:** replace the full-redraw scrolling with incremental scrolling, to cut memory use and,
 more importantly, the scrolling cost.
 
-**Prototype (branch `enhanced/scroll`, `enhanced/docs/SCROLLER.md`).** The background part works:
+**Prototype (branch `enhanced/main`, `enhanced/docs/SCROLLER.md`).** The background part works:
 a module that draws one tile column / row at a time, with a vertical ring and copper wrap,
 matches the original display at every camera position tested (560 frames, all levels), in an
 emulator harness that adds blitter, copper and display emulation. What it showed:
