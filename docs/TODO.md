@@ -3,6 +3,10 @@
 Ideas and planned work for an enhanced build, roughly in the order they build on each other. The
 enhanced build lives in a separate source tree; the byte-identical sources here stay as they are.
 
+**Status (October 2026): every item is done or closed.** The summary list below is the record;
+the numbered sections after it are the plans and measurements as they were made, kept for
+reference (their remarks about what was still open are answered in the summary).
+
 ## Summary of every optimisation discussed
 
 Each line points to the item below with the details and measurements. **Closed:** an item
@@ -30,7 +34,8 @@ decided against, kept for the record with the reason.
 - [x] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
       redraw only the new edge instead of the whole screen; no freezes when falling (3).
       Integrated into both programs (512K and 1MB) on branch `enhanced/scroll`, with a disk image;
-      tested in the emulator side by side with the originals. Still to do: real-machine timing (WinUAE)
+      tested in the emulator side by side with the originals, and in WinUAE (A500, A500 + 512K,
+      A500+, A600, A1200)
 - [x] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
 - [x] Clean changes of display between a level and the progress map (bitplanes off while the
       screens are rebuilt, switched in the vertical blank), and the loading picture no longer
@@ -190,7 +195,9 @@ moved, resized or added by rebuilding the directory alone, without reassembling 
 * **Verification:** both builds must boot and load every level in an emulator (see 6), and the
   original layout must still be reproducible as a regression check.
 
-**Open questions**
+**Open questions** (answered since: the file table is read from the disk into the program's own
+`FileDir`; `main` keeps the byte-identical sources and the enhanced game is a separate tree,
+`enhanced/src/gng_game.s`, made from them by `make_game.py`)
 
 * Fixed address for the directory in both builds (chip RAM, not overwritten by screens / caches).
 * Whether to keep byte-identical original sources alongside a modified "mod" build (e.g. an
@@ -471,7 +478,8 @@ Plus about 9 KB of note data and instruments for every tier that has music. Note
 * Each tier can be rendered to WAV with the real driver (`sound/tools/sndemu.py`) and compared by
   ear before it is used.
 
-### Still to measure
+### Still to measure (closed: zx0 was not used, and the screens' saving was measured once the
+scroller was in: `enhanced/docs/MEMORY.md`)
 
 * The `$18B00-$1A118` work areas, the corkscrew slack and the vertical margin, so the screen saving
   is exact.
@@ -585,8 +593,8 @@ room for full-quality effects or a larger frame cache.
 ## 6. Boot and timing tests in a full emulator
 
 * Boot `gng.adf` from `mkdisk.py` in WinUAE / FS-UAE (512K and 1MB configurations) to confirm the
-  extended ADF loads, including track 0 stored as an AmigaDOS track. Not yet tested: no Kickstart
-  ROM is available in the build environment.
+  extended ADF loads, including track 0 stored as an AmigaDOS track. (Since done for the enhanced
+  disk: it boots and plays in WinUAE on an A500, A500 + 512K, A500+, A600 and A1200.)
 * Measure the documented timing behaviour: 25 fps drawing, redraw cost, and the short freezes
   while falling (`g_SkipLogic`).
 
@@ -612,7 +620,7 @@ on `main` now assembles both programs: 21,580 lines of code shared, about 640 51
 
 * **Bootblock: describe the machine.** *Done on `enhanced/scroll`: `enhanced/src/boot_patches.s`
   leaves a 32-byte description at `$7FB00` (layout in `enhanced/docs/SCROLLER.md`), the title
-  screen shows it; tested on six fake memory lists, not yet on real Kickstarts.* Kickstart is still running when the bootblock starts, so
+  screen shows it; tested on six fake memory lists, and since in WinUAE.* Kickstart is still running when the bootblock starts, so
   instead of guessing it can walk exec's memory list (`ExecBase->MemList`: each MemHeader gives
   the type - chip, fast; slow RAM at `$C00000` shows up as fast without DMA - its start and end).
   It writes a small block - say `'GNGM'`, version, chip size, then up to 4 (start, size, type)
@@ -643,8 +651,8 @@ on `main` now assembles both programs: 21,580 lines of code shared, about 640 51
 * **Order:** *One source for both builds: done (on `main`, `tools/merge_src.py`; both programs
   byte-identical). One program for every machine: done on `enhanced/scroll` without the
   scroller (`enhanced/src/gng_game.s`, profiles from the machine description; tested against
-  both originals; see `enhanced/docs/SCROLLER.md`, One program for every machine). Not yet:
-  slow/fast RAM used (a 512K chip + slow machine runs the 512K profile).* Next the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), into
+  both originals; see `enhanced/docs/SCROLLER.md`, One program for every machine). Slow / fast
+  RAM since used too: the program moves there, and the file cache.* Next the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), into
   both builds of the one source; then this item turns the `ifd BUILD_1MB` blocks into run-time
   choices. The blocks give the complete list of places to merge.
 * **Testing:** `enhanced/tools/compare_runs.py` already runs both originals side by side with the
@@ -656,7 +664,7 @@ on `main` now assembles both programs: 21,580 lines of code shared, about 640 51
 **Two-button joysticks** (done; `enhanced/docs/SCROLLER.md`, *Two-button joysticks*). The
 second button is read from `POTINP` bit 14 (port 2's pin 9, set as an output driven high by
 `POTGO`). Fire stays on the first button; jump on the second, or on up (the default, as the
-original), switched with J on the title for now and in the options menu later. With jump on the
+original), switched on the title menu (`INPUT`) or with J. With jump on the
 button, up only climbs ladders. (A CD32 pad's extra buttons need its serial read-out: not done.)
 
 **Options menu** (done as the title menu: `enhanced/docs/SCROLLER.md`, *The title menu*). The
