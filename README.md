@@ -49,6 +49,9 @@ vasmm68k_mot -Fbin -m68000 -no-opt -o boot.bin gng_boot.s                     ; 
 * **Two-button joysticks** (jump on the second button, or on up as the original).
 * **A title menu** (1 or 2 players, the input setting, and a test page with the memory found
   and the cheat) instead of the original's instructions.
+* **Test page tests**: a sound test (every tune and effect), an arcade-style input test, a
+  sprite test (Arthur's frames and mirrored copies) and, with 1MB of chip RAM or more, a BOB
+  viewer of every cached BOB strip.
 * Memory freed for all this: per-level map tables, joined gaps, the old background save areas
   and dead code removed. An original bug fixed (`MapTileAt` reading the program's code as map
   cells for an object far below a level).
@@ -69,6 +72,7 @@ merged into `enhanced/scroll`. They are all fully merged and kept for the record
 | `enhanced/joystick` | two-button joysticks | `enhanced/scroll` (with the two above merged) |
 | `enhanced/titlemenu` | the title menu and its test page | `enhanced/joystick` |
 | `enhanced/musicquality` | the 512K music package at 3/4 of the tunes' sample rate (`build_game.py --music-rate` for others) | `enhanced/scroll` (with the above merged) |
+| `enhanced/testmenu` | the test page's sound, input and sprite tests, and the BOB viewer (1MB of chip RAM or more) | `enhanced/scroll` (with the above merged) |
 
 New features go on a new branch from `enhanced/scroll` in the same way. The `docs/TODO.md` on
 `main` is the plan as it stood before the enhanced work; see the one on `enhanced/scroll`.
