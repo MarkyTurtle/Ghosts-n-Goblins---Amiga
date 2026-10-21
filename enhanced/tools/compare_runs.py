@@ -4,7 +4,7 @@ and compare what they show, frame by frame (the whole display, HUD included).
 In the emulator a background redraw always finishes at once, so the original camera almost
 always reaches its target just as the enhanced one does, and the two games stay in step:
 same logic, same pictures. A difference in the picture while the game state is still the same
-is a drawing difference. The reference has the DrawBob top-clip bug fixed (see test_bobs.py),
+is a drawing difference. The reference has the DrawBob top-clip bug fixed (docs/FEATURES.md, Fixes),
 since the enhanced build draws those BOBs correctly.
 
   python3 compare_runs.py [frames] [seed] [--png DIR] [--level N] [--teleport N] [--build 512k|1mb]"""

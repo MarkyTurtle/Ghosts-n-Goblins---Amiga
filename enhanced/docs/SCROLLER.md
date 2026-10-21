@@ -14,8 +14,8 @@ row at a time.
 | Step | State |
 |---|---|
 | Test harness: blitter, copper and display emulation on top of the 68000 emulator (`tools/amiga.py`) | done; reproduces the original display exactly (`tools/check_harness.py`: 16 of 16 views equal the level pictures) |
-| Background scroller: layout, tile drawing, edge columns / rows, copper list with ring wrap (`src/scroll.s`) | done; equal to the original at every camera position tested (`tools/test_scroll.py`) |
-| Pristine buffer, BOBs, restores, scenery | done; equal to the original's `DrawBobs` / `DrawSceneryOnRedraw` (`tools/test_bobs.py`) |
+| Background scroller: layout, tile drawing, edge columns / rows, copper list with ring wrap (`src/scroll.s`) | done; equal to the original at every camera position tested (`tools/test_scroll.py`, since retired) |
+| Pristine buffer, BOBs, restores, scenery | done; equal to the original's `DrawBobs` / `DrawSceneryOnRedraw` (`tools/test_bobs.py`, since retired) |
 | Integration into the game (`src/module.s`, `src/patches.s`), a disk image (`tools/build_enh.py`) | done for both programs, 512K and 1MB: `build/gng_enhanced.adf` |
 | Whole game in the emulator against the original (`tools/compare_runs.py`) | done: see *Testing* below |
 | Real hardware / WinUAE timing | **not tested yet** - the emulator here has no timing |
@@ -258,7 +258,8 @@ clipped to the tile rows the pristine buffer holds. The first 512K image you tri
 Earlier, before that fix, the 512K build had run 53,500 frames in step in the same way (all
 levels, walking and teleporting), with only the loading and map frames above differing.
 
-Separately, `tools/test_scroll.py` and `tools/test_bobs.py` still pass (280 of 280 and 140 + 401
+Separately, `tools/test_scroll.py` and `tools/test_bobs.py` (since retired: their test build no
+longer assembled once the scroller was folded into the game) passed (280 of 280 and 140 + 401
 of 401 frames) with the core as integrated. The deepest stack use in play went from about 120 to
 about 320 bytes below `$80000`; the highest level data (level 1's enemy graphics) ends at
 `$7F4DE`, so 2.4 KB remain.
@@ -944,7 +945,7 @@ second time from the cache), and the comparisons with the loads stubbed (`game.p
 ## Files
 
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
-  `ScrDrawBobs`, `CopyAll`); `src/scroll_test.s` assembles it at `$7A000` for the unit tests.
+  `ScrDrawBobs`, `CopyAll`).
 * `src/module.s`: the game module (scroller + glue); `src/patches.s`: the changes to the main
   program.
 * `tools/build_enh.py`: builds the module, the patched program, the bootblock and the disk image.
@@ -956,13 +957,10 @@ second time from the cache), and the comparisons with the loads stubbed (`game.p
 * `tools/amiga.py`: harness: 68000 + blitter + copper + display renderer.
 * `tools/original.py`: drives the original game's display code in the harness (the reference).
 * `tools/check_harness.py`: checks the harness against the level pictures in `render/out/`.
-* `tools/test_scroll.py`: the scroller against the original, frame by frame.
 * `src/boot_patches.s`: the bootblock's memory survey; `tools/test_bootinfo.py` tests it.
 * `tools/test_jump.py`: the two-button joystick settings (jump on up or on button 2).
 * `tools/test_menu.py`: the title menu.
 * `tools/test_cache.py`: the file cache and the level's enemy sets.
-* `tools/test_bobs.py`: BOBs, restores and scenery against the original's `DrawBobs` and
-  `DrawSceneryOnRedraw`.
 
 ```
 cd enhanced/tools
@@ -970,8 +968,6 @@ VASM=/path/to/vasmm68k_mot python3 build_enh.py         # -> ../build/gng_enhanc
 python3 compare_runs.py 6000 1                           # frames, input seed [--level N] [--teleport N]
 python3 compare_runs.py 5000 1 --build 1mb               # the 1MB program   [--png DIR]
 python3 check_harness.py
-VASM=/path/to/vasmm68k_mot python3 test_scroll.py 80     # steps per level
-VASM=/path/to/vasmm68k_mot python3 test_bobs.py 40       # frames per level, then the scenery sweeps
 ```
 
 ## Next steps (as planned at the time; all done - the current list is `docs/TODO.md`)

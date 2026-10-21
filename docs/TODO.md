@@ -50,9 +50,11 @@ decided against, kept for the record with the reason.
       music the A500 slows only briefly, at the dragon's stages, and hardly noticeably
 - [x] Fold the scroller into the game source (`enhanced/src/gng_game.s`, `scroller.s`)
 - [x] BOB masks: one-plane masks on 512K; fully pre-masked graphics for one-blit BOBs on 1MB (3)
-- [ ] Blitter priority only while waiting (`--nasty-wait`): measure on the same frames (a key
-      to switch it in the timing build), keep it if it wins
-- [ ] `tools/test_scroll.py`: its test build (`scroll_test.s`) no longer assembles since the merge
+- [x] **Closed:** blitter priority only while waiting (`--nasty-wait`): not pursued, little to
+      gain (the build option stays, for a timing build)
+- [x] **Retired:** `tools/test_scroll.py` and `tools/test_bobs.py` and their test build
+      (`scroll_test.s`, which no longer assembled since the scroller was folded into the game):
+      `compare_game.py` and the features' own tests cover the scroller and the BOBs now
 - [x] Draw at 50 fps once the redraw cost is gone (3): see above
 
 **Disk**

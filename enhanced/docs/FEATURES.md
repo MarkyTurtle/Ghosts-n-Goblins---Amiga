@@ -240,7 +240,7 @@ All in a 68000 emulator (Unicorn) with a model of the blitter, copper, display a
 | `test_jump.py` | the two jump inputs: open ground, at a ladder, on it |
 | `test_menu.py` | the title menu, the test page and its sound, input, sprite and (1MB) BOB tests |
 | `test_cache.py` | the file cache and the level's enemy sets, from the disk image on each machine |
-| `test_bobs.py`, `test_scroll.py`, `check_harness.py` | the scroller and BOB drawing against the original's (the first enhanced builds) |
+| `check_harness.py` | the harness's display emulation against the level pictures (`render/out/`) |
 | `sound/tools/check_music_512k.py` | the 512K music package against the original packages |
 
 `compare_game.py` stays in step on every stage and machine; the pictures differ only in the

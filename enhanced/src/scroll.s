@@ -44,8 +44,7 @@
 ; two display buffers copy new edges from it and restore under their BOBs from it.
 ;
 ; This file is the core only: it is included by scroller.s (the one program, gng_game.s) and,
-; in the earlier builds, by module.s (the game module the patched programs load) and by
-; scroll_test.s (the unit tests' build at $7A000). The includer
+; in the earlier builds, by module.s (the game module the patched programs load). The includer
 ; defines the custom-chip / globals equates (gng_equates.i, with BUILD_1MB for the 1MB build), CellTiles,
 ; ItemBoxSizes, SmallBobSizes and MASKBUF (a one-plane BOB mask, at most 64 x 80 pixels; 512K
 ; only). BUILD_1MB selects the 1MB build: its program tables are offsets from g_BaseAddr, and

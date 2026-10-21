@@ -5,7 +5,7 @@ For each frame the enhanced build shows while playing, the whole memory is copie
 second emulator holding the ORIGINAL program, which then draws the same picture its own way:
 RedrawScreen at the same camera, CameraJump, DrawBobs with the same draw list, SetBitplanePtrs,
 ShowBackBuffer. The two displays (below the HUD) must be identical. (The reference has the
-DrawBob top-clip bug fixed, as in test_bobs.py; text printed on the playfield is not redrawn
+DrawBob top-clip bug fixed (docs/FEATURES.md, Fixes); text printed on the playfield is not redrawn
 by the reference, so frames after playfield text are reported separately.)
 
   python3 check_game.py [frames] [seed] [--png DIR]"""
@@ -38,7 +38,7 @@ class Reference(Amiga):
     def draw(self, ram):
         self.u.mem_write(0, ram)
         self.u.mem_write(0x80, self.prog[:GLOBALS-0x80])         # original code (the globals stay)
-        self.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))           # DrawBob top-clip fix (see test_bobs.py)
+        self.u.mem_write(0xBAF4, bytes.fromhex('c4c6'))           # DrawBob top-clip fix (docs/FEATURES.md, Fixes)
         self.u.mem_write(0xC2EA, bytes.fromhex('c4c6'))
         self.u.mem_write(0x60, struct.pack('>I', 0x7FFE0))        # no sound driver
         g = lambda n: G[n]
