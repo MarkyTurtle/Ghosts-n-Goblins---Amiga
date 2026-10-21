@@ -2,6 +2,7 @@
 
 > **This is the `enhanced/main` branch: the enhanced version of the game.** Start with
 > [`enhanced/docs/FEATURES.md`](enhanced/docs/FEATURES.md) (what it does, how to build and test it).
+> The disk image (ADF) to play is in the **[latest release](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/releases/latest)**.
 > The original game's disassembly, byte-identical to the original disk, is on
 > [`main`](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/tree/main); the rest of this README describes that disassembly, which this
 > branch builds on.
