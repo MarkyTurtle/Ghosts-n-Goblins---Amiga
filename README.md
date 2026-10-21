@@ -76,6 +76,7 @@ merged into `enhanced/scroll`. They are all fully merged and kept for the record
 | `enhanced/musicquality` | the 512K music package at 3/4 of the tunes' sample rate (`build_game.py --music-rate` for others) | `enhanced/scroll` (with the above merged) |
 | `enhanced/testmenu` | the test page's sound, input and sprite tests, and the BOB viewer (1MB of chip RAM or more) | `enhanced/scroll` (with the above merged) |
 | `enhanced/memory` | loading less: only the level's enemy sets, and a file cache in expansion memory (each file read from the disk once) | `enhanced/scroll` (with `enhanced/musicquality` merged) |
+| `enhanced/display` | clean changes of display between a level and the progress map; the loading picture kept whole on 1MB machines | `enhanced/scroll` (with the above merged) |
 
 New features go on a new branch from `enhanced/scroll` in the same way. The `docs/TODO.md` on
 `main` is the plan as it stood before the enhanced work; see the one on `enhanced/scroll`.
