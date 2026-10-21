@@ -12,7 +12,8 @@
 ;   playfield text (PrintChar's playfield path): EnhPrintField, TextReplay, TextFlush, PrFast,
 ;   DrawStrip (a line of text as one pre-masked BOB)
 ;   the title menu and test page: EnhMenu (CheckGameStart), EnhTitleText (DrawCreditsScreen),
-;   EnhShowMachine (the memory line); JumpButton (the jump input), MenuPage, MenuItem
+;   EnhShowMachine (the memory line), StopMusic (the sound test), EnhTitleSprite (the sprite
+;   test's Arthur); JumpButton (the jump input), MenuPage, MenuItem
 ;   the timing build (RASTER_BUILD): EnhLogicStart / EnhLogicEnd, the RASTER macro
 ;
 ; Memory, in the program's memory map (it moves with the program; enhanced/docs/MEMORY.md):
@@ -225,7 +226,10 @@ EnhSetBitplanePtrs:
 
 ;------------------------------------------------------------------------------
 EnhShowBackBuffer:
-                bsr.w   TextFlush               ; text not drawn yet goes in before it is shown
+                cmpi.b  #PAGE_BOBS,(MenuPage).l ; the BOB test: its strip (bobviewer.s: ViewDraw)
+                bne.b   .nobob
+                jsr     (VIEWER_ORG+8).l
+.nobob:         bsr.w   TextFlush               ; text not drawn yet goes in before it is shown
                 RASTER  $0F0                    ; green: waiting for the copper interrupt
                 lea     CUSTOM,a0
                 movea.l DrawRec(pc),a1
@@ -1132,34 +1136,68 @@ MakeMasks:
                 rts
 
 ;------------------------------------------------------------------------------
-; The title menu (replaces the original's start and key instructions). Two pages, chosen with
-; the joystick (up / down move, fire chooses; left / right or fire change a setting) or keys:
-;   title:  PLAYER 1 START, PLAYER 2 START, INPUT - JUMP ON UP / BUTTON 2, TEST MENU
-;   test:   the memory the bootblock found (EnhShowMachine), CHEAT OFF / ON, EXIT
+; The title menu (replaces the original's start and key instructions), chosen with the
+; joystick (up / down move, fire chooses; left / right or fire change a setting) or keys:
+;   title  (PAGE_TITLE):  PLAYER 1 START, PLAYER 2 START, INPUT - JUMP ON UP / BUTTON 2, TEST MENU
+;   test   (PAGE_TEST):   the memory the bootblock found (EnhShowMachine), MUSIC (OFF, 00-14:
+;                         left / right choose, fire plays or stops), EFFECT (00-29: fire plays),
+;                         INPUT TEST, SPRITE TEST, CHEAT OFF / ON, EXIT
+;   input test (PAGE_INPUT): the joystick's directions and both buttons, lit while held, and
+;                         the last key pressed (its raw code)
+;   sprite test (PAGE_SPRITE): Arthur's sprite frames (left / right: the frame, fire: the
+;                         mirrored copy) on screen, with the frame's number
+;   BOB test (PAGE_BOBS; 1MB of chip RAM or more only: the viewer file, bobviewer.s, is loaded
+;                         at VIEWER_ORG by CacheGraphics, ViewerOn): the cached BOB graphics,
+;                         left / right the strip, up / down scroll it
+; The input, sprite and BOB tests go back to the test page with Esc, or with fire held 3 seconds.
 ; F1 / F2 start a 1 / 2 player game at once, J switches the jump input, C the cheat (as
 ; before). Any change draws the title again (GS_TITLE from step 0: double-buffered, and its
-; 400-frame time-out to the high scores starts again; the test page has no time-out). On the
-; high-score page the joystick goes back to the title.
+; 400-frame time-out to the high scores starts again; only the title page has a time-out). On
+; the high-score page the joystick goes back to the title.
 ;------------------------------------------------------------------------------
+PAGE_TITLE      equ     0
+PAGE_TEST       equ     1
+PAGE_INPUT      equ     2
+PAGE_SPRITE     equ     3
+PAGE_BOBS       equ     4
 MENU_ITEMS      equ     4               ; title page
-TEST_ITEMS      equ     2               ; test page
+TEST_ITEMS      equ     7               ; test page: MUSIC, EFFECT, INPUT TEST, SPRITE TEST, BOB TEST,
+TEST_INPUT      equ     2               ;   CHEAT, EXIT - the items' numbers (BOB TEST only with
+TEST_SPRITE     equ     3               ;   ViewerOn: without it the items after it move up one)
+TEST_BOBS       equ     4
+TEST_CHEAT      equ     5
+TUNES           equ     15              ; tunes 0-14 (TestMusic -1: off)
+EFFECTS         equ     30              ; effects 0-29
+HOLD_EXIT       equ     150             ; frames of fire held that leave a test (3 s)
+KEY_ESC         equ     $45             ; raw key codes
+KEY_F1          equ     $50
+KEY_F2          equ     $51
+KEY_J           equ     $26
+KEY_C           equ     $33
+ARTHUR_FRAMES   equ     42              ; Arthur's frames (0-39 have mirrored copies)
+SPR_X           equ     113             ; the sprite test: Arthur's place from the camera
+SPR_Y           equ     128             ;   (x from its left, y up from its bottom)
 
 ; EnhMenu - CheckGameStart (the title and high-score screens): -> d0 nonzero = start a game
 ; (g_TwoPlayer set); 0 = carry on
 EnhMenu:
+                move.b  (MenuPage).l,d0
+                cmpi.b  #PAGE_INPUT,d0
+                beq.w   .input
+                cmpi.b  #PAGE_SPRITE,d0
+                beq.w   .sprite
+                cmpi.b  #PAGE_BOBS,d0
+                beq.w   .bobs
                 move.b  g_RawKey(a6),d1
-                cmpi.b  #$50,d1                 ; F1
+                cmpi.b  #KEY_F1,d1
                 beq.w   .one
-                cmpi.b  #$51,d1                 ; F2
+                cmpi.b  #KEY_F2,d1
                 beq.w   .two
-                cmpi.b  #$26,d1                 ; J
+                cmpi.b  #KEY_J,d1
                 beq.w   .jump
-                cmpi.b  #$33,d1                 ; C
+                cmpi.b  #KEY_C,d1
                 beq.w   .cheat
-                move.w  g_JoyPrev(a6),d2        ; newly pressed: b0 down, b1 right, b8 up, b9 left,
-                not.w   d2                      ; b15 fire
-                and.w   g_Joy(a6),d2
-                andi.w  #$8303,d2
+                bsr.w   .edges
                 beq.w   .none
                 cmpi.b  #GS_TITLE,g_GameState(a6)
                 bne.w   .title                  ; the high scores: back to the menu
@@ -1168,6 +1206,9 @@ EnhMenu:
                 tst.b   (MenuPage).l
                 beq.w   .main
                 moveq   #TEST_ITEMS,d4
+                tst.b   (ViewerOn).l
+                bne.b   .main
+                subq.w  #1,d4                   ; (no BOB TEST)
 .main:          move.b  (a0),d1
                 btst    #8,d2                   ; up
                 beq.w   .down
@@ -1194,37 +1235,267 @@ EnhMenu:
                 beq.w   .one
                 cmpi.b  #1,d1
                 beq.w   .two
-                st.b    (MenuPage).l            ; TEST MENU
+                move.b  #PAGE_TEST,(MenuPage).l ; TEST MENU
                 clr.b   (a0)
                 bra.w   .redraw
-.testpg:        tst.b   d1
+.testpg:        bsr.w   .tid                    ; the item's number as if BOB TEST were there
+                tst.b   d1
+                beq.w   .music
+                cmpi.b  #1,d1
+                beq.w   .effect
+                cmpi.b  #TEST_CHEAT,d1
                 beq.w   .cheat                  ; CHEAT: fire, left or right
-                tst.w   d2                      ; EXIT: fire
+                tst.w   d2                      ; the others: fire only
                 bpl.w   .none
+                cmpi.b  #TEST_INPUT,d1
+                beq.w   .toinput
+                cmpi.b  #TEST_SPRITE,d1
+                beq.w   .tosprite
+                cmpi.b  #TEST_BOBS,d1
+                beq.w   .tobobs
+                bsr.w   StopMusic               ; EXIT: the music off,
                 move.b  #3,(a0)                 ; back on TEST MENU
 .title:         clr.b   (MenuPage).l
+                bra.w   .redraw
+.music:         lea     (TestMusic).l,a1        ; MUSIC: left / right choose (OFF, 0-14) ...
+                moveq   #TUNES,d4
+                bsr.w   .lr
+                bne.w   .redraw
+                tst.w   d2                      ; ... fire plays it (or stops the music)
+                bpl.w   .none
+                move.b  (a1),d1
+                bmi.w   .stop
+                moveq   #0,d0                   ; (PlayMusic: the tune in the low word only)
+                move.b  d1,d0
+                jsr     PlayMusic
+                bra.w   .none
+.stop:          bsr.w   StopMusic
+                bra.w   .none
+.effect:        lea     (TestEffect).l,a1       ; EFFECT: left / right choose, fire plays it
+                moveq   #EFFECTS-1,d4
+                bsr.w   .lr
+                bne.w   .redraw
+                tst.w   d2
+                bpl.w   .none
+                moveq   #0,d0
+                move.b  (a1),d0
+                jsr     PlaySfx
+                bra.w   .none
+.toinput:       move.b  #PAGE_INPUT,(MenuPage).l
+                move.w  #-1,(InputShown).l      ; (draws at once)
+                clr.b   (InputKey).l
+                clr.b   (InputKeyShown).l
+                bra.w   .test
+.tosprite:      move.b  #PAGE_SPRITE,(MenuPage).l
+                bra.w   .test
+.tobobs:        move.b  #PAGE_BOBS,(MenuPage).l
+.test:          clr.w   (HoldTime).l
                 bra.w   .redraw
 .one:           clr.b   g_TwoPlayer(a6)
                 bra.w   .start
 .two:           st.b    g_TwoPlayer(a6)
-.start:         clr.b   (MenuPage).l
+.start:         bsr.w   StopMusic
+                clr.b   (MenuPage).l
                 moveq   #1,d0
                 rts
 .jump:          not.b   (JumpButton).l
                 bra.w   .redraw
 .cheat:         not.b   g_CheatOn(a6)
+                bra.w   .redraw
+
+; the input test: show what is held, back with Esc or fire held
+.input:         bsr.w   .leave
+                bne.w   .back
+                move.b  g_RawKey(a6),d1         ; a key: shown as its raw code
+                beq.w   .in2
+                move.b  d1,(InputKey).l
+                clr.w   g_RawKey(a6)
+.in2:           cmpi.b  #1,g_SubState(a6)       ; (not while the title is being drawn)
+                bne.w   .none
+                move.w  g_Joy(a6),d0
+                andi.w  #$C303,d0               ; directions and both buttons
+                move.b  (InputKey).l,d1
+                cmp.w   (InputShown).l,d0
+                bne.w   .in3
+                cmp.b   (InputKeyShown).l,d1
+                beq.w   .none
+.in3:           move.w  d0,(InputShown).l       ; changed: show it
+                move.b  d1,(InputKeyShown).l
+                bra.w   .redraw
+
+; the sprite test: left / right the frame, fire the mirrored copy; back with Esc or fire held
+.sprite:        bsr.w   .leave
+                bne.w   .back
+                bsr.w   .edges
+                beq.w   .none
+                lea     (SprFrame).l,a1
+                moveq   #ARTHUR_FRAMES-1,d4
+                bsr.w   .lr
+                bne.w   .redraw
+                tst.w   d2
+                bpl.w   .none
+                not.b   (SprMirror).l
+                bra.w   .redraw
+;- the BOB test: the viewer takes the joystick (bobviewer.s); back with Esc or fire held
+.bobs:          bsr.w   .leave
+                bne.w   .back
+                bsr.w   .edges
+                beq.w   .none
+                jsr     (VIEWER_ORG).l          ; ViewInput -> d0 = 1: changed
+                tst.b   d0
+                bne.w   .redraw
+                bra.w   .none
+.back:          move.b  #PAGE_TEST,(MenuPage).l ; back to the test page, on the test left
+                clr.w   (HoldTime).l
+                bra.w   .redraw
+
+; d1 = a test page item -> d1 = its number as if BOB TEST were there (TEST_*)
+.tid:           tst.b   (ViewerOn).l
+                bne.b   .tid1
+                cmpi.b  #TEST_BOBS,d1
+                bcs.b   .tid1
+                addq.b  #1,d1
+.tid1:          rts
+; d2 = the joystick bits newly pressed (b0 down, b1 right, b8 up, b9 left, b15 fire); Z if none
+.edges:         move.w  g_JoyPrev(a6),d2
+                not.w   d2
+                and.w   g_Joy(a6),d2
+                andi.w  #$8303,d2
+                rts
+; left / right: the byte at a1 one down / up, round from d4 (TUNES: from -1, OFF) -> Z if neither
+.lr:            move.b  (a1),d0
+                btst    #9,d2                   ; left
+                beq.w   .lr1
+                subq.b  #1,d0
+                cmpi.b  #TUNES,d4
+                beq.w   .lrm
+                tst.b   d0
+                bpl.w   .lrset
+                move.b  d4,d0                   ; (round to the last)
+                bra.w   .lrset
+.lrm:           cmpi.b  #-2,d0                  ; (MUSIC: OFF is -1, below it the last tune)
+                bne.w   .lrset
+                moveq   #TUNES-1,d0
+                bra.w   .lrset
+.lr1:           btst    #1,d2                   ; right
+                beq.w   .lrno
+                addq.b  #1,d0
+                cmpi.b  #TUNES,d4
+                bne.w   .lr2
+                cmp.b   d4,d0                   ; (MUSIC: after the last tune, OFF)
+                blt.w   .lrset
+                moveq   #-1,d0
+                bra.w   .lrset
+.lr2:           cmp.b   d4,d0
+                bls.w   .lrset
+                moveq   #0,d0
+.lrset:         move.b  d0,(a1)
+                moveq   #1,d0                   ; (NZ: changed)
+                rts
+.lrno:          moveq   #0,d0
+                rts
+; leave a test? Esc, or fire held for HOLD_EXIT frames -> NZ
+.leave:         cmpi.b  #KEY_ESC,g_RawKey(a6)
+                beq.w   .lvyes
+                tst.w   g_Joy(a6)               ; fire held
+                bpl.w   .lvno
+                addq.w  #1,(HoldTime).l
+                cmpi.w  #HOLD_EXIT,(HoldTime).l
+                bcc.w   .lvyes
+                moveq   #0,d0
+                rts
+.lvno:          clr.w   (HoldTime).l
+                moveq   #0,d0
+                rts
+.lvyes:         clr.w   g_RawKey(a6)
+                moveq   #1,d0
+                rts
 .redraw:        clr.w   g_RawKey(a6)
                 move.b  #GS_TITLE,g_GameState(a6)       ; the title again
                 clr.b   g_SubState(a6)
 .none:          moveq   #0,d0
                 rts
 
-; EnhTitleText - DrawCreditsScreen, after the logo: the credits and the menu, or the test page
+;------------------------------------------------------------------------------
+; StopMusic - the test page: silence the tune playing. The driver has no command for it, so
+; each music voice is pointed at an end of track ($67: the voice stops and its channel gets
+; the silent sample at the next tick), as CmdPlayTune points them at a tune. The driver
+; workspace is found from its code (CmdPlayTune's lea DriverVars(pc),a3 at entry + $1E: the
+; same driver in every package). All registers kept.
+;------------------------------------------------------------------------------
+DRV_MUS0        equ     $004            ; the driver's music voices (sound/gng_music_*.s)
+DRV_VOICE       equ     $068
+VC_DATAPTR      equ     $000
+VC_STACKPTR     equ     $01A
+VC_DURATION     equ     $046
+StopMusic:
+                movem.l d0/a0-a2,-(a7)
+                movea.l (VEC_SPURIOUS).w,a0     ; the driver's entry
+                cmpi.w  #$47FA,$1E(a0)          ; lea d16(pc),a3 there?
+                bne.b   .out
+                lea     $20(a0),a0
+                adda.w  (a0),a0                 ; DriverVars
+                lea     DRV_MUS0(a0),a0
+                move    sr,-(a7)
+                ori     #$0700,sr               ; (not while the vertical blank ticks the driver)
+                moveq   #3,d0
+.voice:         move.l  #EndTrack,VC_DATAPTR(a0)
+                clr.w   VC_DURATION(a0)
+                lea     VC_DURATION(a0),a1
+                move.l  a1,VC_STACKPTR(a0)
+                lea     DRV_VOICE(a0),a0
+                dbra    d0,.voice
+                move    (a7)+,sr
+.out:           movem.l (a7)+,d0/a0-a2
+                rts
+EndTrack:       dc.b    $67                     ; ENDTRACK
+                even
+
+;------------------------------------------------------------------------------
+; EnhTitleSprite - the title's step 0, after the text (in place of clearing g_ArthurVisible):
+; Arthur hidden, except on the sprite test: shown at the middle of the screen in the frame
+; chosen (SprFrame; its mirrored copy ~n with SprMirror, frames 0-39), placed from the camera
+; as ArthurSpritePos (called next) expects
+;------------------------------------------------------------------------------
+EnhTitleSprite:
+                clr.b   g_ArthurVisible(a6)
+                cmpi.b  #PAGE_SPRITE,(MenuPage).l
+                bne.b   .out
+                st.b    g_ArthurVisible(a6)
+                clr.b   g_ArthurFlash(a6)
+                move.w  g_ScrollTileX(a6),d0    ; the camera
+                lsl.w   #4,d0
+                add.w   g_ScrollFineX(a6),d0
+                add.w   #SPR_X,d0
+                move.w  d0,g_ArthurX(a6)
+                move.w  g_ScrollTileY(a6),d0
+                lsl.w   #4,d0
+                add.w   g_ScrollFineY(a6),d0
+                add.w   #SPR_Y,d0
+                move.w  d0,g_ArthurY(a6)
+                move.b  (SprFrame).l,d0
+                tst.b   (SprMirror).l
+                beq.b   .frame
+                cmpi.b  #39,d0
+                bhi.b   .frame
+                not.b   d0                      ; ~n: the mirrored copy
+.frame:         move.b  d0,g_ArthurFrame(a6)
+                move.b  #$7F,g_ArthurShownFrame(a6)     ; (the vertical blank copies it in)
+.out:           rts
+
+; EnhTitleText - DrawCreditsScreen, after the logo: the page's text
 EnhTitleText:
                 movem.l d0-d7/a0-a5,-(a7)
-                tst.b   (MenuPage).l
-                bne.b   .test
-                bsr.w   .credcol
+                move.b  (MenuPage).l,d0
+                beq.w   .titlepg
+                cmpi.b  #PAGE_TEST,d0
+                beq.w   .test
+                cmpi.b  #PAGE_INPUT,d0
+                beq.w   .input
+                cmpi.b  #PAGE_BOBS,d0
+                beq.w   .bobs
+                bra.w   .sprite
+.titlepg:       bsr.w   .credcol
                 lea     TxtCreditProgram,a3
                 moveq   #6,d1
                 moveq   #$48,d2
@@ -1237,6 +1508,8 @@ EnhTitleText:
                 moveq   #6,d1
                 moveq   #$68,d2
                 jsr     PrintString
+                move.w  #$80,(ItemRow).l
+                move.w  #4,(ItemStep).l         ; (16 lines apart)
                 lea     TxtMenu1(pc),a1
                 moveq   #0,d6                   ; item
                 bsr.w   .item
@@ -1245,7 +1518,7 @@ EnhTitleText:
                 lea     TxtMenuInput(pc),a1
                 lea     TxtJumpUp(pc),a2
                 tst.b   (JumpButton).l
-                beq.b   .in
+                beq.w   .in
                 lea     TxtJumpB2(pc),a2
 .in:            bsr.w   .item2
                 lea     TxtMenuTest(pc),a1
@@ -1254,73 +1527,240 @@ EnhTitleText:
                 moveq   #0,d5
                 move.w  #$C2,d2
                 bsr.w   .line
-                bra.b   .out
-.test:          bsr.w   .credcol
-                lea     TxtMenuTest(pc),a3
-                moveq   #11,d1
-                moveq   #$48,d2
-                jsr     PrintString
+                bra.w   .out
+.test:          lea     TxtMenuTest(pc),a3
+                bsr.w   .heading
                 bsr.w   EnhShowMachine          ; the memory, at $58
-                lea     TxtCheatItem(pc),a1
+                move.w  #$6C,(ItemRow).l
+                move.w  #3,(ItemStep).l         ; (seven items: 12 lines apart, see .item)
+                moveq   #0,d6
+                lea     TxtMusicItem(pc),a1     ; MUSIC  OFF / nn
+                lea     TxtOff(pc),a2
+                move.b  (TestMusic).l,d0
+                bmi.w   .mus
+                bsr.w   .number
+.mus:           bsr.w   .item2
+                lea     TxtEffect(pc),a1        ; EFFECT nn
+                move.b  (TestEffect).l,d0
+                bsr.w   .number
+                bsr.w   .item2
+                lea     TxtInputTest(pc),a1
+                bsr.w   .item
+                lea     TxtSpriteTest(pc),a1
+                bsr.w   .item
+                tst.b   (ViewerOn).l
+                beq.b   .nobobs
+                lea     TxtBobTest(pc),a1
+                bsr.w   .item
+.nobobs:        lea     TxtCheatItem(pc),a1
                 lea     TxtOff(pc),a2
                 tst.b   g_CheatOn(a6)
-                beq.b   .ch
+                beq.w   .ch
                 lea     TxtOn(pc),a2
-.ch:            moveq   #0,d6
-                bsr.w   .item2
+.ch:            bsr.w   .item2
                 lea     TxtExit(pc),a1
                 bsr.w   .item
+                bra.w   .out
+.input:         lea     TxtInputTest(pc),a3
+                bsr.w   .heading
+                move.w  g_Joy(a6),d7            ; (what is held now)
+                lea     InputLabels(pc),a4
+.inl:           move.w  (a4)+,d4                ; the bit, then column, row, text
+                bmi.w   .inkey
+                move.b  (a4)+,d1
+                move.b  (a4)+,d2
+                ext.w   d1
+                andi.w  #$FF,d2
+                move.w  (a4)+,d0
+                lea     InputLabels(pc),a3
+                adda.w  d0,a3
+                btst    d4,d7
+                sne     d5
+                bsr.w   .col
+                jsr     PrintString
+                bra.w   .inl
+.inkey:         lea     TxtKey(pc),a1           ; KEY $nn (the last key's raw code), or KEY --
+                lea     (NumText).l,a2
+                move.b  (InputKey).l,d0
+                beq.w   .nokey
+                move.b  #'$',(a2)+
+                moveq   #2,d3
+                bsr.w   .hex
+                lea     (NumText).l,a2
+                st      d5
+                bra.w   .keyl
+.nokey:         lea     TxtNone(pc),a2
+                moveq   #0,d5
+.keyl:          bsr.w   .compose
+                move.w  #$B8,d2
+                bsr.w   .line
+                lea     TxtLeave(pc),a3
+                moveq   #0,d5
+                move.w  #$C4,d2
+                bsr.w   .line
+                bra.w   .out
+.bobs:          lea     TxtBobTest(pc),a3       ; the BOB test: its name, the strip (bobviewer.s:
+                bsr.w   .heading                ; ViewText; the strip is drawn by ViewDraw), the keys
+                jsr     (VIEWER_ORG+4).l
+                st      d5
+                moveq   #$58,d2
+                bsr.w   .line
+                lea     TxtBobKeys(pc),a3
+                moveq   #0,d5
+                move.w  #$B8,d2
+                bsr.w   .line
+                lea     TxtLeave(pc),a3
+                moveq   #0,d5
+                move.w  #$C4,d2
+                bsr.w   .line
+                bra.w   .out
+.sprite:        lea     TxtSpriteTest(pc),a3
+                bsr.w   .heading
+                move.b  (SprFrame).l,d0         ; ARTHUR FRAME nn (MIRRORED)
+                bsr.w   .number
+                lea     (OptText).l,a3
+                lea     TxtFrame(pc),a1
+                bsr.w   .append
+                movea.l a2,a1
+                bsr.w   .append
+                tst.b   (SprMirror).l
+                beq.w   .spr1
+                cmpi.b  #39,(SprFrame).l
+                bhi.w   .spr1
+                lea     TxtMirrored(pc),a1      ; (only frames 0-39 have one)
+                bsr.w   .append
+.spr1:          clr.b   (a3)
+                lea     (OptText).l,a3
+                st      d5
+                moveq   #$58,d2
+                bsr.w   .line
+                lea     TxtSpriteKeys(pc),a3
+                moveq   #0,d5
+                move.w  #$B8,d2
+                bsr.w   .line
+                lea     TxtLeave(pc),a3
+                moveq   #0,d5
+                move.w  #$C4,d2
+                bsr.w   .line
 .out:           movem.l (a7)+,d0-d7/a0-a5
                 rts
+.heading:       moveq   #-1,d5                  ; a3 = a page's name, centred at $48
+                moveq   #$48,d2
+                bra.w   .line
 .credcol:       move.b  #$18,g_TextShadow(a6)   ; the credits' colours
                 move.b  #$0D,g_TextInk(a6)
                 move.b  #$1F,g_TextPaper(a6)
                 rts
-; item d6 (then d6 + 1): text a1 (.item2: and a2), at row $80 + 16 x d6, '> ... <' and in the
-; credits' colours when it is the one chosen
+; d0 = a number 0-99 -> a2 = NumText, its two decimal digits
+.number:        lea     (NumText).l,a2
+                andi.w  #$FF,d0
+                divu.w  #10,d0
+                add.b   #'0',d0
+                move.b  d0,(a2)+
+                swap    d0
+                add.b   #'0',d0
+                move.b  d0,(a2)+
+                clr.b   (a2)
+                lea     (NumText).l,a2
+                rts
+; d0 = a byte -> d3 hex digits at a2 (d3 = 2)
+.hex:           rol.b   #4,d0
+                move.b  d0,d1
+                andi.b  #$0F,d1
+                add.b   #'0',d1
+                cmpi.b  #'9',d1
+                bls.w   .hx
+                addq.b  #'A'-'9'-1,d1
+.hx:            move.b  d1,(a2)+
+                subq.w  #1,d3
+                bne.w   .hex
+                clr.b   (a2)
+                rts
+; item d6 (then d6 + 1): text a1 (.item2: and a2), at row ItemRow + 16 x d6, '> ... <' and in
+; the credits' colours when it is the one chosen
 .item:          suba.l  a2,a2
 .item2:         lea     (OptText).l,a3
                 moveq   #0,d5
                 cmp.b   (MenuItem).l,d6
                 seq     d5
-                bne.b   .i1
+                bne.w   .i1
                 move.b  #'>',(a3)+
                 move.b  #' ',(a3)+
-.i1:            move.b  (a1)+,(a3)+
-                bne.b   .i1
-                subq.l  #1,a3
+.i1:            bsr.w   .append
                 move.l  a2,d0
-                beq.b   .i3
-.i2:            move.b  (a2)+,(a3)+
-                bne.b   .i2
-                subq.l  #1,a3
+                beq.w   .i3
+                movea.l a2,a1
+                bsr.w   .append
 .i3:            tst.b   d5
-                beq.b   .i4
+                beq.w   .i4
                 move.b  #' ',(a3)+
                 move.b  #'<',(a3)+
 .i4:            clr.b   (a3)
-                move.w  d6,d2
-                lsl.w   #4,d2
-                add.w   #$80,d2
+                move.w  d6,d2                   ; row: ItemRow + d6 x (ItemStep x 4)
+                mulu.w  (ItemStep).l,d2
+                lsl.w   #2,d2
+                add.w   (ItemRow).l,d2
                 addq.w  #1,d6
                 lea     (OptText).l,a3
+                bra.w   .line
+; a1 then a2 into OptText -> a3 = OptText
+.compose:       lea     (OptText).l,a3
+                bsr.w   .append
+                movea.l a2,a1
+                bsr.w   .append
+                clr.b   (a3)
+                lea     (OptText).l,a3
+                rts
+.append:        move.b  (a1)+,(a3)+             ; a1's text to a3 (a3 left on its end)
+                bne.w   .append
+                subq.l  #1,a3
+                rts
 ; a3 = text, centred at row d2; d5 nonzero: the credits' colours, else the instructions' ones
 .line:          movea.l a3,a0
 .len:           tst.b   (a0)+
-                bne.b   .len
+                bne.w   .len
                 suba.l  a3,a0
                 moveq   #33,d1                  ; (length + 1 counted)
                 sub.w   a0,d1
                 lsr.w   #1,d1
-                tst.b   d5
-                beq.b   .plain
-                bsr.b   .credcol
-                bra.b   .print
-.plain:         move.b  #$1F,g_TextShadow(a6)   ; the instructions' colours
+                bsr.w   .col
+                jmp     PrintString
+.col:           tst.b   d5                      ; the colours for d5
+                bne.w   .credcol
+                move.b  #$1F,g_TextShadow(a6)   ; the instructions' colours
                 move.b  #$01,g_TextInk(a6)
                 move.b  #$19,g_TextPaper(a6)
-.print:         jmp     PrintString
+                rts
 
+; the input test's labels: the g_Joy bit, the column, the row, the text (from InputLabels)
+InputLabels:    dc.w    8
+                dc.b    15,$70
+                dc.w    TxtUp-InputLabels
+                dc.w    9
+                dc.b    8,$80
+                dc.w    TxtLeft-InputLabels
+                dc.w    1
+                dc.b    19,$80
+                dc.w    TxtRight-InputLabels
+                dc.w    0
+                dc.b    14,$90
+                dc.w    TxtDown-InputLabels
+                dc.w    15
+                dc.b    8,$A4
+                dc.w    TxtFire-InputLabels
+                dc.w    14
+                dc.b    18,$A4
+                dc.w    TxtFire2-InputLabels
+                dc.w    -1
+TxtUp:          dc.b    'UP',0
+TxtLeft:        dc.b    'LEFT',0
+TxtRight:       dc.b    'RIGHT',0
+TxtDown:        dc.b    'DOWN',0
+TxtFire:        dc.b    'FIRE',0
+TxtFire2:       dc.b    'FIRE 2',0
+TxtKey:         dc.b    'KEY ',0
+TxtNone:        dc.b    '--',0
+TxtLeave:       dc.b    'Esc or hold fire: back',0
 TxtMenu1:       dc.b    'PLAYER 1 START',0
 TxtMenu2:       dc.b    'PLAYER 2 START',0
 TxtMenuInput:   dc.b    'INPUT - ',0
@@ -1328,14 +1768,35 @@ TxtJumpUp:      dc.b    'JUMP ON UP',0
 TxtJumpB2:      dc.b    'JUMP ON BUTTON 2',0
 TxtMenuTest:    dc.b    'TEST MENU',0
 TxtKeys:        dc.b    'SPACE pause   Esc abort',0
+TxtMusicItem:   dc.b    'MUSIC  ',0
+TxtEffect:      dc.b    'EFFECT ',0
+TxtInputTest:   dc.b    'INPUT TEST',0
+TxtSpriteTest:  dc.b    'SPRITE TEST',0
+TxtFrame:       dc.b    'ARTHUR FRAME ',0
+TxtMirrored:    dc.b    ' MIRRORED',0
+TxtSpriteKeys:  dc.b    'left/right frame  fire mirror',0
+TxtBobTest:     dc.b    'BOB TEST',0
+TxtBobKeys:     dc.b    'left/right strip  up/down scroll',0
 TxtCheatItem:   dc.b    'CHEAT ',0
 TxtOff:         dc.b    'OFF',0
 TxtOn:          dc.b    'ON',0
 TxtExit:        dc.b    'EXIT',0
-MenuPage:       dc.b    0                       ; 0 the title, else the test page
+MenuPage:       dc.b    0                       ; PAGE_TITLE, PAGE_TEST, PAGE_INPUT, PAGE_SPRITE
 MenuItem:       dc.b    0                       ; the item chosen on the page
 JumpButton:     dc.b    0                       ; nonzero: jump on the joystick's second button
+TestMusic:      dc.b    -1                      ; the test page's tune (-1: OFF) ...
+TestEffect:     dc.b    0                       ; ... and effect
+InputKey:       dc.b    0                       ; the input test: the last key's raw code (0: none)
+InputKeyShown:  dc.b    0                       ;   ... and the one the page shows
+SprFrame:       dc.b    0                       ; the sprite test: Arthur's frame ...
+SprMirror:      dc.b    0                       ; ... and its mirrored copy
+ViewerOn:       dc.b    0                       ; the BOB viewer is loaded (1MB of chip RAM: CacheGraphics)
                 even
+ItemRow:        dc.w    0                       ; the row of a page's first item ...
+ItemStep:       dc.w    4                       ; ... and the lines between items / 4
+InputShown:     dc.w    0                       ; the input test: the state the page shows
+HoldTime:       dc.w    0                       ; frames fire has been held (a test's exit)
+NumText:        dcb.b   4,0                     ; a number, made up
 OptText:        dcb.b   40,0                    ; a line, made up
 
 ;------------------------------------------------------------------------------

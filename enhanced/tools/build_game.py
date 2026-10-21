@@ -42,11 +42,11 @@ FT_OFFSET, FT_VERSION = 0x400, 1         # the file table (gng_game.i FT_OFFSET,
 FILES_START = 0x600
 
 
-def vasm(src, out, listing=None, defs=()):
+def vasm(src, out, listing=None, defs=(), incl=None):
     """assemble src to out (vasm, -Fbin -no-opt) with the include paths the game needs and -D
     for each (name, value) in defs; the listing too if asked; stops the build on an error"""
     cmd = [VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', os.path.join(ENH, 'src'), '-I', ROOT,
-           '-I', os.path.join(ROOT, 'sound'), '-o', out]
+           '-I', os.path.join(ROOT, 'sound'), '-o', out] + (['-I', incl] if incl else [])
     if listing: cmd += ['-L', listing]
     cmd += [f'-D{k}={v}' for k, v in defs] + [src]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -159,6 +159,21 @@ def build(extra_defs=()):
     print(f'level tables: {slots} cells at most, {", ".join(f"{len(t):,}" for t in tables)} bytes')
     vasm(src, prog, lst, extra_defs)
     syms = symbols(lst)
+    # the BOB viewer (src/bobviewer.s, 1MB of chip RAM only): assembled for VIEWER_ORG with the
+    # program's symbols; the program then again with its length (nothing in it moves)
+    viewer = os.path.join(OUT, 'viewer.bin')
+    with open(os.path.join(OUT, 'viewer_syms.i'), 'w') as f:
+        f.write('; the program\'s symbols for bobviewer.s (build_game.py writes this)\n')
+        for k, v in sorted(syms.items()):
+            if re.fullmatch(r'[A-Za-z_]\w*', k): f.write(f'{k}\tequ\t${v:X}\n')
+    vasm(os.path.join(ENH, 'src', 'bobviewer.s'), viewer, os.path.join(OUT, 'viewer.lst'),
+         defs=(('VIEWER_BUILD', 1),), incl=OUT)
+    extra_defs = tuple(extra_defs) + (('VIEWER_LEN', os.path.getsize(viewer)),)
+    vasm(src, prog, lst, extra_defs)
+    s2 = symbols(lst)
+    if any(s2.get(k) != v for k, v in syms.items() if k not in ('VIEWER_LEN',)):
+        sys.exit('the program moved when the viewer\'s length went in')
+    syms = s2
     if syms['FrameOffsets1'] - syms['WorldMap'] != MAP_LIMIT:
         sys.exit('MAP_LIMIT is not FrameOffsets1 - WorldMap: the level tables would miss cells')
     sfx, music = os.path.join(OUT, 'sfx.bin'), os.path.join(OUT, 'music.bin')
@@ -188,6 +203,8 @@ def build(extra_defs=()):
                syms['MUSICB_FILE'] + os.path.getsize(music) <= syms['MAP_LOW'] + syms['SFX_AREA']),
               ("the 512K effects package fits its area", os.path.getsize(sfx) <= syms['SFX_AREA']),
               ("the 512K music package fits its area", os.path.getsize(music512) <= syms['SFX_AREA']),
+              ("the BOB viewer fits below $FE800 (Kickstart 1.3's top of a 1MB machine's chip RAM)",
+               syms['VIEWER_ORG'] + os.path.getsize(viewer) <= 0xFE800),
               ("the text strip is after the buffers and holds 28 characters",
                syms['TEXT_STRIP'] >= syms['SCREEN_0'] + 3 * 47120 and syms['STRIP_MAX'] >= 28)]
     import struct as _st
@@ -232,7 +249,8 @@ def disk_files(prog, sfx, music, relocs, out=None):
                  't108-109_level6_tiles.bin'])]
             + [('effects (512K package)', sfx), ('relocations', relocs)]
             + [(f'level {l} map tables', os.path.join(out, f'tables{l}.bin')) for l in range(7)]
-            + [('music (512K package)', os.path.join(out, 'music512.bin'))])
+            + [('music (512K package)', os.path.join(out, 'music512.bin'))]
+            + [('BOB viewer (1MB)', os.path.join(out, 'viewer.bin'))])
 
 
 def check_records(src, syms, files):

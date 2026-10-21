@@ -244,9 +244,17 @@ def game(machine=None, disk=False):
     d = build_game.OUT
     files = build_game.disk_files(os.path.join(d, 'game.bin'), os.path.join(d, 'sfx.bin'),
                                   os.path.join(d, 'music.bin'), os.path.join(d, 'relocs.bin'), d)
-    return GameRun(os.path.join(d, 'game.bin'), {fid: path for fid, (name, path) in enumerate(files)}, '512k',
-                   machine, listing=os.path.join(d, 'game.lst'), by_id=True,
-                   disk=os.path.join(d, '..', 'gng_game.adf') if disk else None)
+    run = GameRun(os.path.join(d, 'game.bin'), {fid: path for fid, (name, path) in enumerate(files)}, '512k',
+                  machine, listing=os.path.join(d, 'game.lst'), by_id=True,
+                  disk=os.path.join(d, '..', 'gng_game.adf') if disk else None)
+    # the BOB viewer's labels (its own file, assembled for VIEWER_ORG in chip RAM: not moved)
+    lst = os.path.join(d, 'viewer.lst')
+    if os.path.exists(lst):
+        text = open(lst).read()
+        part = text[text.index('Symbols by name:'):text.index('Symbols by value:')]
+        run.L.update({m.group(1): int(m.group(2), 16) for m in re.finditer(r'^(\S+)\s+A:([0-9A-F]+)$', part, re.M)
+                      if m.group(1) not in run.L})
+    return run
 
 
 def enhanced(build='512k', machine=None):

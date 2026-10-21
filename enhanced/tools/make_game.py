@@ -404,7 +404,8 @@ def byteloader(S):
 def title_menu(S):
     """the title screen's start and key instructions become a menu (scroller.s: EnhMenu,
     EnhTitleText): PLAYER 1 START, PLAYER 2 START, INPUT - JUMP ON UP / BUTTON 2, TEST MENU
-    (the memory the bootblock found, the cheat); F1 / F2 still start a game at once"""
+    (the memory the bootblock found, the sound, input and sprite tests, the cheat); F1 / F2 still
+    start a game at once. Arthur is shown on the sprite test (EnhTitleSprite)"""
     a = S.s.index("CheckGameStart:\n        btst    #$7,$bfe001.l                   ; 05F74/05FCA\n")
     b = S.s.index("l_05F9A:\n", a)
     S.s = (S.s[:a] + "CheckGameStart:\n"
@@ -418,6 +419,9 @@ def title_menu(S):
     # the instructions the menu replaces (168 bytes, an even number: what follows keeps its alignment)
     S.s, n = re.subn(r"\n(TxtPressF1|TxtPressF2|TxtFire1|TxtFire2|TxtPause|TxtAbort):\n\tdc\.b\t'[^'\n]*'\n\tdc\.b\t\$00", '', S.s)
     assert n == 6, n
+    # Arthur shown only on the test page's sprite test (EnhTitleSprite)
+    S.sub("        clr.b   g_ArthurVisible(a6)             ; 05EF4/05F4A\n",
+          I('jsr     EnhTitleSprite', 'Arthur hidden, except on the sprite test (05EF4: clr.b g_ArthurVisible)') + '\n')
     # the test page stays until it is left; the title page goes on to the high scores
     S.sub("        addq.b  #GS_TITLE,g_GameState(a6)       ; 05F24/05F7A\n",
           I('tst.b   (MenuPage).l', 'the test page: no time-out') + '\n' + I('bne.b   l_05F2C') + '\n'

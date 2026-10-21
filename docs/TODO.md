@@ -113,10 +113,17 @@ decided against, kept for the record with the reason.
       setting), TEST MENU (the memory line and the cheat, moved from the title) (8); see
       `enhanced/docs/SCROLLER.md`, *The title menu* (made on branch `enhanced/titlemenu`,
       merged; tried in WinUAE)
-- [ ] A sound test on the test page: play each tune and effect (8)
-- [ ] A sprite test on the test page: show the BOB and sprite frames (8), if there is room
-- [ ] An input test on the test page, as on an arcade machine: the joystick directions and both
-      buttons shown on screen as they are pressed (8), if there is room
+- [x] A sound test on the test page: play each tune and effect (8); MUSIC (OFF, 00-14) and
+      EFFECT (00-29), fire plays, MUSIC OFF stops the tune (made on branch `enhanced/testmenu`)
+- [x] A sprite test on the test page (8): Arthur's 42 sprite frames and their mirrored copies;
+      the enemies' BOB sets are not shown (on 512K only the level's sets exist, and BOBs are drawn
+      by the play loop)
+- [x] A BOB viewer on the test page (`BOB TEST`), on machines with 1MB of chip RAM or more only:
+      every cached, pre-masked BOB strip drawn with `ScrDrawBob`; its own file (`FID_VIEWER`)
+      loaded after the caches (branch `enhanced/testmenu`). Not on 512K chip machines (with or
+      without an expansion): their BOB graphics are only the level's
+- [x] An input test on the test page, as on an arcade machine (8): the joystick's directions and
+      both buttons lit while held, and the last key's raw code
 
 **Testing**
 - [x] Boot and timing tests of the disk image and the enhanced builds in a full emulator (6):

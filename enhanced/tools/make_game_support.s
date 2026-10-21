@@ -10,7 +10,8 @@
 ;   LoadFile          a file by its id, with the 4489_byteloader (FileDir: the disk's file table)
 ;   IrqLevel1 / 3     the interrupt entries that give the handlers their a6
 ;   EnhRelocate       the program's move to expansion memory (ApplyRelocs)
-;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx)
+;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx),
+;                     and the test page's BOB viewer loaded (bobviewer.s, at VIEWER_ORG)
 ; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
 ; (MACHINE_INFO). With 1MB or more of chip RAM (any chip RAM above $80000: Kickstart 1.3 keeps the
@@ -104,6 +105,8 @@ LoadLevelTables:
         rts
 FileMusic512:
 	FENTRY	MUSIC_FILE,MUSIC512_LEN,FID_MUSIC512    ; the music for 512K (sound/gng_music_512k.s)
+FileViewer:
+	FENTRY	VIEWER_ORG,VIEWER_LEN,FID_VIEWER        ; the BOB viewer (1MB of chip RAM: CacheGraphics)
 MfmBuf:
         dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
 
@@ -348,6 +351,9 @@ CacheGraphics:
         bsr.w   BuildMaskedGfx
         move.l  #MITEM_GFX_BUF,(ItemGfxPtr).l
         move.l  #MESHOT_GFX_BUF,(EShotGfxPtr).l
+        lea.l   (FileViewer).l,a1               ; the test page's BOB viewer (bobviewer.s): only here
+        bsr.w   LoadFile
+        st.b    (ViewerOn).l
         lea.l   (FileProgressMap).l,a1          ; keep the packed progress map
         bsr.w   LoadFile
         lea.l   (FileProgressMap).l,a2

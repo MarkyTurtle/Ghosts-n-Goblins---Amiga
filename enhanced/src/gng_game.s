@@ -3494,7 +3494,7 @@ l_05CF8:
 l_05D14:
         move.l  d0,(a0)+                        ; 05D14/05D3C
         dbra    d1,l_05D14                      ; 05D16/05D3E
-        lea.l   DefaultHiNames(pc),a0           ; 05D1A/05D42
+        lea.l   (DefaultHiNames).l,a0           ; 05D1A/05D42
         lea.l   g_HiNames(a6),a1                ; 05D1E/05D46
         moveq   #$1d,d0                         ; 05D22/05D4A
 l_05D24:
@@ -3663,7 +3663,7 @@ AttractTitle:
         clr.w   g_RawKey(a6)                    ; 05EE8/05F3E
         bsr.w   SwapScreens                     ; 05EEC/05F42
         bsr.w   DrawCreditsScreen               ; 05EF0/05F46
-        clr.b   g_ArthurVisible(a6)             ; 05EF4/05F4A
+        jsr     EnhTitleSprite                  ; Arthur hidden, except on the sprite test (05EF4: clr.b g_ArthurVisible)
         clr.b   g_Spr47Visible(a6)              ; 05EF8/05F4E
         bsr.w   ArthurSpritePos                 ; 05EFC/05F52
         bsr.w   SetBitplanePtrs                 ; 05F00/05F56
@@ -3751,7 +3751,7 @@ StartGame:
         move.b  #$1f,g_TextShadow(a6)           ; 0600A/06064
         move.b  #$1b,g_TextInk(a6)              ; 06010/0606A
         move.b  #$5,g_TextPaper(a6)             ; 06016/06070
-        lea.l   TxtPlayer(pc),a3                ; 0601C/06076
+        lea.l   (TxtPlayer).l,a3                ; 0601C/06076
         moveq   #$1,d1                          ; 06020/0607A
         moveq   #$0,d2                          ; 06022/0607C
         bsr.w   PrintString                     ; 06024/0607E
@@ -3766,7 +3766,7 @@ StartGame:
         move.b  #$1f,g_TextShadow(a6)           ; 06040/0609A
         move.b  #$1b,g_TextInk(a6)              ; 06046/060A0
         move.b  #$5,g_TextPaper(a6)             ; 0604C/060A6
-        lea.l   TxtPlayer(pc),a3                ; 06052/060AC
+        lea.l   (TxtPlayer).l,a3                ; 06052/060AC
         moveq   #$17,d1                         ; 06056/060B0
         moveq   #$0,d2                          ; 06058/060B2
         bsr.w   PrintString                     ; 0605A/060B4
@@ -3780,7 +3780,7 @@ l_06070:
         move.b  #$1f,g_TextShadow(a6)           ; 06070/060CA
         move.b  #$1,g_TextInk(a6)               ; 06076/060D0
         move.b  #$18,g_TextPaper(a6)            ; 0607C/060D6
-        lea.l   TxtTopScore(pc),a3              ; 06082/060DC
+        lea.l   (TxtTopScore).l,a3              ; 06082/060DC
         moveq   #$b,d1                          ; 06086/060E0
         moveq   #$0,d2                          ; 06088/060E2
         bsr.w   PrintString                     ; 0608A/060E4
@@ -3800,7 +3800,7 @@ DrawNameGrid:
         moveq   #$0,d4                          ; 060A6/06100
         moveq   #$4,d7                          ; 060A8/06102
         moveq   #$38,d2                         ; 060AA/06104
-        lea.l   NameGridLetters(pc),a0          ; 060AC/06106
+        lea.l   (NameGridLetters).l,a0          ; 060AC/06106
 l_060B0:
         moveq   #$4,d1                          ; 060B0/0610A
         moveq   #$c,d6                          ; 060B2/0610C
@@ -3826,7 +3826,7 @@ l_060DA:
         dbra    d7,l_060B0                      ; 060EE/06148
         move.b  #$3,g_TextInk(a6)               ; 060F2/0614C
         move.b  #$6,g_TextPaper(a6)             ; 060F8/06152
-        lea.l   TxtInitial(pc),a3               ; 060FE/06158
+        lea.l   (TxtInitial).l,a3               ; 060FE/06158
         moveq   #$8,d1                          ; 06102/0615C
         move.w  #$d8,d2                         ; 06104/0615E
         bsr.w   PrintString                     ; 06108/06162
@@ -3892,7 +3892,7 @@ l_0614A:
         beq.w   l_0621E                         ; 06190/061EA
         cmp.w   #$3e,d5                         ; 06194/061EE  space
         beq.w   l_06238                         ; 06198/061F2
-        lea.l   NameGridLetters(pc),a0          ; 0619C/061F6
+        lea.l   (NameGridLetters).l,a0          ; 0619C/061F6
         move.b  (a0,d5.w),d0                    ; 061A0/061FA
 l_061A4:
         move.w  g_ArthurAux(a6),d1              ; 061A4/061FE  three letters already?
@@ -3949,7 +3949,7 @@ snd70_go:
         beq.b   snd70_512                       
         move    (a7)+,ccr                       
 l1m_0626C:
-        bsr.w   PlayMusic                       ;      /0626C
+        jsr     (PlayMusic).l                       ;      /0626C
         bra.w   snd70_end                       
 snd70_512:
         move    (a7)+,ccr                       
@@ -6677,7 +6677,8 @@ FileRelocs:
 ;   LoadFile          a file by its id, with the 4489_byteloader (FileDir: the disk's file table)
 ;   IrqLevel1 / 3     the interrupt entries that give the handlers their a6
 ;   EnhRelocate       the program's move to expansion memory (ApplyRelocs)
-;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx)
+;   CacheGraphics     with 1MB of chip RAM: every graphic cached with masks (BuildMaskedGfx),
+;                     and the test page's BOB viewer loaded (bobviewer.s, at VIEWER_ORG)
 ; ==================================================================
 ; ReadProfile - Start, first thing: Profile from the bootblock's machine description
 ; (MACHINE_INFO). With 1MB or more of chip RAM (any chip RAM above $80000: Kickstart 1.3 keeps the
@@ -6771,6 +6772,8 @@ LoadLevelTables:
         rts
 FileMusic512:
 	FENTRY	MUSIC_FILE,MUSIC512_LEN,FID_MUSIC512    ; the music for 512K (sound/gng_music_512k.s)
+FileViewer:
+	FENTRY	VIEWER_ORG,VIEWER_LEN,FID_VIEWER        ; the BOB viewer (1MB of chip RAM: CacheGraphics)
 MfmBuf:
         dc.l    MFM_BUFFER                      ; LoadFile's MFM buffer (the progress map sets PM_MFM)
 
@@ -7015,6 +7018,9 @@ CacheGraphics:
         bsr.w   BuildMaskedGfx
         move.l  #MITEM_GFX_BUF,(ItemGfxPtr).l
         move.l  #MESHOT_GFX_BUF,(EShotGfxPtr).l
+        lea.l   (FileViewer).l,a1               ; the test page's BOB viewer (bobviewer.s): only here
+        bsr.w   LoadFile
+        st.b    (ViewerOn).l
         lea.l   (FileProgressMap).l,a1          ; keep the packed progress map
         bsr.w   LoadFile
         lea.l   (FileProgressMap).l,a2
@@ -11420,7 +11426,7 @@ SetBoxClass:
         clr.w   d1                              ; 0AB92/0ABF6
         move.b  O_Size(a5),d1                   ; 0AB94/0ABF8
         add.w   d1,d1                           ; 0AB98/0ABFC
-        lea.l   BoxSizeTable(pc),a0             ; 0AB9A/0ABFE
+        lea.l   (BoxSizeTable).l,a0             ; 0AB9A/0ABFE
         move.b  $1(a0,d1.w),d1                  ; 0AB9E/0AC02
         move.b  d0,O_Size(a5)                   ; 0ABA2/0AC06
         ext.w   d0                              ; 0ABA6/0AC0A
@@ -11790,7 +11796,7 @@ AddScore:
 DrawWeaponIcon:
         move.w  g_Weapon(a6),d0                 ; 0AEB4/0AF18
         mulu.w  #$80,d0                         ; 0AEB8/0AF1C
-        lea.l   WeaponIcons(pc),a0              ; 0AEBC/0AF20
+        lea.l   (WeaponIcons).l,a0              ; 0AEBC/0AF20
         adda.w  d0,a0                           ; 0AEC0/0AF24
         lea.l   $40(a0),a1                      ; 0AEC2/0AF26
         lea.l   (SPRITE4B_DATA+$69).l,a2        ; 0AEC6/0AF2A

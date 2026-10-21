@@ -38,6 +38,7 @@ FILES = {
     'FID_SFX': ('the 512K effects package: driver, 30 effects', '`LoadSound`', 'start-up (no machine description)'),
     'FID_RELOCS': ("the relocation tables: the program's and the 1MB package's addresses", '`EnhRelocate`', 'start-up (the program moves)'),
     'FID_TABLES0': ("a level's map tables: cell slots, BlockTiles, CellTiles", '`LoadLevelTables`', 'start-up (level 0) and each level start'),
+    'FID_VIEWER': ("the test page's BOB viewer (`bobviewer.s`)", '`CacheGraphics`', 'start-up (1MB of chip RAM or more)'),
     'FID_MUSIC512': ('the 512K music package: the 512K effects and the 1MB tunes (3/4 rate)', '`LoadSound`', 'start-up (plain 512K)'),
 }
 
@@ -197,6 +198,7 @@ def write_memory(S):
         (S['SMALLBOB_CACHE'], S['MESHOT_GFX_BUF'], '`SMALLBOB_CACHE`', 'the small BOBs with masks'),
         (S['MESHOT_GFX_BUF'], S['MITEM_GFX_BUF'], '`MESHOT_GFX_BUF`', 'enemy shots with masks'),
         (S['MITEM_GFX_BUF'], S['MITEM_GFX_END'], '`MITEM_GFX_BUF`', 'weapons, pickups, effects with masks'),
+        (S['VIEWER_ORG'], S['VIEWER_ORG'] + S['VIEWER_LEN'], '`VIEWER_ORG`', 'the test page\'s BOB viewer (`FID_VIEWER`, `bobviewer.s`), from a 256-byte boundary'),
     ]
     stages = '\n'.join(f'| {lv + 1} | {h(top)} | {kb(S["LEVEL_TOP"] - top)} | {", ".join(left) or "nothing"} |'
                        for lv, (top, left) in enumerate(plan))
@@ -255,7 +257,7 @@ from the upper chip RAM caches.
 
 """ + '\n'.join(table(upper)) + f"""
 
-From {h(S['MITEM_GFX_END'])} to the end of chip RAM: not used by the graphics (`$100000` on a
+From {h(S['VIEWER_ORG'] + S['VIEWER_LEN'])} to the end of chip RAM: not used (`$100000` on a
 1MB A500+ / A600; Kickstart 1.3 keeps the top of a 1MB machine's chip RAM and lists it as ending
 at `$FE800`; `$200000` on an A1200). With 1MB of chip RAM the sound package area at `MUSIC_FILE`
 in the first 512K is not used either.
