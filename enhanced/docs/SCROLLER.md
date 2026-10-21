@@ -834,7 +834,7 @@ program is 206 bytes longer (the menu, less the original's instruction code and 
 player games from the menu and with F1 / F2, moving round, the input and cheat switches, the
 test page staying, EXIT, the time-out to the high scores and back).
 
-### The test page's tests (made on branch `enhanced/testmenu`)
+### The test page's tests (made on branch `enhanced/testmenu`, merged)
 
 The test page (`TEST MENU`) has a sound test, an input test and a sprite test (`scroller.s`:
 `EnhMenu`, `EnhTitleText`, `StopMusic`, `EnhTitleSprite`; `MenuPage` is now `PAGE_TITLE`,
