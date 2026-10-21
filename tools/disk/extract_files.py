@@ -11,7 +11,7 @@ FILES = [
  (33, 0x5400, 't033-036_arthur_sprites.bin', '$37468', '$80 (staging)', 'Start (FileTable+0)',
   "Arthur's hardware-sprite frames: 42 x 32x32, 4 planes; mirrored copies built at start-up", 'gng_main.s Start, render/out/arthur.png'),
  (37, 0x0D20, 't037_small_bob_sets.bin', '$311E8 (BOB_GFX_A)', '$80 (staging)', 'LoadLevel (512K: every level)',
-  '10 small BOB graphics sets, per-level subset selected by LevelSmallBobMask (contents not yet identified)', 'gng_main.s LoadLevel'),
+  '10 single-image item/scenery BOBs (coin, money bag, stone block, grass raft, rock, 3 gravestones, boulder and ice platforms); per-level subset selected by LevelSmallBobMask', 'gng_main.s LoadLevel'),
  (38, 0x1D042, 't038-056_enemy_bobs.bin', '$37468', '$80 (staging)', 'LoadLevel (512K: every level)',
   '21 enemy BOB sets (BobSetOffsets/BobSetSizes); LoadLevel copies the sets each level needs', 'README Data formats, render/out/bobs.png'),
  (57, 0x0EA6, 't057_item_gfx_part2.bin', '$1CF8E', '$80 (staging)', 'Start',

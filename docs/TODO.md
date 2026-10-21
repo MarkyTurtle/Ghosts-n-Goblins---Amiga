@@ -3,6 +3,10 @@
 Ideas and planned work for an enhanced build, roughly in the order they build on each other. The
 enhanced build lives in a separate source tree; the byte-identical sources here stay as they are.
 
+**This is the plan as it stood before the enhanced work.** It was carried out on the
+`enhanced/scroll` branch, whose `docs/TODO.md` is the up-to-date list (every item there is now
+done or closed); the unticked items here are left as they were.
+
 ## Summary of every optimisation discussed
 
 Each line points to the item below with the details and measurements.
