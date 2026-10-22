@@ -102,6 +102,9 @@ DLOOP	macro	; last entry: frames, direction, then continue at the label
 	dc.b	(\1)|$80,\2
 	dc.w	\3-*
 	endm
+COPPTR	macro	; copper moves loading a DMA pointer register pair (BPLxPT, SPRxPT) with an address
+	dc.w	\1PTH,(\2)>>16,\1PTL,(\2)&$FFFF
+	endm
 FENTRY	macro	; file table entry: load address, length in bytes, first track
 	dc.l	\1,\2
 	dc.w	\3
@@ -285,6 +288,9 @@ ProgramEntry:
         bra.w   l1m_05A6E                       ;      /00020
 	else
         bra.w   Start                           ; 000A0/     
+	endc
+	ifd	RELOC_PAD	; relocation test (enhanced/tools/reloc_test.py): every address
+	dcb.b	RELOC_PAD,0	; after this point moves by RELOC_PAD bytes
 	endc
 
 ;---------------------------------------------------------------------------
@@ -4667,25 +4673,15 @@ l_05B96:
         dbra    d7,l_05B94                      ; 05C1A/05BB8
         lea.l   HudTimerSprA(pc),a0             ; 05C1E/05BBC  HudTimerSprA / B into the lower HUD sprite blocks
         lea.l   HudTimerSprB(pc),a1             ; 05C22/05BC0
-	ifd	BUILD_1MB
-        lea.l   $2e628.l,a2                     ;      /05BC4
-        lea.l   $2e7c0.l,a3                     ;      /05BCA
-	else
-        lea.l   $30efc.l,a2                     ; 05C26/     
-        lea.l   $31094.l,a3                     ; 05C2C/     
-	endc
+        lea.l   (SPRITE4B_DATA+$44).l,a2        ; 05C26/05BC4
+        lea.l   (SPRITE6B_DATA+$44).l,a3        ; 05C2C/05BCA
         moveq   #$21,d7                         ; 05C32/05BD0
 l_05C34:
         move.l  (a0)+,(a2)+                     ; 05C34/05BD2
         move.l  (a1)+,(a3)+                     ; 05C36/05BD4
         dbra    d7,l_05C34                      ; 05C38/05BD6
-	ifd	BUILD_1MB
-        lea.l   $2e6f4.l,a2                     ;      /05BDA
-        lea.l   $2e88c.l,a3                     ;      /05BE0
-	else
-        lea.l   $30fc8.l,a2                     ; 05C3C/     
-        lea.l   $31160.l,a3                     ; 05C42/     
-	endc
+        lea.l   (SPRITE5B_DATA+$44).l,a2        ; 05C3C/05BDA
+        lea.l   (SPRITE7B_DATA+$44).l,a3        ; 05C42/05BE0
         moveq   #$21,d7                         ; 05C48/05BE6
 l_05C4A:
         move.l  (a0)+,(a2)+                     ; 05C4A/05BE8
@@ -4857,13 +4853,8 @@ l_05D48:
         move.l  a1,g_CopperSpare1(a6)           ; 05D68/05DC6
         lea.l   (COPPER_B2).l,a1                ; 05D6C/05DCA
         move.l  a1,g_CopperSpare2(a6)           ; 05D72/05DD0
-	ifd	BUILD_1MB
-        move.l  #$513e0,g_SaveBufA(a6)          ;      /05DD4
-        move.l  #$543e0,g_SaveBufB(a6)          ;      /05DDC
-	else
-        move.l  #$311e8,g_SaveBufA(a6)          ; 05D76/       background save areas, $3000 bytes each: the load buffers BOB_GFX_A / B are free once
-        move.l  #$341e8,g_SaveBufB(a6)          ; 05D7E/       LoadLevel has copied the graphics sets it needs to the end of the level file
-	endc
+        move.l  #SAVE_BUF_A,g_SaveBufA(a6)      ; 05D76/05DD4  background save areas, $3000 bytes each: the load buffers BOB_GFX_A / B are free once
+        move.l  #SAVE_BUF_B,g_SaveBufB(a6)      ; 05D7E/05DDC  LoadLevel has copied the graphics sets it needs to the end of the level file
         lea.l   g_RestoreBufB(a6),a1            ; 05D86/05DE4  empty restore lists (they grow down from $632 and $872)
         clr.w   -(a1)                           ; 05D8A/05DE8
         move.l  a1,g_RestoreListA(a6)           ; 05D8C/05DEA
@@ -4876,17 +4867,10 @@ l_05D48:
         clr.w   g_NewTileY(a6)                  ; 05DA6/05E04
         clr.w   g_ScrollFineX(a6)               ; 05DAA/05E08
         clr.w   g_ScrollFineY(a6)               ; 05DAE/05E0C
-	ifd	BUILD_1MB
-        move.l  #$80,g_ScreenBack(a6)           ;      /05E10
-        move.l  #$b480,g_ScreenFront(a6)        ;      /05E18
-        move.l  #$16880,g_ScreenSpare1(a6)      ;      /05E20
-        move.l  #$21c80,g_ScreenSpare2(a6)      ;      /05E28
-	else
-        move.l  #$37468,g_ScreenBack(a6)        ; 05DB2/       the four screen buffers
-        move.l  #$42868,g_ScreenFront(a6)       ; 05DBA/     
-        move.l  #$4dc68,g_ScreenSpare1(a6)      ; 05DC2/     
-        move.l  #$59068,g_ScreenSpare2(a6)      ; 05DCA/     
-	endc
+        move.l  #SCREEN_0,g_ScreenBack(a6)      ; 05DB2/05E10  the four screen buffers
+        move.l  #SCREEN_1,g_ScreenFront(a6)     ; 05DBA/05E18
+        move.l  #SCREEN_2,g_ScreenSpare1(a6)    ; 05DC2/05E20
+        move.l  #SCREEN_3,g_ScreenSpare2(a6)    ; 05DCA/05E28
         lea.l   (SCREEN_2).l,a0                 ; 05DD2/05E30  unpack the copyright screen (ByteRun1-style RLE) into SCREEN_0
         lea.l   (SCREEN_0).l,a1                 ; 05DD8/05E36
         moveq   #$20,d5                         ; 05DDE/05E3C
@@ -4935,11 +4919,7 @@ l_05E36:
         clr.w   g_Level(a6)                     ; 05E46/05E9C
         clr.b   g_Checkpoint(a6)                ; 05E4A/05EA0
         clr.b   g_CheatOn(a6)                   ; 05E4E/05EA4
-	ifd	BUILD_1MB
-        move.l  #$573e0,g_LevelFileAddr(a6)     ;      /05EA8
-	else
-        move.l  #$65548,g_LevelFileAddr(a6)     ; 05E52/     
-	endc
+        move.l  #LEVEL_FILE,g_LevelFileAddr(a6) ; 05E52/05EA8
         bsr.w   RedrawScreen                    ; 05E5A/05EB0
         bsr.w   SwapScreens                     ; 05E5E/05EB4
         bsr.w   SetBitplanePtrs                 ; 05E62/05EB8
@@ -4968,11 +4948,9 @@ IdleLoop:
 ; (kept as bytes: the code is only reached through the patched return address)
 ;---------------------------------------------------------------------------
 RedrawEntry:
-	ifd	BUILD_1MB
-	dc.b	$61,$00,$60,$6E,$42,$2E,$00,$22,$60,$FE
-	else
-	dc.b	$61,$00,$61,$30,$42,$2E,$00,$1E,$60,$FE
-	endc
+        bsr.w   RedrawScreen                    ; 05EAC/05F02  the redraw VblIRQ asked for (user mode)
+        clr.b   g_SkipLogic(a6)                 ; 05EB0/05F06  let the logic run again
+        bra.b   *                               ; 05EB4/05F0A  idle until the next interrupt
 
 ;---------------------------------------------------------------------------
 ; ==================================================================
@@ -7366,11 +7344,7 @@ l_077AA:
         dbra    d7,l_077AA                      ; 077AC/07814
         bsr.w   SetMapBitplanePtrs              ; 077B0/07818
         lea.l   CUSTOM,a0                       ; 077B4/0781C
-	ifd	BUILD_1MB
-        move.l  #$2e29c,COP2LCH(a0)             ;      /07822
-	else
-        move.l  #$1a250,COP2LCH(a0)             ; 077BA/       map copper list
-	endc
+        move.l  #COPPER_MAP,COP2LCH(a0)         ; 077BA/07822  map copper list
         bsr.w   SwapScreens                     ; 077C2/0782A
         move.w  g_Level(a6),d0                  ; 077C6/0782E  marker = ProgressMapMarkers[level][checkpoint]
         lsl.w   #$3,d0                          ; 077CA/07832
@@ -7877,11 +7851,7 @@ InitHardware:
         clr.b   g_RedrawPending(a6)             ; 07DAA/07E00
         st.b    g_SkipLogic(a6)                 ; 07DAE/07E04
         move.l  g_CopperFront(a6),COP2LCH(a0)   ; 07DB2/07E08  copper: COP1 = the init list at COPPER_INIT, COP2 = the front list
-	ifd	BUILD_1MB
-        move.l  #$2e164,COP1LCH(a0)             ;      /07E0E
-	else
-        move.l  #$1a118,COP1LCH(a0)             ; 07DB8/     
-	endc
+        move.l  #COPPER_INIT,COP1LCH(a0)        ; 07DB8/07E0E
         move.w  COPJMP1(a0),d0                  ; 07DC0/07E16
         move.w  #INTF_INTEN|INTF_EXTER|INTF_DSKSYNC|INTF_RBF|INTF_AUD3|INTF_AUD2|INTF_AUD1|INTF_AUD0|INTF_BLIT|INTF_VERTB|INTF_COPER|INTF_PORTS|INTF_SOFTINT|INTF_DSKBLK|INTF_TBE,INTENA(a0); 07DC4/07E1A  all interrupts off before installing the vectors
         lea.l   Level1Logic(pc),a1              ; 07DCA/07E20  level 1 autovector
@@ -7890,11 +7860,7 @@ InitHardware:
         move.l  a1,(VEC_LEVEL2).w               ; 07DD6/07E2C
         lea.l   VblIRQ(pc),a1                   ; 07DDA/07E30  level 3 autovector
         move.l  a1,(VEC_LEVEL3).w               ; 07DDE/07E34
-	ifd	BUILD_1MB
-        clr.l   $2e160.l                        ;      /07E38  clear the long before COPPER_INIT
-	else
-        clr.l   $1a114.l                        ; 07DE2/       clear the long before COPPER_INIT
-	endc
+        clr.l   (COPPER_INIT-4).l               ; 07DE2/07E38  clear the long before COPPER_INIT
         move.w  #DMAF_SETCLR|DMAF_BLITHOG|DMAF_MASTER|DMAF_RASTER|DMAF_COPPER|DMAF_BLITTER|DMAF_SPRITE|DMAF_DISK,DMACON(a0); 07DE8/07E3E  DMA on: blitter priority, master, bitplanes, copper, blitter, sprites, disk
         move.w  #INTF_INTEN|INTF_EXTER|INTF_DSKSYNC|INTF_RBF|INTF_AUD3|INTF_AUD2|INTF_AUD1|INTF_AUD0|INTF_BLIT|INTF_VERTB|INTF_COPER|INTF_PORTS|INTF_SOFTINT|INTF_DSKBLK|INTF_TBE,INTREQ(a0); 07DEE/07E44
         move.w  #INTF_SETCLR|INTF_INTEN|INTF_VERTB|INTF_PORTS|INTF_SOFTINT,INTENA(a0); 07DF4/07E4A  INTENA = SET|INTEN|VERTB|PORTS|SOFTINT
@@ -7916,116 +7882,60 @@ l_07DFA:
 ; then the copper interrupt and a jump to COP2 (the front list)
 CopperTemplate:
 	dc.w	BPLCON1,$0000	; no fine scroll
-	ifd	BUILD_1MB
-	dc.w	BPL1PTH,$0002,BPL1PTL,$D080	; BPL1PT = $2D080
-	dc.w	BPL2PTH,$0002,BPL2PTL,$D0A4	; BPL2PT = $2D0A4
-	dc.w	BPL3PTH,$0002,BPL3PTL,$D0C8	; BPL3PT = $2D0C8
-	dc.w	BPL4PTH,$0002,BPL4PTL,$D0EC	; BPL4PT = $2D0EC
-	dc.w	BPL5PTH,$0002,BPL5PTL,$D110	; BPL5PT = $2D110
-	dc.w	SPR0PTH,$0002,SPR0PTL,$E5E4	; SPR0PT = $2E5E4
-	dc.w	SPR1PTH,$0002,SPR1PTL,$E6B0	; SPR1PT = $2E6B0
-	dc.w	SPR2PTH,$0002,SPR2PTL,$E77C	; SPR2PT = $2E77C
-	dc.w	SPR3PTH,$0002,SPR3PTL,$E848	; SPR3PT = $2E848
-	dc.w	SPR4PTH,$0002,SPR4PTL,$E2E4	; SPR4PT = $2E2E4
-	dc.w	SPR5PTH,$0002,SPR5PTL,$E3A4	; SPR5PT = $2E3A4
-	dc.w	SPR6PTH,$0002,SPR6PTL,$E464	; SPR6PT = $2E464
-	dc.w	SPR7PTH,$0002,SPR7PTL,$E524	; SPR7PT = $2E524
-	else
-	dc.w	BPL1PTH,$0006,BPL1PTL,$4468	; BPL1PT = $64468
-	dc.w	BPL2PTH,$0006,BPL2PTL,$448C	; BPL2PT = $6448C
-	dc.w	BPL3PTH,$0006,BPL3PTL,$44B0	; BPL3PT = $644B0
-	dc.w	BPL4PTH,$0006,BPL4PTL,$44D4	; BPL4PT = $644D4
-	dc.w	BPL5PTH,$0006,BPL5PTL,$44F8	; BPL5PT = $644F8
-	dc.w	SPR0PTH,$0003,SPR0PTL,$0EB8	; SPR0PT = $30EB8
-	dc.w	SPR1PTH,$0003,SPR1PTL,$0F84	; SPR1PT = $30F84
-	dc.w	SPR2PTH,$0003,SPR2PTL,$1050	; SPR2PT = $31050
-	dc.w	SPR3PTH,$0003,SPR3PTL,$111C	; SPR3PT = $3111C
-	dc.w	SPR4PTH,$0003,SPR4PTL,$0BB8	; SPR4PT = $30BB8
-	dc.w	SPR5PTH,$0003,SPR5PTL,$0C78	; SPR5PT = $30C78
-	dc.w	SPR6PTH,$0003,SPR6PTL,$0D38	; SPR6PT = $30D38
-	dc.w	SPR7PTH,$0003,SPR7PTL,$0DF8	; SPR7PT = $30DF8
-	endc
+	COPPTR	BPL1,CLEAR_AREA	; $64468
+	COPPTR	BPL2,CLEAR_AREA+$24	; $6448C
+	COPPTR	BPL3,CLEAR_AREA+$48	; $644B0
+	COPPTR	BPL4,CLEAR_AREA+$6C	; $644D4
+	COPPTR	BPL5,CLEAR_AREA+$90	; $644F8
+	COPPTR	SPR0,SPRITE4B_DATA	; $30EB8
+	COPPTR	SPR1,SPRITE5B_DATA	; $30F84
+	COPPTR	SPR2,SPRITE6B_DATA	; $31050
+	COPPTR	SPR3,SPRITE7B_DATA	; $3111C
+	COPPTR	SPR4,SPRITE0_DATA	; $30BB8
+	COPPTR	SPR5,SPRITE1_DATA	; $30C78
+	COPPTR	SPR6,SPRITE2_DATA	; $30D38
+	COPPTR	SPR7,SPRITE3_DATA	; $30DF8
 	dc.w	$4401,$FF00	; WAIT line $44
 	dc.w	INTREQ,$8010	; set COPER: the copper interrupt (level 3)
 	dc.w	COPJMP2,$0000	; jump to COP2LC (the front list)
 ; COPPER_A1: playfield planes in SCREEN_0 (one of the four lists COP2 points at)
-	ifd	BUILD_1MB
-	dc.w	BPL1PTH,$0000,BPL1PTL,$0082	; BPL1PT = $00082
-	dc.w	BPL2PTH,$0000,BPL2PTL,$00A6	; BPL2PT = $000A6
-	dc.w	BPL3PTH,$0000,BPL3PTL,$00CA	; BPL3PT = $000CA
-	dc.w	BPL4PTH,$0000,BPL4PTL,$00EE	; BPL4PT = $000EE
-	dc.w	BPL5PTH,$0000,BPL5PTL,$0112	; BPL5PT = $00112
-	else
-	dc.w	BPL1PTH,$0003,BPL1PTL,$746A	; BPL1PT = $3746A
-	dc.w	BPL2PTH,$0003,BPL2PTL,$748E	; BPL2PT = $3748E
-	dc.w	BPL3PTH,$0003,BPL3PTL,$74B2	; BPL3PT = $374B2
-	dc.w	BPL4PTH,$0003,BPL4PTL,$74D6	; BPL4PT = $374D6
-	dc.w	BPL5PTH,$0003,BPL5PTL,$74FA	; BPL5PT = $374FA
-	endc
+	COPPTR	BPL1,SCREEN_0+$2	; $3746A
+	COPPTR	BPL2,SCREEN_0+$26	; $3748E
+	COPPTR	BPL3,SCREEN_0+$4A	; $374B2
+	COPPTR	BPL4,SCREEN_0+$6E	; $374D6
+	COPPTR	BPL5,SCREEN_0+$92	; $374FA
 	dc.w	BPLCON1,$0000	; no fine scroll
 	dc.w	$FFFF,$FFFE	; end of list
 ; COPPER_A2: SCREEN_1
-	ifd	BUILD_1MB
-	dc.w	BPL1PTH,$0000,BPL1PTL,$B482	; BPL1PT = $0B482
-	dc.w	BPL2PTH,$0000,BPL2PTL,$B4A6	; BPL2PT = $0B4A6
-	dc.w	BPL3PTH,$0000,BPL3PTL,$B4CA	; BPL3PT = $0B4CA
-	dc.w	BPL4PTH,$0000,BPL4PTL,$B4EE	; BPL4PT = $0B4EE
-	dc.w	BPL5PTH,$0000,BPL5PTL,$B512	; BPL5PT = $0B512
-	else
-	dc.w	BPL1PTH,$0004,BPL1PTL,$286A	; BPL1PT = $4286A
-	dc.w	BPL2PTH,$0004,BPL2PTL,$288E	; BPL2PT = $4288E
-	dc.w	BPL3PTH,$0004,BPL3PTL,$28B2	; BPL3PT = $428B2
-	dc.w	BPL4PTH,$0004,BPL4PTL,$28D6	; BPL4PT = $428D6
-	dc.w	BPL5PTH,$0004,BPL5PTL,$28FA	; BPL5PT = $428FA
-	endc
+	COPPTR	BPL1,SCREEN_1+$2	; $4286A
+	COPPTR	BPL2,SCREEN_1+$26	; $4288E
+	COPPTR	BPL3,SCREEN_1+$4A	; $428B2
+	COPPTR	BPL4,SCREEN_1+$6E	; $428D6
+	COPPTR	BPL5,SCREEN_1+$92	; $428FA
 	dc.w	BPLCON1,$0000	; no fine scroll
 	dc.w	$FFFF,$FFFE	; end of list
 ; COPPER_B1: SCREEN_2
-	ifd	BUILD_1MB
-	dc.w	BPL1PTH,$0001,BPL1PTL,$6882	; BPL1PT = $16882
-	dc.w	BPL2PTH,$0001,BPL2PTL,$68A6	; BPL2PT = $168A6
-	dc.w	BPL3PTH,$0001,BPL3PTL,$68CA	; BPL3PT = $168CA
-	dc.w	BPL4PTH,$0001,BPL4PTL,$68EE	; BPL4PT = $168EE
-	dc.w	BPL5PTH,$0001,BPL5PTL,$6912	; BPL5PT = $16912
-	else
-	dc.w	BPL1PTH,$0004,BPL1PTL,$DC6A	; BPL1PT = $4DC6A
-	dc.w	BPL2PTH,$0004,BPL2PTL,$DC8E	; BPL2PT = $4DC8E
-	dc.w	BPL3PTH,$0004,BPL3PTL,$DCB2	; BPL3PT = $4DCB2
-	dc.w	BPL4PTH,$0004,BPL4PTL,$DCD6	; BPL4PT = $4DCD6
-	dc.w	BPL5PTH,$0004,BPL5PTL,$DCFA	; BPL5PT = $4DCFA
-	endc
+	COPPTR	BPL1,SCREEN_2+$2	; $4DC6A
+	COPPTR	BPL2,SCREEN_2+$26	; $4DC8E
+	COPPTR	BPL3,SCREEN_2+$4A	; $4DCB2
+	COPPTR	BPL4,SCREEN_2+$6E	; $4DCD6
+	COPPTR	BPL5,SCREEN_2+$92	; $4DCFA
 	dc.w	BPLCON1,$0000	; no fine scroll
 	dc.w	$FFFF,$FFFE	; end of list
 ; COPPER_B2: SCREEN_3
-	ifd	BUILD_1MB
-	dc.w	BPL1PTH,$0002,BPL1PTL,$1C82	; BPL1PT = $21C82
-	dc.w	BPL2PTH,$0002,BPL2PTL,$1CA6	; BPL2PT = $21CA6
-	dc.w	BPL3PTH,$0002,BPL3PTL,$1CCA	; BPL3PT = $21CCA
-	dc.w	BPL4PTH,$0002,BPL4PTL,$1CEE	; BPL4PT = $21CEE
-	dc.w	BPL5PTH,$0002,BPL5PTL,$1D12	; BPL5PT = $21D12
-	else
-	dc.w	BPL1PTH,$0005,BPL1PTL,$906A	; BPL1PT = $5906A
-	dc.w	BPL2PTH,$0005,BPL2PTL,$908E	; BPL2PT = $5908E
-	dc.w	BPL3PTH,$0005,BPL3PTL,$90B2	; BPL3PT = $590B2
-	dc.w	BPL4PTH,$0005,BPL4PTL,$90D6	; BPL4PT = $590D6
-	dc.w	BPL5PTH,$0005,BPL5PTL,$90FA	; BPL5PT = $590FA
-	endc
+	COPPTR	BPL1,SCREEN_3+$2	; $5906A
+	COPPTR	BPL2,SCREEN_3+$26	; $5908E
+	COPPTR	BPL3,SCREEN_3+$4A	; $590B2
+	COPPTR	BPL4,SCREEN_3+$6E	; $590D6
+	COPPTR	BPL5,SCREEN_3+$92	; $590FA
 	dc.w	BPLCON1,$0000	; no fine scroll
 	dc.w	$FFFF,$FFFE	; end of list
 ; COPPER_MAP: the between-level progress map (50-byte lines, modulo $D8 then $92)
-	ifd	BUILD_1MB
-	dc.w	BPL1PTH,$0001,BPL1PTL,$6882	; BPL1PT = $16882
-	dc.w	BPL2PTH,$0001,BPL2PTL,$68B4	; BPL2PT = $168B4
-	dc.w	BPL3PTH,$0001,BPL3PTL,$68E6	; BPL3PT = $168E6
-	dc.w	BPL4PTH,$0001,BPL4PTL,$6918	; BPL4PT = $16918
-	dc.w	BPL5PTH,$0001,BPL5PTL,$694A	; BPL5PT = $1694A
-	else
-	dc.w	BPL1PTH,$0004,BPL1PTL,$DC6A	; BPL1PT = $4DC6A
-	dc.w	BPL2PTH,$0004,BPL2PTL,$DC9C	; BPL2PT = $4DC9C
-	dc.w	BPL3PTH,$0004,BPL3PTL,$DCCE	; BPL3PT = $4DCCE
-	dc.w	BPL4PTH,$0004,BPL4PTL,$DD00	; BPL4PT = $4DD00
-	dc.w	BPL5PTH,$0004,BPL5PTL,$DD32	; BPL5PT = $4DD32
-	endc
+	COPPTR	BPL1,SCREEN_2+$2	; $4DC6A
+	COPPTR	BPL2,SCREEN_2+$34	; $4DC9C
+	COPPTR	BPL3,SCREEN_2+$66	; $4DCCE
+	COPPTR	BPL4,SCREEN_2+$98	; $4DD00
+	COPPTR	BPL5,SCREEN_2+$CA	; $4DD32
 	dc.w	BPLCON1,$0000	; no fine scroll
 	dc.w	BPL1MOD,$00D8
 	dc.w	BPL2MOD,$00D8
@@ -8058,104 +7968,72 @@ FileTable:
 	ifd	BUILD_1MB
 	FENTRY	$00080,$05400,33	; tracks 33-36: Arthur's sprite frames
 	else
-	FENTRY	$37468,$05400,33	; tracks 33-36: Arthur's sprite frames
+	FENTRY	SCREEN_0,$05400,33                     ; tracks 33-36: Arthur's sprite frames
 	endc
 FileSmallBobs:
 	ifd	BUILD_1MB
 	FENTRY	$00080,$00D20,37	; track 37: small item / scenery BOBs
 	else
-	FENTRY	$311E8,$00D20,37	; track 37: small item / scenery BOBs
+	FENTRY	BOB_GFX_A,$00D20,37                    ; track 37: small item / scenery BOBs
 	endc
 FileEnemyBobs:
 	ifd	BUILD_1MB
 	FENTRY	$00080,$1D042,38	; tracks 38-56: enemy BOB sets
 	else
-	FENTRY	$37468,$1D042,38	; tracks 38-56: enemy BOB sets
+	FENTRY	SCREEN_0,$1D042,38                     ; tracks 38-56: enemy BOB sets
 	endc
 FileItemGfx2:
 	ifd	BUILD_1MB
 	FENTRY	$00080,$00EA6,57	; track 57: weapon / effect BOBs, tail
 	else
-	FENTRY	$1CF8E,$00EA6,57	; track 57: weapon / effect BOBs, tail
+	FENTRY	ITEM_GFX2_BUF,$00EA6,57                ; track 57: weapon / effect BOBs, tail
 	endc
 FileEnemyShotGfx:
 	ifd	BUILD_1MB
 	FENTRY	$00080,$01234,58	; track 58: enemy shot BOBs
 	else
-	FENTRY	$1A298,$01234,58	; track 58: enemy shot BOBs
+	FENTRY	ESHOT_GFX_BUF,$01234,58                ; track 58: enemy shot BOBs
 	endc
 FileItemGfx:
 	ifd	BUILD_1MB
 	FENTRY	$00080,$01AC2,59	; tracks 59-60: weapon / pickup / effect BOBs
 	else
-	FENTRY	$1B4CC,$01AC2,59	; tracks 59-60: weapon / pickup / effect BOBs
+	FENTRY	ITEM_GFX_BUF,$01AC2,59                 ; tracks 59-60: weapon / pickup / effect BOBs
 	endc
 FileFont:
 	ifd	BUILD_1MB
 	FENTRY	$00080,$01840,61	; track 61: font
 	else
-	FENTRY	$37468,$01840,61	; track 61: font
+	FENTRY	SCREEN_0,$01840,61                     ; track 61: font
 	endc
 FileProgressMap:
 	ifd	BUILD_1MB
 	FENTRY	$00080,$01D5C,62	; tracks 62-63: progress map (RLE)
 	else
-	FENTRY	$311E8,$01D5C,62	; tracks 62-63: progress map (RLE)
+	FENTRY	BOB_GFX_A,$01D5C,62                    ; tracks 62-63: progress map (RLE)
 	endc
 FileMusic:
 	ifd	BUILD_1MB
-	FENTRY	$3604C,$1B394,64	; tracks 64-81: sound driver, music and effects (1MB)
+	FENTRY	MUSIC_FILE,$1B394,64                   ; tracks 64-81: sound driver, music and effects (1MB)
 	else
-	FENTRY	$28E54,$07D64,126	; tracks 126-131: sound driver and effects (512K)
+	FENTRY	MUSIC_FILE,$07D64,126                  ; tracks 126-131: sound driver and effects (512K)
 	endc
 FileCopyrightScreen:
-	ifd	BUILD_1MB
-	FENTRY	$16880,$025FE,82	; tracks 82-83: copyright warning screen (RLE)
-	else
-	FENTRY	$4DC68,$025FE,82	; tracks 82-83: copyright warning screen (RLE)
-	endc
+	FENTRY	SCREEN_2,$025FE,82                     ; tracks 82-83: copyright warning screen (RLE)
 FileLevel0:
-	ifd	BUILD_1MB
-	FENTRY	$573E0,$07440,84	; tracks 84-88: level 0 tiles
-	else
-	FENTRY	$65548,$07440,84	; tracks 84-88: level 0 tiles
-	endc
+	FENTRY	LEVEL_FILE,$07440,84                   ; tracks 84-88: level 0 tiles
 FileLevel1:
-	ifd	BUILD_1MB
-	FENTRY	$573E0,$0C120,89	; tracks 89-96: level 1 tiles
-	else
-	FENTRY	$65548,$0C120,89	; tracks 89-96: level 1 tiles
-	endc
+	FENTRY	LEVEL_FILE,$0C120,89                   ; tracks 89-96: level 1 tiles
 FileLevel2:
-	ifd	BUILD_1MB
-	FENTRY	$573E0,$05460,97	; tracks 97-100: level 2 tiles
-	else
-	FENTRY	$65548,$05460,97	; tracks 97-100: level 2 tiles
-	endc
+	FENTRY	LEVEL_FILE,$05460,97                   ; tracks 97-100: level 2 tiles
 FileLevel3:
-	ifd	BUILD_1MB
-	FENTRY	$573E0,$04880,101	; tracks 101-103: level 3 tiles
-	else
-	FENTRY	$65548,$04880,101	; tracks 101-103: level 3 tiles
-	endc
+	FENTRY	LEVEL_FILE,$04880,101                  ; tracks 101-103: level 3 tiles
 FileLevel4:
-	ifd	BUILD_1MB
-	FENTRY	$573E0,$02760,104	; tracks 104-105: level 4 tiles
-	else
-	FENTRY	$65548,$02760,104	; tracks 104-105: level 4 tiles
-	endc
+	FENTRY	LEVEL_FILE,$02760,104                  ; tracks 104-105: level 4 tiles
 FileLevel5:
-	ifd	BUILD_1MB
-	FENTRY	$573E0,$029E0,106	; tracks 106-107: level 5 tiles
-	else
-	FENTRY	$65548,$029E0,106	; tracks 106-107: level 5 tiles
-	endc
+	FENTRY	LEVEL_FILE,$029E0,106                  ; tracks 106-107: level 5 tiles
 FileLevel6:
-	ifd	BUILD_1MB
-	FENTRY	$573E0,$019A0,108	; tracks 108-109: level 6 tiles
-	else
-	FENTRY	$65548,$019A0,108	; tracks 108-109: level 6 tiles
-	endc
+	FENTRY	LEVEL_FILE,$019A0,108                  ; tracks 108-109: level 6 tiles
 
 ;---------------------------------------------------------------------------
 ; Switch to the screen RedrawScreen has just drawn at g_NewTileX/Y: the pending
@@ -11402,11 +11280,7 @@ QueueExplosionDraw:
         move.w  d4,d0                           ; 09FE8/0A04C
         lsr.w   #$1,d0                          ; 09FEA/0A04E
         sub.w   d0,d2                           ; 09FEC/0A050
-	ifd	BUILD_1MB
-        lea.l   (ITEM_GFX_BUF).l,a1             ;      /0A052  explosion graphics + this frame
-	else
-        lea.l   $1b4cc.l,a1                     ; 09FEE/       explosion graphics + this frame
-	endc
+        lea.l   (ITEM_GFX_BUF).l,a1             ; 09FEE/0A052  explosion graphics + this frame
         lea.l   EffectFrames(pc),a2             ; 09FF4/0A058
         move.b  O_Frame(a5),d0                  ; 09FF8/0A05C
         ext.w   d0                              ; 09FFC/0A060
@@ -11729,11 +11603,7 @@ QueueEnemyShotDraw:
         move.w  d4,d0                           ; 0A360/0A3C4
         lsr.w   #$1,d0                          ; 0A362/0A3C6
         sub.w   d0,d2                           ; 0A364/0A3C8
-	ifd	BUILD_1MB
-        lea.l   (ESHOT_GFX_BUF).l,a1            ;      /0A3CA
-	else
-        lea.l   $1a298.l,a1                     ; 0A366/     
-	endc
+        lea.l   (ESHOT_GFX_BUF).l,a1            ; 0A366/0A3CA
         lea.l   EnemyShotFrames(pc),a2          ; 0A36C/0A3D0
         move.b  O_Frame(a5),d0                  ; 0A370/0A3D4
         add.w   d0,d0                           ; 0A374/0A3D8
@@ -11774,11 +11644,7 @@ QueueObjectDraw:
         move.w  d4,d0                           ; 0A3BC/0A420
         lsr.w   #$1,d0                          ; 0A3BE/0A422
         sub.w   d0,d2                           ; 0A3C0/0A424
-	ifd	BUILD_1MB
-        lea.l   (ITEM_GFX_BUF).l,a1             ;      /0A426
-	else
-        lea.l   $1b4cc.l,a1                     ; 0A3C2/     
-	endc
+        lea.l   (ITEM_GFX_BUF).l,a1             ; 0A3C2/0A426
         lea.l   EffectFrames(pc),a2             ; 0A3C8/0A42C
         move.b  O_Frame(a5),d0                  ; 0A3CC/0A430
         add.w   d0,d0                           ; 0A3D0/0A434
@@ -12472,12 +12338,12 @@ l_0A9AC:
         seq.b   (a2)                            ; 0A9BE/0AA22
         bne.w   l_0AADC                         ; 0A9C0/0AA24
         bra.b   l_0A9DA                         ; 0A9C4/0AA28
-	ifd	BUILD_1MB
-	dc.b	$4A,$2A,$00,$1D,$67,$0E,$08,$2A,$00,$02,$00,$0B,$66,$06,$42,$12
-	else
-	dc.b	$4A,$2A,$00,$19,$67,$0E,$08,$2A,$00,$02,$00,$0B,$66,$06,$42,$12
-	endc
-	dc.b	$60,$00,$01,$04
+        tst.b   G_SHIFT+$19(a2)                 ; 0A9C6/0AA2A  (never reached: nothing branches here)
+        beq.b   l_0A9DA                         ; 0A9CA/0AA2E
+        btst    #$2,$b(a2)                      ; 0A9CC/0AA30
+        bne.b   l_0A9DA                         ; 0A9D2/0AA36
+        clr.b   (a2)                            ; 0A9D4/0AA38
+        bra.w   l_0AADC                         ; 0A9D6/0AA3A
 l_0A9DA:
         movea.l $6(a2),a1                       ; 0A9DA/0AA3E  restart the script: count and first entry
         move.w  (a1)+,d0                        ; 0A9DE/0AA42
@@ -13017,17 +12883,10 @@ DrawWeaponIcon:
         lea.l   WeaponIcons(pc),a0              ; 0AEBC/0AF20
         adda.w  d0,a0                           ; 0AEC0/0AF24
         lea.l   $40(a0),a1                      ; 0AEC2/0AF26
-	ifd	BUILD_1MB
-        lea.l   $2e64d.l,a2                     ;      /0AF2A
-        lea.l   $2e7e4.l,a3                     ;      /0AF30
-        lea.l   $2e719.l,a4                     ;      /0AF36
-        lea.l   $2e8b0.l,a5                     ;      /0AF3C
-	else
-        lea.l   $30f21.l,a2                     ; 0AEC6/     
-        lea.l   $310b8.l,a3                     ; 0AECC/     
-        lea.l   $30fed.l,a4                     ; 0AED2/     
-        lea.l   $31184.l,a5                     ; 0AED8/     
-	endc
+        lea.l   (SPRITE4B_DATA+$69).l,a2        ; 0AEC6/0AF2A
+        lea.l   (SPRITE6B_DATA+$68).l,a3        ; 0AECC/0AF30
+        lea.l   (SPRITE5B_DATA+$69).l,a4        ; 0AED2/0AF36
+        lea.l   (SPRITE7B_DATA+$68).l,a5        ; 0AED8/0AF3C
         moveq   #$f,d6                          ; 0AEDE/0AF42
 l_0AEE0:
         move.b  (a0)+,d0                        ; 0AEE0/0AF44
@@ -13100,43 +12959,23 @@ l_0AF80:
         bls.b   l_0AF88                         ; 0AF84/0AFEC
         moveq   #$7,d0                          ; 0AF86/0AFEE
 l_0AF88:
-	ifd	BUILD_1MB
-        lea.l   $2e4f4.l,a1                     ;      /0AFF0
-        lea.l   $2e5b4.l,a2                     ;      /0AFF6
-	else
-        lea.l   $30dc8.l,a1                     ; 0AF88/     
-        lea.l   $30e88.l,a2                     ; 0AF8E/     
-	endc
+        lea.l   (SPRITE6_DATA+$C).l,a1          ; 0AF88/0AFF0
+        lea.l   (SPRITE7_DATA+$C).l,a2          ; 0AF8E/0AFF6
         bra.b   HudDigit                        ; 0AF94/0AFFC
 DrawTimer:
         move.b  g_TimeLeft(a6),d0               ; 0AF96/0AFFE
-	ifd	BUILD_1MB
-        lea.l   $2e608.l,a1                     ;      /0B002
-        lea.l   $2e6d4.l,a2                     ;      /0B008
-	else
-        lea.l   $30edc.l,a1                     ; 0AF9A/     
-        lea.l   $30fa8.l,a2                     ; 0AFA0/     
-	endc
+        lea.l   (SPRITE4B_DATA+$24).l,a1        ; 0AF9A/0B002
+        lea.l   (SPRITE5B_DATA+$24).l,a2        ; 0AFA0/0B008
         bsr.w   HudDigit                        ; 0AFA6/0B00E
         move.b  g_TimeLeft+1(a6),d0             ; 0AFAA/0B012
         lsr.b   #$4,d0                          ; 0AFAE/0B016
-	ifd	BUILD_1MB
-        lea.l   $2e7a0.l,a1                     ;      /0B018
-        lea.l   $2e86c.l,a2                     ;      /0B01E
-	else
-        lea.l   $31074.l,a1                     ; 0AFB0/     
-        lea.l   $31140.l,a2                     ; 0AFB6/     
-	endc
+        lea.l   (SPRITE6B_DATA+$24).l,a1        ; 0AFB0/0B018
+        lea.l   (SPRITE7B_DATA+$24).l,a2        ; 0AFB6/0B01E
         bsr.w   HudDigit                        ; 0AFBC/0B024
         moveq   #$f,d0                          ; 0AFC0/0B028
         and.b   g_TimeLeft+1(a6),d0             ; 0AFC2/0B02A
-	ifd	BUILD_1MB
-        lea.l   $2e7a1.l,a1                     ;      /0B02E
-        lea.l   $2e86d.l,a2                     ;      /0B034
-	else
-        lea.l   $31075.l,a1                     ; 0AFC6/     
-        lea.l   $31141.l,a2                     ; 0AFCC/     
-	endc
+        lea.l   (SPRITE6B_DATA+$25).l,a1        ; 0AFC6/0B02E
+        lea.l   (SPRITE7B_DATA+$25).l,a2        ; 0AFCC/0B034
         bra.w   HudDigit                        ; 0AFD2/0B03A
 
 ;---------------------------------------------------------------------------
@@ -13194,14 +13033,66 @@ PrintHexByte:	; (no references found - unused/debug code)
         move.b  d4,d0                           ; 0B036/0B09E
         move.w  (a7)+,d4                        ; 0B038/0B0A0
         rts                                     ; 0B03A/0B0A2
-	dc.b	$3F,$04,$38,$00,$70,$0F,$E9,$5C,$C0,$04,$61,$68,$70,$0F,$E9,$5C
-	dc.b	$C0,$04,$61,$60,$70,$0F,$E9,$5C,$C0,$04,$61,$58,$70,$0F,$E9,$5C
-	dc.b	$C0,$04,$61,$50,$30,$04,$38,$1F,$4E,$75,$2F,$04,$28,$00,$70,$0F
-	dc.b	$E9,$9C,$C0,$04,$61,$3E,$70,$0F,$E9,$9C,$C0,$04,$61,$36,$70,$0F
-	dc.b	$E9,$9C,$C0,$04,$61,$2E,$70,$0F,$E9,$9C,$C0,$04,$61,$26,$70,$0F
-	dc.b	$E9,$9C,$C0,$04,$61,$1E,$70,$0F,$E9,$9C,$C0,$04,$61,$16,$70,$0F
-	dc.b	$E9,$9C,$C0,$04,$61,$0E,$70,$0F,$E9,$9C,$C0,$04,$61,$06,$20,$04
-	dc.b	$28,$1F,$4E,$75
+PrintHexWord:	; (no references found - unused/debug code): d0.w as four hex digits
+        move.w  d4,-(a7)                        ; 0B03C/0B0A4
+        move.w  d0,d4                           ; 0B03E/0B0A6
+        moveq   #$f,d0                          ; 0B040/0B0A8
+        rol.w   #$4,d4                          ; 0B042/0B0AA
+        and.b   d4,d0                           ; 0B044/0B0AC
+        bsr.b   PrintChar                       ; 0B046/0B0AE
+        moveq   #$f,d0                          ; 0B048/0B0B0
+        rol.w   #$4,d4                          ; 0B04A/0B0B2
+        and.b   d4,d0                           ; 0B04C/0B0B4
+        bsr.b   PrintChar                       ; 0B04E/0B0B6
+        moveq   #$f,d0                          ; 0B050/0B0B8
+        rol.w   #$4,d4                          ; 0B052/0B0BA
+        and.b   d4,d0                           ; 0B054/0B0BC
+        bsr.b   PrintChar                       ; 0B056/0B0BE
+        moveq   #$f,d0                          ; 0B058/0B0C0
+        rol.w   #$4,d4                          ; 0B05A/0B0C2
+        and.b   d4,d0                           ; 0B05C/0B0C4
+        bsr.b   PrintChar                       ; 0B05E/0B0C6
+        move.w  d4,d0                           ; 0B060/0B0C8
+        move.w  (a7)+,d4                        ; 0B062/0B0CA
+        rts                                     ; 0B064/0B0CC
+PrintHexLong:	; (no references found - unused/debug code): d0.l as eight hex digits
+        move.l  d4,-(a7)                        ; 0B066/0B0CE
+        move.l  d0,d4                           ; 0B068/0B0D0
+        moveq   #$f,d0                          ; 0B06A/0B0D2
+        rol.l   #$4,d4                          ; 0B06C/0B0D4
+        and.b   d4,d0                           ; 0B06E/0B0D6
+        bsr.b   PrintChar                       ; 0B070/0B0D8
+        moveq   #$f,d0                          ; 0B072/0B0DA
+        rol.l   #$4,d4                          ; 0B074/0B0DC
+        and.b   d4,d0                           ; 0B076/0B0DE
+        bsr.b   PrintChar                       ; 0B078/0B0E0
+        moveq   #$f,d0                          ; 0B07A/0B0E2
+        rol.l   #$4,d4                          ; 0B07C/0B0E4
+        and.b   d4,d0                           ; 0B07E/0B0E6
+        bsr.b   PrintChar                       ; 0B080/0B0E8
+        moveq   #$f,d0                          ; 0B082/0B0EA
+        rol.l   #$4,d4                          ; 0B084/0B0EC
+        and.b   d4,d0                           ; 0B086/0B0EE
+        bsr.b   PrintChar                       ; 0B088/0B0F0
+        moveq   #$f,d0                          ; 0B08A/0B0F2
+        rol.l   #$4,d4                          ; 0B08C/0B0F4
+        and.b   d4,d0                           ; 0B08E/0B0F6
+        bsr.b   PrintChar                       ; 0B090/0B0F8
+        moveq   #$f,d0                          ; 0B092/0B0FA
+        rol.l   #$4,d4                          ; 0B094/0B0FC
+        and.b   d4,d0                           ; 0B096/0B0FE
+        bsr.b   PrintChar                       ; 0B098/0B100
+        moveq   #$f,d0                          ; 0B09A/0B102
+        rol.l   #$4,d4                          ; 0B09C/0B104
+        and.b   d4,d0                           ; 0B09E/0B106
+        bsr.b   PrintChar                       ; 0B0A0/0B108
+        moveq   #$f,d0                          ; 0B0A2/0B10A
+        rol.l   #$4,d4                          ; 0B0A4/0B10C
+        and.b   d4,d0                           ; 0B0A6/0B10E
+        bsr.b   PrintChar                       ; 0B0A8/0B110
+        move.l  d4,d0                           ; 0B0AA/0B112
+        move.l  (a7)+,d4                        ; 0B0AC/0B114
+        rts                                     ; 0B0AE/0B116
 
 ;---------------------------------------------------------------------------
 ; PrintChar - draw character d0 at byte column d1, line d2 (line < 32: the HUD
@@ -14300,7 +14191,7 @@ l_0BB68:
         move.w  d6,d1                           ; 0BB94/     
         mulu.w  #$5,d6                          ; 0BB96/     
         sub.w   d0,d6                           ; 0BB9A/     
-        lea.l   $371e8.l,a4                     ; 0BB9C/       build the mask at $371E8 from planes 0-2 ...
+        lea.l   (MASK_LINE_BUF).l,a4            ; 0BB9C/       build the mask at $371E8 from planes 0-2 ...
 l_0BBA2:
         btst    #$6,DMACONR(a2)                 ; 0BBA2/     
         bne.b   l_0BBA2                         ; 0BBA8/     
@@ -15022,7 +14913,7 @@ l_0C2F4:
 	endc
         sub.w   d0,d6                           ; 0C314/0C2B2
 	ifnd	BUILD_1MB
-        lea.l   $371e8.l,a4                     ; 0C316/       mask, then 5 cookie-cut blits (no background save)
+        lea.l   (MASK_LINE_BUF).l,a4            ; 0C316/       mask, then 5 cookie-cut blits (no background save)
 	endc
         move.w  #$4000,(a2)                     ; 0C31C/0C2B4
 	ifnd	BUILD_1MB
@@ -15322,11 +15213,7 @@ WaitDiskReady:
 ;---------------------------------------------------------------------------
 ReadTrackDMA:
         bsr.b   WaitDiskReady                   ; 0C54C/0C480
-	ifd	BUILD_1MB
-        move.l  #$7c000,$20(a0)                 ;      /0C482
-	else
-        move.l  #$33fe8,$20(a0)                 ; 0C54E/       DSKPT = MFM buffer
-	endc
+        move.l  #MFM_BUFFER,$20(a0)             ; 0C54E/0C482  DSKPT = MFM buffer
         move.w  #$9900,$24(a0)                  ; 0C556/0C48A  DSKLEN written twice to start DMA ($1900 words)
         move.w  #$9900,$24(a0)                  ; 0C55C/0C490
 l_0C562:
@@ -15350,11 +15237,7 @@ StepOut:	; (no references found - unused/debug code)
 ; MFM decode into a5 (handles a partial last long); out d1 = stored checksum, d4 = computed, d2 = track number
 ;---------------------------------------------------------------------------
 DecodeTrack:
-	ifd	BUILD_1MB
-        lea.l   $7c002.l,a3                     ;      /0C4B4
-	else
-        lea.l   $33fea.l,a3                     ; 0C580/     
-	endc
+        lea.l   (MFM_BUFFER+$2).l,a3            ; 0C580/0C4B4
         movea.l a5,a4                           ; 0C586/0C4BA
         move.l  #$55555555,d3                   ; 0C588/0C4BC
         move.w  (a3)+,d2                        ; 0C58E/0C4C2
@@ -26947,7 +26830,9 @@ HunkEnd:
 	dc.b	'i40typeEB'
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00,$00,$01,$19,$4A,$40,$01,$FF,$63
 	dc.b	$00,$00,$00,$00,$00,$00,$02,$2E,$31,$37,$00,$00,$00,$00,$00,$28
-	dc.b	$DE,$8E,$00,$01,$19,$58,$40,$01,$FF,$38,$00,$00,$00,$00,$00,$00
+	dc.b		$DE,$8E,$00,$01,$19,$58,$40,$01
+GlobalsBlock:	; the globals (GLOBALS, a6) overlay these bytes at run time
+	dc.b	$FF,$38,$00,$00,$00,$00,$00,$00
 	dc.b	$06
 	dc.b	'Dtab0E1'
 	dc.b	$00,$28,$DD,$BA,$00,$28,$DC,$90,$00,$01,$19,$68,$40,$01,$FF,$46
@@ -26995,6 +26880,7 @@ HunkEnd:
 ; $1898C) is placed over them at run time.
 ;---------------------------------------------------------------------------
 FileTail:
+GlobalsBlock:	; the globals (GLOBALS, a6) overlay these bytes at run time
 	dc.b	$F2,$F3,$ED,$E9,$EC,$EF,$F3,$0C,$10,$0F,$0E,$10,$17,$14,$10,$02
 FileTailP2:
 	dc.b	$F8,$F3,$F4,$F5,$F5,$EB,$EF,$FE,$FE,$FE,$05,$06,$05,$06,$0C,$04

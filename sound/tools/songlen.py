@@ -1,3 +1,6 @@
+"""How long a tune plays: channel_length() follows a channel's voice bytecode (NOTE / REST
+durations, CALL / CALLN patterns expanded) to the end or the JUMP that loops it; used for
+the tune lengths in SOUND.md."""
 import struct
 def channel_length(f,start):
     """Ticks for one pass of a channel: expands CALL/CALLN repeats; stops at END or JUMP. Returns (ticks, ended_by)."""

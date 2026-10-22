@@ -3,52 +3,153 @@
 Ideas and planned work for an enhanced build, roughly in the order they build on each other. The
 enhanced build lives in a separate source tree; the byte-identical sources here stay as they are.
 
-**This is the plan as it stood before the enhanced work.** It was carried out on the
-`enhanced/main` branch, whose `docs/TODO.md` is the up-to-date list (every item there is now
-done or closed); the unticked items here are left as they were.
+**Status (October 2026): every item is done or closed.** The summary list below is the record;
+the numbered sections after it are the plans and measurements as they were made, kept for
+reference (their remarks about what was still open are answered in the summary).
 
 ## Summary of every optimisation discussed
 
-Each line points to the item below with the details and measurements.
+Each line points to the item below with the details and measurements. **Closed:** an item
+decided against, kept for the record with the reason.
 
 **Loading and disk layout**
-- [ ] Own loader and a shared file directory file, read by both the bootblock and the game (1)
-- [ ] Optional second-stage loader to escape the bootblock's 1,024-byte limit (1)
-- [ ] Disk builder lays the files out itself and patches the tables (2)
-- [ ] zx0 compression of every file, decompressed in place (4); about 296 KB less on disk (5)
-- [ ] One main program for both 512K and 1MB instead of two copies: 100 KB less on disk (5)
-- [ ] Font stored without its unused bytes: 3 KB less on disk (5)
+- [x] Own loader and a shared file directory file, read by both the bootblock and the game (1):
+      the 4489_byteloader disk's file table at `$400` (see **Disk**)
+- [x] Optional second-stage loader to escape the bootblock's 1,024-byte limit (1): not needed;
+      the byteloader bootblock fits in 1 KB and copies its loader to `$7FB20`
+- [x] Disk builder lays the files out itself and patches the tables (2): `build_game.py` places
+      every file, writes the file table and checks each file record's length
+- [x] **Closed:** zx0 compression of every file, decompressed in place (4); about 296 KB less on
+      disk (5). On 512K there is no buffer space left to unpack files into (the level area
+      is full with the music in), and every file already fits on the disk (about 100 KB free)
+- [x] One main program for every memory size: the bootblock finds the memory and leaves a machine
+      description at a known place; the program picks its features from it (`gng_game.s`) (7)
+- [x] Slow / fast RAM used on machines that have it: under 1MB of chip RAM the program moves to
+      the expansion at start-up (`EnhRelocate`, a relocation file made by `build_game.py`), and
+      the 1MB music package goes into the chip RAM it left (7)
+- [x] **Closed:** font stored without its unused bytes: 3 KB less on disk only (5); not worth
+      it with the disk not full
 
 **Display and drawing**
-- [ ] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
+- [x] Double-buffered corkscrew scroller with vertical copper wrap: 3 screen buffers instead of 4,
       redraw only the new edge instead of the whole screen; no freezes when falling (3).
-      Background part prototyped and tested on branch `enhanced/main` (interleaved, 141 KB)
-- [ ] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
-- [ ] BOB masks: one-plane masks (+20%, stored or built on demand into a small cache) on 512K;
-      fully pre-masked graphics for one-blit BOBs on 1MB (3)
-- [ ] Possibly draw at 50 fps once the redraw cost is gone (3)
+      Integrated into both programs (512K and 1MB) on branch `enhanced/main`, with a disk image;
+      tested in the emulator side by side with the originals, and in WinUAE (A500, A500 + 512K,
+      A500+, A600, A1200)
+- [x] Pristine background buffer: restore BOBs from it, no save blit, no `$3000` budget (3)
+- [x] Clean changes of display between a level and the progress map (bitplanes off while the
+      screens are rebuilt, switched in the vertical blank), and the loading picture no longer
+      overwritten on 1MB before the copyright screen (branch `enhanced/display`, merged; tried in WinUAE)
+- [x] Raster-time debug build (COLOR00 per stage), then drawing every frame (50 fps instead of
+      the game's 25) on the 512K program too: 50 fps on an A500 except in busy scenes (25 fps
+      there); see `enhanced/docs/SCROLLER.md`, *Frame rate*
+- [x] One-plane BOB masks made at level load on 512K (7 blits per BOB -> 5, about a quarter less
+      blitter work); see `enhanced/docs/SCROLLER.md`, One program for every machine
+- [x] Pre-masked (one-blit) images on 512K as far as each level's memory goes: shots, small
+      BOBs, the dragon, items, then the other sets (stages 4 and 7: every image); see
+      `enhanced/docs/SCROLLER.md`
+- [x] Look-ahead column: the next column built a few tiles a frame in the spare column's
+      memory, so a crossing no longer draws a whole column in one frame (`ScrPrepare`)
+- [x] Playfield text: queued and drawn once a frame from a glyph cache straight into the ring;
+      name entry keeps the background (key message ~11x less CPU, title 3x, name entry ~3x)
+- [x] Look-ahead rows (the ring's spare tile row): `ScrPrepareRow`
+- [x] **Closed:** keep busy scenes at 50 fps on an A500 with a copper-driven blit queue (an
+      interrupt per blit costs about as much as it saves on a 68000). In WinUAE with the 512K
+      music the A500 slows only briefly, at the dragon's stages, and hardly noticeably
+- [x] Fold the scroller into the game source (`enhanced/src/gng_game.s`, `scroller.s`)
+- [x] BOB masks: one-plane masks on 512K; fully pre-masked graphics for one-blit BOBs on 1MB (3)
+- [x] **Closed:** blitter priority only while waiting (`--nasty-wait`): not pursued, little to
+      gain (the build option stays, for a timing build)
+- [x] **Retired:** `tools/test_scroll.py` and `tools/test_bobs.py` and their test build
+      (`scroll_test.s`, which no longer assembled since the scroller was folded into the game):
+      `compare_game.py` and the features' own tests cover the scroller and the BOBs now
+- [x] Draw at 50 fps once the redraw cost is gone (3): see above
+
+**Disk**
+- [x] An AmigaDOS-format disk (880K ADF) with a file table, loaded with the 4489_byteloader
+      by the bootblock and the game (made on branch `enhanced/byteloader`, merged)
+- [x] Boot from any drive (the boot IORequest's unit) and load from it (5): the bootblock finds
+      the unit and passes it on in the machine description (version 2); the bootblock's and the
+      game's loads read it (branch `enhanced/bootdrive`, merged; tried in WinUAE: A500+ 2.04,
+      A600, A1200 from DF1; Kickstart 1.3 boots only from DF0)
 
 **Memory**
-- [ ] Per-level files: tiles, map / cell / attribute tables, zones, spawns, placements and the
-      level's enemy graphics; about 30 KB less resident, no 118 KB load into a screen buffer (4)
-- [ ] File cache in expansion memory on 1MB machines: the disk is read once (4)
-- [ ] Drop mirrored enemy frames (39% of the enemy graphics) and flip them when the frame cache
-      builds them: about 24 KB less on level 5 (5)
-- [ ] Mirror Arthur's current frame on demand instead of keeping 40 mirrored frames: about 20 KB (5)
-- [ ] (Not worth it, measured: metatile recoding of the map tables, flip flags for level tiles,
+- [x] Per-level map tables: each level's `BlockTiles` / `CellTiles` entries in a file of its
+      own (`LoadLevelTables`): 17 KB less resident, the program 77 KB instead of 110 KB
+- [x] 512K: the old background save areas: the small BOBs and the progress map load into the
+      screens, the MFM buffer is at the top of the level area (the first screen while the
+      progress map loads); a trace of every `LoadFile`. The screens come 24 KB lower
+- [x] Remove the original routines the scroller replaced and the debug routines (`drop_dead_code`,
+      make_game.py): 3 KB
+- [x] **Closed:** per-level `TileAttr` banks (5). Measured with the cells round each level's
+      edges (what `MapTileAt` can read): levels 0, 1, 3 and 4 use all four banks, and level 1
+      (stage 2, the fullest) 680 different records, too many for a byte index, so the stages
+      that need memory would gain nothing
+- [x] **Closed:** the zone, spawn and placement tables per level (4): 3,170 bytes for all
+      levels, so stage 2 would gain at most about 2 KB, for moving tables full of pointers
+- [x] The level's enemy graphics only (4): `LoadEnemySets` reads just the level's BOB sets
+      from the enemy graphics file (22-65 KB of its 118 KB), each to its place, sets less than a
+      track apart as one piece; per-level files would not fit on the disk (about 330 KB). A
+      level start reads 8-16 fewer tracks (25-59%). See `enhanced/docs/SCROLLER.md`, *Loading
+      less, and the file cache*
+- [x] File cache in spare memory (4): with the program moved to slow / fast RAM, the enemy
+      graphics, small BOBs, progress map and the levels' tile and table files are kept after
+      their first load (a level loaded again reads no track); with 1MB of chip RAM or more, the
+      levels' tile and table files, in the chip RAM above the graphics caches or in slow / fast
+      RAM (`CacheInit`, `LoadFile`)
+- [x] **Closed:** drop mirrored enemy frames (39% of the enemy graphics) and flip them when the
+      frame cache builds them: about 24 KB less on level 5 (5). Flipping at run time would cost
+      too much frame time
+- [x] **Closed:** mirror Arthur's current frame on demand instead of keeping 40 mirrored frames:
+      about 20 KB (5); not needed
+- [x] **Closed** (not worth it, measured: metatile recoding of the map tables, flip flags for level tiles,
       trimming sample tails) (5)
 
 **Sound**
-- [ ] Music on 512K: add the tunes' samples and note data (about 43 KB) to the 512K effects
-      package, not the whole 79 KB of the 1MB package (4)
-- [ ] Music quality tiers chosen by the machine's memory (4)
-- [ ] Resample the music samples (2/3 saves about 11 KB) by scaling the instruments' period
-      multipliers; also fixes periods below Paula's minimum of 124 (5)
-- [ ] Effects: at most a modest cut (they already play at their recorded 8-10 kHz) (5)
+- [x] Music on 512K machines with an expansion (slow or fast RAM): the whole 1MB package, in the
+      chip RAM the program moved out of
+- [x] Music on a plain 512K A500 (made on branch `enhanced/music512`, merged; tried in WinUAE on A500, A500 + 512K, A500+, A600 and A1200): a combined package
+      (`sound/gng_music_512k.s`: the 512K effects with the 1MB tunes, 75.5 KB) in the room freed
+      by the per-level map tables, joined gaps, old save areas and dead code; stages 1, 2, 3, 5
+      and 6 pre-mask fewer BOB sets, and about 7 KB is left on the fullest stage
+- [x] Music quality tiers chosen by the machine's memory (4): the 512K package (plain 512K
+      A500) has the tunes' samples at 3/4 of their rate, chosen from listening to 3/4, 2/3
+      and 1/2; machines with 1MB of chip RAM or an expansion keep full quality. A menu choice
+      cannot free memory (the layout is fixed at build time). The 8.2 KB saved goes to
+      pre-masking (made on branch `enhanced/musicquality`, merged; tried in WinUAE)
+- [x] Resample the music samples by scaling the instruments' period multipliers (5): done at
+      3/4 for 512K (`make_music_512k.py --rate`). The resampled samples' lowest periods rise from
+      114 to about 152, within Paula's minimum of 124; the waveform samples 0-1 (not resampled)
+      still go down to about 120
+- [x] **Closed:** effects: at most a modest cut (they already play at their recorded 8-10 kHz) (5)
+
+**Controls and extras**
+- [x] Two-button joysticks: one button fires, the other jumps; up-to-jump kept as an option (8):
+      the title menu's INPUT item (or J) switches it (`JumpButton`); see
+      `enhanced/docs/SCROLLER.md`, *Two-button joysticks* (made on branch `enhanced/joystick`,
+      merged; tried in WinUAE)
+- [x] A title menu instead of the instructions: PLAYER 1 START, PLAYER 2 START, INPUT (the jump
+      setting), TEST MENU (the memory line and the cheat, moved from the title) (8); see
+      `enhanced/docs/SCROLLER.md`, *The title menu* (made on branch `enhanced/titlemenu`,
+      merged; tried in WinUAE)
+- [x] A sound test on the test page: play each tune and effect (8); MUSIC (OFF, 00-14) and
+      EFFECT (00-29), fire plays, MUSIC OFF stops the tune (made on branch `enhanced/testmenu`, merged)
+- [x] A sprite test on the test page (8): Arthur's 42 sprite frames and their mirrored copies;
+      the enemies' BOB sets are not shown (on 512K only the level's sets exist, and BOBs are drawn
+      by the play loop)
+- [x] A BOB viewer on the test page (`BOB TEST`), on machines with 1MB of chip RAM or more only:
+      every cached, pre-masked BOB strip drawn with `ScrDrawBob`; its own file (`FID_VIEWER`)
+      loaded after the caches (branch `enhanced/testmenu`, merged). Not on 512K chip machines (with or
+      without an expansion): their BOB graphics are only the level's
+- [x] An input test on the test page, as on an arcade machine (8): the joystick's directions and
+      both buttons lit while held, and the last key's raw code
 
 **Testing**
-- [ ] Boot and timing tests of the disk image and the enhanced builds in a full emulator (6)
-- [ ] Before building: a full chip-RAM budget for the enhanced 512K build (4)
+- [x] Boot and timing tests of the disk image and the enhanced builds in a full emulator (6):
+      the emulator harness boots the disk (`test_boot4489.py`); WinUAE runs on A500, A500 +
+      512K, A500+, A600 and A1200
+- [x] Before building: a full chip-RAM budget for the enhanced 512K build (4): `build_game.py`
+      checks the layout and prints each stage's level data and pre-masking at every build
 
 ## 1. Shared file directory loaded from disk (own loader)
 
@@ -94,7 +195,9 @@ moved, resized or added by rebuilding the directory alone, without reassembling 
 * **Verification:** both builds must boot and load every level in an emulator (see 6), and the
   original layout must still be reproducible as a regression check.
 
-**Open questions**
+**Open questions** (answered since: the file table is read from the disk into the program's own
+`FileDir`; `main` keeps the byte-identical sources and the enhanced game is a separate tree,
+`enhanced/src/gng_game.s`, made from them by `make_game.py`)
 
 * Fixed address for the directory in both builds (chip RAM, not overwritten by screens / caches).
 * Whether to keep byte-identical original sources alongside a modified "mod" build (e.g. an
@@ -112,7 +215,11 @@ would be opt-in.
 **Goal:** replace the full-redraw scrolling with incremental scrolling, to cut memory use and,
 more importantly, the scrolling cost.
 
-**Prototype (branch `enhanced/main`, `enhanced/docs/SCROLLER.md`).** The background part works:
+**Integrated (branch `enhanced/main`, `enhanced/docs/SCROLLER.md`).** The scroller, the
+pristine buffer and the BOBs now run in the 512K game (a module loaded from its own track plus
+in-place patches), with a disk image to try. The first prototype's findings:
+
+The background part works:
 a module that draws one tile column / row at a time, with a vertical ring and copper wrap,
 matches the original display at every camera position tested (560 frames, all levels), in an
 emulator harness that adds blitter, copper and display emulation. What it showed:
@@ -291,6 +398,12 @@ All levels' tables are resident today: `CellTiles` 26,368 + `BlockTiles` 6,656 +
 41,216 bytes. Per-level files would keep at most 10,584 (level 2), saving about **30 KB**. Spawn,
 zone and placement tables (a few KB) would move too.
 
+**Done (per-level map tables):** `BlockTiles` and `CellTiles` now come from a file per level
+(`enhanced/docs/SCROLLER.md`, *Per-level map tables*). The estimate above counted only the
+level's own cells; a level also reads the cells round it and some bytes past the map, so the
+largest level needs 49 cells and the saving is about 17 KB, not 30. `TileAttr` (8 KB) is still
+resident.
+
 **Music** (`sound/tools/tune_samples.py`, which follows each tune's patterns to its instruments,
 and counts the samples their lengths run into when they overrun):
 
@@ -322,7 +435,7 @@ cache); keep full pre-masking for 1MB machines.
 
 ### Design
 
-* **zx0** for every file. The decompressor is small, and zx0 can decompress in place (packed data
+* **zx0** for every file (**closed**: no buffer space left on 512K to unpack into, and every file fits on the disk). The decompressor is small, and zx0 can decompress in place (packed data
   at the end of the destination with a small safety margin), so no staging buffer is needed.
   Decompression should be well ahead of floppy speed (about 6 KB per track), so loads get shorter
   and faster (to be measured on a 68000). Samples are unpacked once into chip RAM; packing them
@@ -365,7 +478,8 @@ Plus about 9 KB of note data and instruments for every tier that has music. Note
 * Each tier can be rendered to WAV with the real driver (`sound/tools/sndemu.py`) and compared by
   ear before it is used.
 
-### Still to measure
+### Still to measure (closed: zx0 was not used, and the screens' saving was measured once the
+scroller was in: `enhanced/docs/MEMORY.md`)
 
 * The `$18B00-$1A118` work areas, the corkscrew slack and the vertical margin, so the screen saving
   is exact.
@@ -479,7 +593,94 @@ room for full-quality effects or a larger frame cache.
 ## 6. Boot and timing tests in a full emulator
 
 * Boot `gng.adf` from `mkdisk.py` in WinUAE / FS-UAE (512K and 1MB configurations) to confirm the
-  extended ADF loads, including track 0 stored as an AmigaDOS track. Not yet tested: no Kickstart
-  ROM is available in the build environment.
+  extended ADF loads, including track 0 stored as an AmigaDOS track. (Since done for the enhanced
+  disk: it boots and plays in WinUAE on an A500, A500 + 512K, A500+, A600 and A1200.)
 * Measure the documented timing behaviour: 25 fps drawing, redraw cost, and the short freezes
   while falling (`g_SkipLogic`).
+
+## 7. One program for every memory size
+
+Today there are two main programs on the disk (512K at track 110, 1MB at track 17), and the
+bootblock picks one with a rough test (`$4.w` - ExecBase - above 512K, or the stack above
+`$80000`). The two differ in about 190 places (the `ifd BUILD_1MB` blocks of `gng_main.s`, which
+on `main` now assembles both programs: 21,580 lines of code shared, about 640 512K-only and 680
+1MB-only), all of which come down to memory:
+
+| | 512K program | 1MB program |
+|---|---|---|
+| Code | at `$80`, absolute addresses | anywhere: position independent through `g_BaseAddr` |
+| Enemy graphics | reloaded from disk for each level | loaded once, cached with masks (`BuildMaskedGfx`) |
+| BOB drawing | 2 mask blits + 5 plane blits | one blit (pre-masked) |
+| Progress map | reloaded each time | cached |
+| Sound | effects only (32 KB package) | music and effects (111 KB package), `PlayMusic` |
+| Drawing | every other frame (25 fps) | every frame (50 fps) |
+| Screens, HUD, copper, sprites | `$37468`-`$65548` | `$80`-`$2E914` |
+
+**Plan**
+
+* **Bootblock: describe the machine.** *Done on `enhanced/main`: `enhanced/src/boot_patches.s`
+  leaves a 32-byte description at `$7FB00` (layout in `enhanced/docs/SCROLLER.md`), the title
+  screen shows it; tested on six fake memory lists, and since in WinUAE.* Kickstart is still running when the bootblock starts, so
+  instead of guessing it can walk exec's memory list (`ExecBase->MemList`: each MemHeader gives
+  the type - chip, fast; slow RAM at `$C00000` shows up as fast without DMA - its start and end).
+  It writes a small block - say `'GNGM'`, version, chip size, then up to 4 (start, size, type)
+  regions, PAL/NTSC, CPU type from `AttnFlags` - at a well-known address before taking the
+  machine over. Candidates: `$100`-`$1FF` (the user interrupt vectors, unused on the Amiga), or
+  a reserved block at the start of the loaded program file (then it moves with the program and
+  nothing else can overwrite it). Space in the bootblock is tight (code and data up to about
+  `$3A8` of 1,024 bytes); the own-loader idea in item 1 would lift that limit, and the machine
+  block fits naturally next to the shared file directory there.
+* **One program, position independent** (start from the 1MB source: it already is). At start-up
+  it reads the machine block and chooses a profile, with the addresses of every buffer computed
+  into globals instead of equates:
+  * *512K chip only*: today's 512K layout and behaviour (graphics reloaded per level, effects
+    only, 2-pass masks or the one-plane masks / on-demand cache of item 3).
+  * *512K chip + 512K slow RAM* (the most common expanded A500): code, level data, collision
+    tables, the progress map cache and the music sequences in slow RAM; everything the blitter,
+    copper, sprites or audio DMA read (screens, graphics, masks, samples) in chip RAM. The
+    original 1MB program cannot use this machine properly (its masked graphics would land in
+    slow RAM, which the blitter cannot read); a merged program can.
+  * *1MB chip (or more)*: today's 1MB behaviour.
+  * Fast RAM (A1200 / accelerators) treated like slow RAM.
+* **Feature switches from the profile**, not from the build: masked-graphics cache, music
+  quality tier (item 4), 50 / 25 fps drawing, file caching (item 4). The scroller module
+  (`enhanced/`) already builds both ways from one source (`BUILD_1MB`); the assemble-time switch
+  becomes a runtime one (two ScrDrawBob variants behind a pointer).
+* **Disk:** one main program instead of two (about 100 KB less), loaded where the bootblock
+  chose; the 1MB music package and the 512K effects package both stay, picked by profile.
+* **Order:** *One source for both builds: done (on `main`, `tools/merge_src.py`; both programs
+  byte-identical). One program for every machine: done on `enhanced/main` without the
+  scroller (`enhanced/src/gng_game.s`, profiles from the machine description; tested against
+  both originals; see `enhanced/docs/SCROLLER.md`, One program for every machine). Slow / fast
+  RAM since used too: the program moves there, and the file cache.* Next the source folding in `enhanced/docs/SCROLLER.md` (*Next steps* 0), into
+  both builds of the one source; then this item turns the `ifd BUILD_1MB` blocks into run-time
+  choices. The blocks give the complete list of places to merge.
+* **Testing:** `enhanced/tools/compare_runs.py` already runs both originals side by side with the
+  enhanced builds; the merged program can be run in each profile against the matching original
+  (512K, 1MB chip), plus a 512K chip + 512K slow configuration in the emulator and in WinUAE.
+
+## 8. Controls, options menu, sound and sprite tests
+
+**Two-button joysticks** (done; `enhanced/docs/SCROLLER.md`, *Two-button joysticks*). The
+second button is read from `POTINP` bit 14 (port 2's pin 9, set as an output driven high by
+`POTGO`). Fire stays on the first button; jump on the second, or on up (the default, as the
+original), switched on the title menu (`INPUT`) or with J. With jump on the
+button, up only climbs ladders. (A CD32 pad's extra buttons need its serial read-out: not done.)
+
+**Options menu** (done as the title menu: `enhanced/docs/SCROLLER.md`, *The title menu*). The
+title page has the start items and INPUT; the test page the memory line, CHEAT and EXIT, with
+room for the tests below. Every byte of it is resident: on 512K it comes out of the level
+data area, where the fullest stages pre-mask what fits.
+
+**Sound test.** Play each of the 15 tunes and 30 effects through the driver already loaded
+(`MUSIC_PLAYER` commands 1 and 2); on 512K the 512K package has every tune and effect, on 1MB
+the 1MB package's extra effects too.
+
+**Sprite test.** Show Arthur's frames and the BOB sets one by one. The enemy sets are only
+in memory for the current level (512K), so it would load the enemy graphics file into a screen
+buffer as a level start does; only if the room allows.
+
+**Input test.** As an arcade machine's switch test: the four joystick directions and both
+buttons (fire on the CIA, the second button on `POTINP`) for each port, shown on screen and
+lit while held, with the keyboard keys the game uses. Small (text drawn with the existing
+font), so it should fit with the options menu.

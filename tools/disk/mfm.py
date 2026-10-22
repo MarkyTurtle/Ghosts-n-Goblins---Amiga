@@ -1,3 +1,5 @@
+"""Raw MFM helpers for the original disk's track dumps: the bit offsets of a sync word, and how
+often each known sync appears on a track (to tell the AmigaDOS track from the custom ones)."""
 import sys,collections
 def bits(fn):
     d=open(fn,'rb').read(); return int.from_bytes(d,'big'), len(d)*8

@@ -10,3 +10,6 @@ enhanced/build/
 /tools/build1mb/gng_main_1mb.s
 /tools/build1mb/gng_equates_1mb.i
 /tools/build1mb/gen1m.py
+enhanced/tools/_srcedit.bin
+/sound/samples/r*_*/
+!/sound/samples/r3_4/
