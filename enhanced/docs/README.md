@@ -7,15 +7,15 @@
 | [DISK.md](DISK.md) | the disk: bootblock, file table, every file with its offset, size and load address; booting (generated) |
 | [FORMATS.md](FORMATS.md) | the format of every file and of the data the game builds from them |
 | [SCROLLER.md](SCROLLER.md) | the development log: how each feature was made, measured and tested, in order (older sections describe earlier builds) |
+| [TODO.md](TODO.md) | the plan: every enhancement considered, with its measurements, and what became of it (all done or closed) |
 
-Elsewhere: `../../docs/TODO.md` (what is done, what is left, with measurements),
-`../../README.md` (the original game's disassembly, its formats and findings),
-`../../docs/GLOBALS.md` and `XREF.md` (every global and who uses it),
-`../../sound/SOUND.md` (the sound driver and its data).
+Elsewhere: `../../original/README.md` (the original game's disassembly, its formats and findings),
+`../../original/docs/GLOBALS.md` and `XREF.md` (every global and who uses it),
+`../../original/sound/SOUND.md` (the sound driver and its data).
 
 Build and check (needs [vasm](http://sun.hasenbraten.de/vasm/) as `vasmm68k_mot`, Python 3 with
 `unicorn`, `numpy`, `Pillow`, and `scipy` for the music package; installing them on Windows and
-Linux: [`../../docs/BUILDING.md`](../../docs/BUILDING.md)):
+Linux: [`../../BUILDING.md`](../../BUILDING.md)):
 
 ```
 cd enhanced/tools

@@ -1,5 +1,5 @@
 ;==============================================================================
-; gng_music_512k.s - made by sound/tools/make_music_512k.py from gng_music_1mb.s and
+; gng_music_512k.s - made by enhanced/sound/tools/make_music_512k.py from gng_music_1mb.s and
 ; gng_sfx_512k.s: the 512K effects package with the 1MB tunes (see that script). Do not edit. Tunes' samples 5-9 at 3/4 of their rate (--rate).
 ;==============================================================================
 ; =========================================================================

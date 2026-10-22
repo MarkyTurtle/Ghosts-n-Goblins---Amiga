@@ -1,15 +1,18 @@
 __pycache__/
 *.adf
-/main.bin
-/boot.bin
-/main_1mb.bin
+.venv/
+# the original's build (original/build.sh)
+/original/main.bin
+/original/boot.bin
+/original/main_1mb.bin
+# generated per build, merged into original/gng_main.s / gng_equates.i by original/tools/merge_src.py
+/original/tools/gng_main.s
+/original/tools/gng_equates.i
+/original/tools/build1mb/gng_main_1mb.s
+/original/tools/build1mb/gng_equates_1mb.i
+/original/tools/build1mb/gen1m.py
+# the enhanced build
 enhanced/build/
-# generated per build, merged into the root gng_main.s / gng_equates.i by tools/merge_src.py
-/tools/gng_main.s
-/tools/gng_equates.i
-/tools/build1mb/gng_main_1mb.s
-/tools/build1mb/gng_equates_1mb.i
-/tools/build1mb/gen1m.py
 enhanced/tools/_srcedit.bin
-/sound/samples/r*_*/
-!/sound/samples/r3_4/
+/enhanced/sound/samples/r*_*/
+!/enhanced/sound/samples/r3_4/

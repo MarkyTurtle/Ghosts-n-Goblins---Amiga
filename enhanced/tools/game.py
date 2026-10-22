@@ -14,7 +14,7 @@ from unicorn.m68k_const import UC_M68K_REG_PC, UC_M68K_REG_SR
 from amiga import Amiga, CUSTOM, FILES, GLOBALS, equates
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', '..')
+ROOT = os.path.join(HERE, '..', '..', 'original')  # the original game's folder (original/: its sources, tools, files)
 BUILD = os.path.join(HERE, '..', 'build')
 JOY = {'': 0, 'R': 0x0003, 'L': 0x0300, 'U': 0x0100, 'D': 0x0001,
        'UR': 0x0102, 'UL': 0x0200, 'DR': 0x0002, 'DL': 0x0301}

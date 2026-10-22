@@ -8,7 +8,7 @@ import hashlib, os, re, subprocess, sys
 from amiga import equates
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', '..')
+ROOT = os.path.join(HERE, '..', '..', 'original')  # the original game's folder (original/: its sources, tools, files)
 SRC = os.path.join(ROOT, 'gng_main.s')
 EQ = os.path.join(ROOT, 'gng_equates.i')
 VASM = os.environ.get('VASM', 'vasmm68k_mot')

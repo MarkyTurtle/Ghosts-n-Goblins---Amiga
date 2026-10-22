@@ -9,7 +9,7 @@ green waiting for line $44, black idle); build/game_raster/, build/gng_game_rast
 --nasty-wait: blitter priority only while waiting for the blitter (NASTY_WAIT, scroll.s);
 build/game_nastywait/ (with --raster: game_raster_nastywait/), build/gng_game_nastywait.adf
 --music-rate N/D: the 512K music package with the tunes' sampled instruments at N/D of their
-rate (sound/tools/make_music_512k.py --rate; smaller, so the level area gets the difference);
+rate (enhanced/sound/tools/make_music_512k.py --rate; smaller, so the level area gets the difference);
 build/game_musicN_D/, build/gng_game_musicN_D.adf
 
 Writes enhanced/build/game/:
@@ -27,7 +27,8 @@ import os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENH = os.path.join(HERE, '..')
-ROOT = os.path.join(ENH, '..')
+ROOT = os.path.join(ENH, '..', 'original')  # the original game's folder (original/: its sources, tools, files)
+ENH_SND = os.path.join(ENH, 'sound')                 # the enhanced game's sound: the 512K music package
 RASTER = '--raster' in sys.argv
 NASTY = '--nasty-wait' in sys.argv
 MUSIC_RATE = sys.argv[sys.argv.index('--music-rate') + 1] if '--music-rate' in sys.argv else None
@@ -35,7 +36,7 @@ VARIANT = (('_raster' if RASTER else '') + ('_nastywait' if NASTY else '')
            + (f'_music{MUSIC_RATE.replace("/", "_")}' if MUSIC_RATE else ''))
 OUT = os.path.join(ENH, 'build', 'game' + VARIANT)
 M512_SRC = (os.path.join(OUT, 'gng_music_512k.s') if MUSIC_RATE        # (the committed one: full quality)
-            else os.path.join(ROOT, 'sound', 'gng_music_512k.s'))
+            else os.path.join(ENH_SND, 'gng_music_512k.s'))
 VASM = os.environ.get('VASM', 'vasmm68k_mot')
 ADF_SIZE = 901120                        # 80 cylinders x 2 heads x 11 sectors x 512 bytes
 FT_OFFSET, FT_VERSION = 0x400, 1         # the file table (gng_game.i FT_OFFSET, boot_4489.s)
@@ -46,7 +47,7 @@ def vasm(src, out, listing=None, defs=(), incl=None):
     """assemble src to out (vasm, -Fbin -no-opt) with the include paths the game needs and -D
     for each (name, value) in defs; the listing too if asked; stops the build on an error"""
     cmd = [VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', os.path.join(ENH, 'src'), '-I', ROOT,
-           '-I', os.path.join(ROOT, 'sound'), '-o', out] + (['-I', incl] if incl else [])
+           '-I', os.path.join(ROOT, 'sound'), '-I', ENH_SND, '-o', out] + (['-I', incl] if incl else [])
     if listing: cmd += ['-L', listing]
     cmd += [f'-D{k}={v}' for k, v in defs] + [src]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -148,9 +149,9 @@ def build(extra_defs=()):
         path = os.path.join(OUT, f'tables{l}.bin')
         open(path, 'wb').write(data)
         tdefs += [(f'TBLLEN{l}', len(data))]
-    # the 512K music package (sound/tools/make_music_512k.py): its length for the program's file
+    # the 512K music package (enhanced/sound/tools/make_music_512k.py): its length for the program's file
     # record (the same wherever it is assembled; it is assembled again for MUSIC_FILE below)
-    subprocess.run([sys.executable, os.path.join(ROOT, 'sound', 'tools', 'make_music_512k.py')]
+    subprocess.run([sys.executable, os.path.join(ENH_SND, 'tools', 'make_music_512k.py')]
                    + (['--rate', MUSIC_RATE, '--out', M512_SRC] if MUSIC_RATE else []), check=True, capture_output=True)
     music512 = os.path.join(OUT, 'music512.bin')
     vasm(M512_SRC, music512)

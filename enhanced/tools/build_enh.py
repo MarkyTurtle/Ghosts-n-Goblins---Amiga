@@ -34,7 +34,7 @@ import hashlib, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENH = os.path.join(HERE, '..')
-ROOT = os.path.join(ENH, '..')
+ROOT = os.path.join(ENH, '..', 'original')  # the original game's folder (original/: its sources, tools, files)
 SRC, OUT = os.path.join(ENH, 'src'), os.path.join(ENH, 'build')
 VASM = os.environ.get('VASM', 'vasmm68k_mot')
 BOOT_SHA1 = '0bf93a4078bf317fa2774b4b973e1c79c0060227'

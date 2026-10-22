@@ -1,4 +1,4 @@
-"""Redundancy in the graphics and map tables, for the space-saving notes in docs/TODO.md:
+"""Redundancy in the graphics and map tables, for the space-saving notes in enhanced/docs/TODO.md:
 enemy BOB frames that are exact mirror images of another frame of the same set, mirrored level
 tiles, and how far CellTiles / TileAttr would shrink when recoded.   python3 tools/budget/gfx_redundancy.py"""
 import struct, glob

@@ -26,7 +26,7 @@
 ; memory map is in gng_game.i and enhanced/docs/MEMORY.md.
 ;
 ; The address column still gives the original addresses (512K/1MB), for reading this alongside
-; the root gng_main.s and docs/XREF.md; lines without one are new.
+; original/gng_main.s and original/docs/XREF.md; lines without one are new.
 ; ===========================================================================
 ; HOW TO READ THIS FILE
 ;  a6      always points at the globals block (GLOBALS); globals are g_Name(a6).
@@ -6770,7 +6770,7 @@ LoadLevelTables:
         movem.l (a7)+,d0-d7/a0-a6
         rts
 FileMusic512:
-	FENTRY	MUSIC_FILE,MUSIC512_LEN,FID_MUSIC512    ; the music for 512K (sound/gng_music_512k.s)
+	FENTRY	MUSIC_FILE,MUSIC512_LEN,FID_MUSIC512    ; the music for 512K (enhanced/sound/gng_music_512k.s)
 FileViewer:
 	FENTRY	VIEWER_ORG,VIEWER_LEN,FID_VIEWER        ; the BOB viewer (1MB of chip RAM: CacheGraphics)
 MfmBuf:

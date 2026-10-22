@@ -107,7 +107,7 @@ LoadLevelTables:
         movem.l (a7)+,d0-d7/a0-a6
         rts
 FileMusic512:
-	FENTRY	MUSIC_FILE,MUSIC512_LEN,FID_MUSIC512    ; the music for 512K (sound/gng_music_512k.s)
+	FENTRY	MUSIC_FILE,MUSIC512_LEN,FID_MUSIC512    ; the music for 512K (enhanced/sound/gng_music_512k.s)
 FileViewer:
 	FENTRY	VIEWER_ORG,VIEWER_LEN,FID_VIEWER        ; the BOB viewer (1MB of chip RAM: CacheGraphics)
 MfmBuf:

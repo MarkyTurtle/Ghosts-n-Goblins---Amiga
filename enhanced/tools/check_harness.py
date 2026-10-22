@@ -17,7 +17,7 @@ def rgb(o, img):
 def main():
   bad = 0; n = 0
   for lv in (0, 1, 2, 3):
-      o = Original(lv); png = f'../../render/out/level{lv}.png'
+      o = Original(lv); png = f'../../original/render/out/level{lv}.png'
       H, W = np.array(Image.open(png)).shape[:2]
       rnd = random.Random(lv)
       for _ in range(4):

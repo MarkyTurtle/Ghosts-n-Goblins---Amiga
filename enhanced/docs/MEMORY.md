@@ -25,7 +25,7 @@ everything from there moves when the program's size changes. Names are the equat
 |---|---|---:|---|---|
 | $00000 | $00080 | 128 | vectors | the 68000 exception vectors (`CrashReset` for the CPU exceptions; level 1 / 3 autovectors `IrqLevel1` / `IrqLevel3`; `$60`: the sound driver's entry) |
 | $00080 | $12E5E | 77,278 | program | the program: code and tables (`gng_game.s`), entered at `$A0` |
-| $12E5E | $145EA | 6,028 | `GLOBALS` | the globals block and the object slots (`a6`; `docs/GLOBALS.md`) |
+| $12E5E | $145EA | 6,028 | `GLOBALS` | the globals block and the object slots (`a6`; `original/docs/GLOBALS.md`) |
 | $145EA | $24CFA | 67,344 | `MUSIC_FILE` | the sound package (`SFX_AREA` bytes): see the machines below |
 | $24CFA | $24E7A | 384 | `COPPER_INIT` | copper lists: the template and the progress map's list (`COPPER_MAP`); the playfield lists are in the scroller's storage |
 | $24E7A | $260AE | 4,660 | `ESHOT_GFX_BUF` | enemy shot BOBs (file `FID_ESHOTS`) |

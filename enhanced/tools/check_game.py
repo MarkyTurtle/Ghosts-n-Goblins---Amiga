@@ -33,7 +33,7 @@ class Reference(Amiga):
     def __init__(self):
         super().__init__()
         self.w16(0xDFF108, 0x92); self.w16(0xDFF10A, 0x92)     # BPL1MOD / BPL2MOD as InitHardware
-        self.prog = open(os.path.join(HERE, '..', '..', 'bin', 'main_512k.bin'), 'rb').read()
+        self.prog = open(os.path.join(HERE, '..', '..', 'original', 'bin', 'main_512k.bin'), 'rb').read()
 
     def draw(self, ram):
         self.u.mem_write(0, ram)

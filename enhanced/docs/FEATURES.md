@@ -7,7 +7,7 @@ enemies, timings and scoring - is the original's: in the emulator the enhanced g
 original program are run side by side with the same input and stay in the same game state
 every frame (*Testing*, below).
 
-This branch is `enhanced/main`. Where things are:
+This is the enhanced game's folder (`enhanced/`; the original game is in `original/`). Where things are:
 
 | Document | |
 |---|---|
@@ -16,8 +16,8 @@ This branch is `enhanced/main`. Where things are:
 | `DISK.md` | the disk layout, the file table, every file, booting (generated from the build) |
 | `FORMATS.md` | the format of every file and of the data the game builds from them |
 | `SCROLLER.md` | the development log: how each feature was made, measured and tested, in order |
-| `../../docs/TODO.md` | what is done and what is left |
-| `../../README.md` | the original game: the disassembly, its formats, findings and bugs |
+| `TODO.md` | what is done and what is left |
+| `../../original/README.md` | the original game: the disassembly, its formats, findings and bugs |
 
 ## Playing it
 
@@ -125,8 +125,8 @@ the program, so the screens and graphics stay in chip RAM, and the chip RAM it l
 the music. Now:
 * with 1MB of chip RAM, or with the program moved to an expansion: the original 1MB sound
   package - 15 tunes and the 1MB set of effects, full quality;
-* on a plain 512K A500: a package made for it (`sound/gng_music_512k.s`,
-  `sound/tools/make_music_512k.py`) - the 512K effects with the 1MB tunes, the tunes' sampled
+* on a plain 512K A500: a package made for it (`enhanced/sound/gng_music_512k.s`,
+  `enhanced/sound/tools/make_music_512k.py`) - the 512K effects with the 1MB tunes, the tunes' sampled
   instruments resampled to 3/4 of their rate (the pitch kept exact by the instruments' period
   multipliers), 67 KB. The quality was chosen by ear; `build_game.py --music-rate N/D` builds
   others. Every tune is checked against the 1MB package and every effect against the 512K one
@@ -228,7 +228,7 @@ Ready-made disks (the game and the timing build) are attached to each [release](
 v1.0 is built from `enhanced/main` at the tag `V1.0`.
 
 `enhanced/tools/build_game.py` (needs vasm, `vasmm68k_mot`, and Python: what to install, on Windows
-and Linux, is in [`docs/BUILDING.md`](../../docs/BUILDING.md)) makes `enhanced/build/gng_game.adf`:
+and Linux, is in [`BUILDING.md`](../../BUILDING.md)) makes `enhanced/build/gng_game.adf`:
 
 | Option | Builds |
 |---|---|
@@ -261,8 +261,8 @@ All in a 68000 emulator (Unicorn) with a model of the blitter, copper, display a
 | `test_menu.py` | the title menu, the test page and its sound, input, sprite and (1MB) BOB tests |
 | `test_cache.py` | the file cache and the level's enemy sets, from the disk image on each machine |
 | `test_display.py` | changes of display: the bitplanes switched in the vertical blank, off while the map is unpacked and the level drawn; the loading picture untouched while shown |
-| `check_harness.py` | the harness's display emulation against the level pictures (`render/out/`) |
-| `sound/tools/check_music_512k.py` | the 512K music package against the original packages |
+| `check_harness.py` | the harness's display emulation against the level pictures (`original/render/out/`) |
+| `enhanced/sound/tools/check_music_512k.py` | the 512K music package against the original packages |
 
 `compare_game.py` stays in step on every stage and machine; the pictures differ only in the
 title's text, the frames while graphics load and one frame of the progress map, where the

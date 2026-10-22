@@ -5,9 +5,9 @@ and sizes) and of the data the game builds from them in memory. All numbers are 
 (68000). *Line-interleaved* means a picture is stored line by line, each line holding the rows
 of all its bitplanes one after another (plane 0 first); a row is `width / 8` bytes.
 
-The files that come from the original disk are unchanged (`disk/files/`, `disk/FILES.md`);
+The files that come from the original disk are unchanged (`original/disk/files/`, `original/disk/FILES.md`);
 the main README's *Data formats* section has more on the world map, cells, collision and the
-game's tables, and `docs/SPAWNS.md` on the spawn tables. The files new to the enhanced disk
+game's tables, and `original/docs/SPAWNS.md` on the spawn tables. The files new to the enhanced disk
 are the map table files, the relocation file, the 512K music package and the file table.
 
 ## The disk
@@ -28,7 +28,7 @@ HAM6, 256 x 516 interlaced (two fields of 258 lines), 6 planes, 32 bytes a row, 
 (192 bytes a line), the two fields' lines alternating in pairs: frame line *r* is at
 `(r / 2) x 384 + (r & 1) x 192`. The bootblock shows it with two copper lists swapped each
 frame (`BPLCON0` = `$6804`) and the 16-colour palette at its end (`Palette` in
-`boot_4489.s`; the original bootblock kept it at `$382`). Rendered: `render/out/loadscreen.png`.
+`boot_4489.s`; the original bootblock kept it at `$382`). Rendered: `original/render/out/loadscreen.png`.
 
 ### Copyright screen and progress map (`FID_COPYRIGHT`, `FID_PROGMAP`): RLE pictures
 
@@ -43,7 +43,7 @@ early) and, for the progress map, 2 bytes after each line.
 | copyright screen (9,726) | 224 | 32 | 5 x 36 = 180 | colours 0-3 only (black, white, `$BBB`, `$888`) |
 | progress map (7,516) | 80 | 44 | 5 x 48 + 2 = 242 | the game palette, with its own copper list (`COPPER_MAP`) |
 
-Rendered: `render/out/copyright_screen.png`, `render/out/progress_map.png` (`render/pictures.py`
+Rendered: `original/render/out/copyright_screen.png`, `original/render/out/progress_map.png` (`original/render/pictures.py`
 has the decoder).
 
 ### Level tiles (`FID_LEVEL0` + level)
@@ -69,7 +69,7 @@ line-interleaved, 5 planes, a whole number of 16-pixel words wide; colour 0 is t
   `EffectFrames`; the `FRAME` macro): offset.w (from the set's start), y adjust.b, height.b. Its
   width comes from the object's size class. The program's `CacheSizes*` tables give each set's
   blocks as (width in pixels, height) for the masked copies.
-* Rendered: `render/out/bobs.png`, `small_bobs_t037.png`, `item_gfx.png`,
+* Rendered: `original/render/out/bobs.png`, `small_bobs_t037.png`, `item_gfx.png`,
   `enemy_shot_gfx.png`.
 
 **Masks.** The files have no masks: the original 512K program built each BOB's mask at draw time
@@ -96,7 +96,7 @@ Start-up splits them into four hardware-sprite banks `$2900` apart at `ARTHUR_SP
 of `$80` bytes (32 lines of the sprite's two data words), then mirrored copies of frames 0-39
 (bits reversed, halves swapped). Frames: 0-14 armoured, 15 frog, 16-31 without armour, 32-36
 skeleton, 37-39 frog, 40 sitting (opening scene), 41 arms raised. Rendered:
-`render/out/arthur.png`.
+`original/render/out/arthur.png`.
 
 ### Font (`FID_FONT`, 6,208 bytes)
 
@@ -130,7 +130,7 @@ Resident in the program, unchanged from the original: `WorldMap` (32 x 11 cells,
 `TileAttr` (8-byte collision records: four quadrant profile bytes, then four flag bytes),
 `FloorProfile` / `WallProfileR` / `WallProfileL`, `MapZoneTable`, `ZoneSpawners`,
 `SpawnScripts`, `LevelItemLists` / `LevelEnemyLists` (`PLACE type, param, x, y`). See the main
-README's *Data formats* and `docs/SPAWNS.md`.
+README's *Data formats* and `original/docs/SPAWNS.md`.
 
 ## Sound
 
@@ -144,16 +144,16 @@ instrument records (28 bytes), the voices' bytecode, the pattern table, `PitchTa
 driver's workspace and the samples (each: length.l, rate.w, then signed 8-bit data). Nothing
 reads the hunk header: the game loads the whole file to the address it was assembled for
 (`SND_ORG`, `build_game.py`) and calls offset `$20`; loaded anywhere else (the 1MB package at
-`$80` when the program has moved) its addresses are moved with the relocation file. The full description is `sound/SOUND.md`.
+`$80` when the program has moved) its addresses are moved with the relocation file. The full description is `original/sound/SOUND.md`.
 
 | Package | Bytes | Tunes | Effects | Used on |
 |---|---:|---|---|---|
-| `FID_MUSIC1M` (`sound/gng_music_1mb.s`, the original 1MB file) | 111,508 | 15, full quality | 30, the 1MB set | 1MB of chip RAM; 512K with the program moved |
-| `FID_MUSIC512` (`sound/gng_music_512k.s`, made by `make_music_512k.py`) | 67,332 | 15, the sampled instruments (samples 5-9) at 3/4 of their rate | 30, the 512K set | a plain 512K machine |
-| `FID_SFX` (`sound/gng_sfx_512k.s`, the original 512K file) | 32,100 | none | 30, the 512K set | no machine description |
+| `FID_MUSIC1M` (`original/sound/gng_music_1mb.s`, the original 1MB file) | 111,508 | 15, full quality | 30, the 1MB set | 1MB of chip RAM; 512K with the program moved |
+| `FID_MUSIC512` (`enhanced/sound/gng_music_512k.s`, made by `make_music_512k.py`) | 67,332 | 15, the sampled instruments (samples 5-9) at 3/4 of their rate | 30, the 512K set | a plain 512K machine |
+| `FID_SFX` (`original/sound/gng_sfx_512k.s`, the original 512K file) | 32,100 | none | 30, the 512K set | no machine description |
 
 In the 512K music package the resampled instruments' period multipliers are divided by 3/4, so
-every note keeps its pitch; `sound/tools/check_music_512k.py` checks every tune and effect
+every note keeps its pitch; `enhanced/sound/tools/check_music_512k.py` checks every tune and effect
 against the original packages.
 
 ## Program support files

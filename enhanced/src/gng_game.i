@@ -263,7 +263,7 @@ MAP_LOW             	equ	GLOBALS+GLOBALS_SIZE	; ($1A118) the memory map below st
 	ifd	MUSIC512_LEN
 	ifgt	MUSIC512_LEN-$7D64
 SFX_AREA            	equ	(MUSIC512_LEN+15)/16*16	; the sound package at MUSIC_FILE: on 512K the music
-                    			; package (the 512K effects and the 1MB tunes, sound/gng_music_512k.s, its
+                    			; package (the 512K effects and the 1MB tunes, enhanced/sound/gng_music_512k.s, its
                     			; length from build_game.py: 75,514 bytes at full quality, less with
                     			; --music-rate), then the rest of the map: offsets as the original's with
                     			; the package moved to the front
@@ -382,7 +382,7 @@ FID_LEVEL0          	equ	12	; 12-18: the levels' tile files
 FID_SFX             	equ	19
 FID_RELOCS          	equ	20
 FID_TABLES0         	equ	21	; 21-27: the levels' map tables
-FID_MUSIC512        	equ	28	; the music for 512K (sound/gng_music_512k.s)
+FID_MUSIC512        	equ	28	; the music for 512K (enhanced/sound/gng_music_512k.s)
 	ifnd	MUSIC512_LEN		; (its length: build_game.py)
 MUSIC512_LEN        	equ	0
 	endc

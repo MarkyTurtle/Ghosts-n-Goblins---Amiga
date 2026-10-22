@@ -1,4 +1,4 @@
-"""Check sound/gng_music_512k.s (make_music_512k.py) with the real driver code (sndemu.py):
+"""Check enhanced/sound/gng_music_512k.s (make_music_512k.py) with the real driver code (sndemu.py):
  * the package at full quality (--rate 1, made into a temporary file): every tune writes the
    same Paula registers, frame by frame, as with the 1MB package;
  * the game's package (the tunes' samples 5-9 at 3/4 of their rate): every tune writes the same
@@ -6,11 +6,12 @@
    quality's / 3/4 (to within one period step) and its length is the new sample's;
  * every effect the same registers as with the 512K package
 (sample addresses compared as sample + offset).
-   python3 sound/tools/check_music_512k.py [frames]"""
+   python3 enhanced/sound/tools/check_music_512k.py [frames]"""
 import os, re, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
-SND = os.path.join(HERE, '..')
-sys.path.insert(0, HERE)
+SND = os.path.join(HERE, '..')                                    # enhanced/sound: the 512K package
+ORIG_SND = os.path.join(HERE, '..', '..', '..', 'original', 'sound')  # the original packages
+sys.path.insert(0, os.path.join(ORIG_SND, 'tools'))               # (sndemu: the driver emulated)
 import sndemu
 
 FRAMES = int(sys.argv[1]) if len(sys.argv) > 1 else 1500
@@ -19,8 +20,9 @@ TMP = tempfile.mkdtemp()
 
 def build(src):
     out, lst = os.path.join(TMP, src + '.bin'), os.path.join(TMP, src + '.lst')
-    subprocess.run(['vasmm68k_mot', '-Fbin', '-m68000', '-no-opt', '-quiet', '-o', out, '-L', lst, src],
-                   cwd=SND, check=True)
+    where = SND if os.path.exists(os.path.join(SND, src)) else ORIG_SND
+    subprocess.run(['vasmm68k_mot', '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', ORIG_SND, '-I', SND,
+                    '-o', out, '-L', lst, src], cwd=where, check=True)
     text = open(lst).read()
     part = text[text.index('Symbols by name:'):text.index('Symbols by value:')]
     syms = {m.group(1): int(m.group(2), 16) for m in re.finditer(r'^(\S+)\s+A:([0-9A-F]+)$', part, re.M)}

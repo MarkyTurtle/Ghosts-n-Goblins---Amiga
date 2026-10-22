@@ -2,8 +2,8 @@
 
 How to install what you need on Windows or Linux, then build and test both versions of the game:
 
-* **`main`**: the original game. Its sources reassemble byte-identical to the original disk.
-* **`enhanced/main`**: the enhanced game. Building it makes a playable disk image (ADF).
+* **`original/`**: the original game. Its sources reassemble byte-identical to the original disk.
+* **`enhanced/`**: the enhanced game. Building it makes a playable disk image (ADF).
 
 Ready-made enhanced disks are attached to each
 [release](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/releases/latest). You only
@@ -23,10 +23,10 @@ Which Python packages each part needs:
 
 | Package | Used by |
 |---|---|
-| `scipy`, `numpy` | building the enhanced disk: `sound/tools/make_music_512k.py` resamples the 512K music |
-| `unicorn` | the tests: the 68000 emulator that runs the game (`enhanced/tools`, `tools/verify`) |
-| `pillow`, `numpy` | the emulator's screenshots, and the pictures in `render/` |
-| `capstone` | the disassembly tools (`tools/trace.py`, `tools/compare_builds.py`, `tools/build1mb/`) |
+| `scipy`, `numpy` | building the enhanced disk: `enhanced/sound/tools/make_music_512k.py` resamples the 512K music |
+| `unicorn` | the tests: the 68000 emulator that runs the game (`enhanced/tools`, `original/tools/verify`) |
+| `pillow`, `numpy` | the emulator's screenshots, and the pictures in `original/render/` |
+| `capstone` | the disassembly tools (`original/tools/trace.py`, `original/tools/compare_builds.py`, `original/tools/build1mb/`) |
 
 Tested with unicorn 2.1.4, numpy 2.5.3, Pillow 12.3.0, scipy 1.18.1 and capstone 5.0.7.
 
@@ -103,16 +103,16 @@ built disk from the WSL files at `\\wsl$\Ubuntu\home\<you>\...`.
 In the commands below, Windows uses `py` (or `python` inside the virtual environment) where
 Linux uses `python3`.
 
-## Building the original game (`main`)
+## Building the original game (`original/`)
 
 ```
-git checkout main
+cd original
 sh build.sh
 ```
 This assembles the 512K program, the 1MB program and the bootblock from `gng_main.s` and
 `gng_boot.s`, and checks each against the original's SHA-1. It prints `main.bin: OK`,
 `boot.bin: OK` and `main_1mb.bin: OK`. On Windows, run it from Git Bash, or run the same
-assembler commands in PowerShell:
+assembler commands in PowerShell, in `original`:
 ```
 vasmm68k_mot -Fbin -m68000 -no-opt -quiet -o main.bin gng_main.s
 vasmm68k_mot -Fbin -m68000 -no-opt -quiet -o boot.bin gng_boot.s
@@ -121,18 +121,18 @@ Get-FileHash -Algorithm SHA1 main.bin, boot.bin, main_1mb.bin
 ```
 The hashes to expect are in `build.sh`.
 
-Other checks on `main`:
+Other checks, in `original`:
 ```
 python3 tools/verify/checks.py      # the bug notes, run on the real code in the emulator
-python3 tools/refdocs.py            # writes docs/GLOBALS.md and docs/XREF.md
 ```
+`original/README.md` describes the rest of the tools (the disassembly generator, the disk
+tools, the renderers).
 
-## Building the enhanced game (`enhanced/main`)
+## Building the enhanced game (`enhanced/`)
 
 ```
-git checkout enhanced/main
 cd enhanced/tools
-python3 make_game.py         # src/gng_game.s from the original source (only after changing it or the tools)
+python3 make_game.py         # ../src/gng_game.s from original/gng_main.s (only after changing either, or the tools)
 python3 build_game.py        # -> enhanced/build/gng_game.adf
 ```
 `build_game.py` assembles the program, the bootblock and the BOB viewer, makes the 512K music

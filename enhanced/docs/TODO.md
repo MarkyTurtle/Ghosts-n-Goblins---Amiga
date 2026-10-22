@@ -109,7 +109,7 @@ decided against, kept for the record with the reason.
 - [x] Music on 512K machines with an expansion (slow or fast RAM): the whole 1MB package, in the
       chip RAM the program moved out of
 - [x] Music on a plain 512K A500 (made on branch `enhanced/music512`, merged; tried in WinUAE on A500, A500 + 512K, A500+, A600 and A1200): a combined package
-      (`sound/gng_music_512k.s`: the 512K effects with the 1MB tunes, 75.5 KB) in the room freed
+      (`enhanced/sound/gng_music_512k.s`: the 512K effects with the 1MB tunes, 75.5 KB) in the room freed
       by the per-level map tables, joined gaps, old save areas and dead code; stages 1, 2, 3, 5
       and 6 pre-mask fewer BOB sets, and about 7 KB is left on the fullest stage
 - [x] Music quality tiers chosen by the machine's memory (4): the 512K package (plain 512K
@@ -166,7 +166,7 @@ moved, resized or added by rebuilding the directory alone, without reassembling 
   `LoadFile` takes a pointer to an entry in `a1`; `LevelFileIndex` picks the level tile files.
   The two builds' tables differ only in load addresses (the 1MB build loads most files to the
   `$80` staging area).
-* `tools/disk/mkdisk.py` already reads all of this to lay out the disk.
+* `original/tools/disk/mkdisk.py` already reads all of this to lay out the disk.
 * Loader state lives at `$28-$2E` (`LDR_TRACK`, `LDR_CYL`, `LDR_RETRY`, `LDR_DIRFLAG`).
 
 **Proposed design**
@@ -178,7 +178,7 @@ moved, resized or added by rebuilding the directory alone, without reassembling 
     pair that `LoadFile` can use directly, or adapt `LoadFile` to the new entry layout;
   * a checksum over the whole directory.
 * **Bootblock:** load the directory first (one track) to a fixed address that both builds leave
-  alone (to be checked against the memory maps in `docs/GLOBALS.md`). Then take the loading
+  alone (to be checked against the memory maps in `original/docs/GLOBALS.md`). Then take the loading
   screen and main program entries from it instead of immediates. Space is tight: the bootblock is
   1,024 bytes with code and data up to about `$3A8`. The loading-screen palette's unused trailing
   zero words could be reclaimed.
@@ -234,7 +234,7 @@ emulator harness that adds blitter, copper and display emulation. What it showed
 * **Masks:** both schemes below still work with this layout. On 512K, one-plane masks (+20%) with 5
   cookie-cut blits per BOB; on 1MB, fully pre-masked graphics with one blit.
 
-**Where things stand now** (512K build; see README *Scrolling* and `tools/verify/camera.py`)
+**Where things stand now** (512K build; see README *Scrolling* and `original/tools/verify/camera.py`)
 
 * Four full screen buffers, `SCREEN_0`-`SCREEN_3`, each `$B400` bytes (288 x 256, 5 planes,
   line-interleaved, 180 bytes a line): 184,320 bytes, over a third of chip RAM. Two are the
@@ -316,7 +316,7 @@ emulator harness that adds blitter, copper and display emulation. What it showed
 **On-demand masked graphics cache (for 512K)**
 
 Different parts of a level have different enemies, so not every set needs a masked copy at the
-same time. `tools/budget/enemy_windows.py` estimates, for every camera cell of each level, which
+same time. `original/tools/budget/enemy_windows.py` estimates, for every camera cell of each level, which
 graphics sets can be on screen within one cell (256 px) either way. It uses the zone spawners and
 placed enemies there, plus the rules in the code: a Blue Killer turns into a Red Arremer,
 gravestones release the Magician, the Crow's set depends on its param, and bosses / Red Arremer /
@@ -350,7 +350,7 @@ Big Man keep running once started. These are estimates from the tables, not play
   pool size, the hit rate and the number of misses per frame (spread misses over frames, or
   pre-build when a spawner starts) need measuring in a full emulator with real play (item 6).
 * The same cache works for the enemy-shot and effect graphics, which are drawn the same way.
-* Prototype first in the emulator harness (`tools/verify/emu.py`) for addressing, then confirm
+* Prototype first in the emulator harness (`original/tools/verify/emu.py`) for addressing, then confirm
   timing in a full emulator (item 6).
 
 ## 4. Compression, per-level files, caching and music on 512K
@@ -360,7 +360,7 @@ and enough chip RAM freed to play the music on 512K machines.
 
 ### Measurements
 
-Made with `tools/budget/level_sizes.py` and `sound/tools/tune_samples.py`.
+Made with `original/tools/budget/level_sizes.py` and `original/sound/tools/tune_samples.py`.
 
 **Chip RAM in the 512K build today** (from `gng_equates.i`; the A500's 512 KB is all chip RAM):
 
@@ -382,7 +382,7 @@ Made with `tools/budget/level_sizes.py` and `sound/tools/tune_samples.py`.
 
 The last region is nearly full: level 1 needs 49,440 + 55,950 = 105,390 bytes, leaving 778.
 
-**Per level** (`tools/budget/level_sizes.py`):
+**Per level** (`original/tools/budget/level_sizes.py`):
 
 | Level | Map / tile tables used | Tile file | Enemy BOB sets | Pre-masked (x2) | One-plane masks (+20%) |
 |---:|---:|---:|---:|---:|---:|
@@ -404,7 +404,7 @@ level's own cells; a level also reads the cells round it and some bytes past the
 largest level needs 49 cells and the saving is about 17 KB, not 30. `TileAttr` (8 KB) is still
 resident.
 
-**Music** (`sound/tools/tune_samples.py`, which follows each tune's patterns to its instruments,
+**Music** (`original/sound/tools/tune_samples.py`, which follows each tune's patterns to its instruments,
 and counts the samples their lengths run into when they overrun):
 
 * The 1MB package is 111,508 bytes, of which 97,690 are samples: 63,254 used by the effects and
@@ -452,7 +452,7 @@ cache); keep full pre-masking for 1MB machines.
 * **512K music package:** build a combined package from the symbolic sources: the 512K driver and
   effects, plus the 1MB tunes, their instruments and samples 0-3 and 5-9. Renumber the instruments
   and keep each sample's neighbours where an instrument overruns into them (the overrun tails are
-  part of the sound; see `sound/SOUND.md`), or fix the lengths deliberately.
+  part of the sound; see `original/sound/SOUND.md`), or fix the lengths deliberately.
 
 ### Music quality tiers
 
@@ -475,7 +475,7 @@ Plus about 9 KB of note data and instruments for every tier that has music. Note
   sizes are the same and the 1MB build already does this today.
 * A player option could pick a lower tier to free memory for the frame cache.
 * The resampled tiers can also fix the instruments played at periods below 124.
-* Each tier can be rendered to WAV with the real driver (`sound/tools/sndemu.py`) and compared by
+* Each tier can be rendered to WAV with the real driver (`original/sound/tools/sndemu.py`) and compared by
   ear before it is used.
 
 ### Still to measure (closed: zx0 was not used, and the screens' saving was measured once the
@@ -514,7 +514,7 @@ mode) as a guide to the disk space a packed version would take:
 zx0 saves about 38% overall: a lot on code and tables (55%) and BOB graphics (40-55%), little on
 the HAM picture (12%) and the samples (17-25%).
 
-The 512K main program (`tools/budget/program_breakdown.py`):
+The 512K main program (`original/tools/budget/program_breakdown.py`):
 
 | Part | Bytes |
 |---|---:|
@@ -534,7 +534,7 @@ The 512K main program (`tools/budget/program_breakdown.py`):
 
 **1. Drop mirrored enemy frames (biggest saving).** 46,120 of the 118,850 bytes of enemy graphics
 (39%) are exact mirror images of another frame in the same set: the left- and right-facing poses
-(`tools/budget/gfx_redundancy.py`; Astaroth 10,240, Unicorn 5,760, Satan 5,460, Red Arremer
+(`original/tools/budget/gfx_redundancy.py`; Astaroth 10,240, Unicorn 5,760, Satan 5,460, Red Arremer
 4,560 ...). Keep one of each pair and build the other when the frame cache (item 3) misses. The
 blitter can't mirror, so the CPU flips it with a byte bit-reverse table (`BitReverseTable` already
 exists). That is about 640 table lookups for a 32 x 32 frame, paid once per cache miss. This saves
@@ -556,7 +556,7 @@ After per-level files the gain is a few KB, so this is not worth the extra decod
 CPU at draw time for little gain; zx0 already takes the tile files from 146,720 to 88,010 bytes
 on disk.
 
-**5. Samples.** `sound/tools/sample_rates.py` runs the real driver through every tune and effect
+**5. Samples.** `original/sound/tools/sample_rates.py` runs the real driver through every tune and effect
 and records the rate each sample is actually played at:
 
 * **Effects** are played at their recording rate, 8-10 kHz. Resampling them is directly audible:
@@ -648,7 +648,7 @@ on `main` now assembles both programs: 21,580 lines of code shared, about 640 51
   becomes a runtime one (two ScrDrawBob variants behind a pointer).
 * **Disk:** one main program instead of two (about 100 KB less), loaded where the bootblock
   chose; the 1MB music package and the 512K effects package both stay, picked by profile.
-* **Order:** *One source for both builds: done (on `main`, `tools/merge_src.py`; both programs
+* **Order:** *One source for both builds: done (on `main`, `original/tools/merge_src.py`; both programs
   byte-identical). One program for every machine: done on `enhanced/main` without the
   scroller (`enhanced/src/gng_game.s`, profiles from the machine description; tested against
   both originals; see `enhanced/docs/SCROLLER.md`, One program for every machine). Slow / fast

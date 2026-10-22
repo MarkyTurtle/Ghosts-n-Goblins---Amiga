@@ -16,7 +16,7 @@ import os, re, sys
 import srcedit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', '..')
+ROOT = os.path.join(HERE, '..', '..', 'original')  # the original game's folder (original/: its sources, tools, files)
 OUT = os.path.join(HERE, '..', 'src', 'gng_game.s')
 
 # block numbers (srcedit.blocks order in gng_main.s) of the sound differences ...
@@ -55,7 +55,7 @@ HEADER = """; Ghosts'n Goblins (Elite, 1990, v3) - main program, ONE PROGRAM FOR
 ; memory map is in gng_game.i and enhanced/docs/MEMORY.md.
 ;
 ; The address column still gives the original addresses (512K/1MB), for reading this alongside
-; the root gng_main.s and docs/XREF.md; lines without one are new."""
+; original/gng_main.s and original/docs/XREF.md; lines without one are new."""
 
 
 def view(lines, one):
@@ -654,7 +654,7 @@ def main():
     dead = drop_dead_code(S)
     open(OUT, 'w').write(S.s.rstrip('\n') + '\n')
     n = widen_branches(OUT)
-    print(f'{os.path.relpath(OUT, ROOT)}: {S.s.count(chr(10))} lines ({dead} dead lines removed); {n} references out of reach made longer')
+    print(f'{os.path.relpath(OUT, os.path.join(ROOT, '..'))}: {S.s.count(chr(10))} lines ({dead} dead lines removed); {n} references out of reach made longer')
 
 
 if __name__ == '__main__':

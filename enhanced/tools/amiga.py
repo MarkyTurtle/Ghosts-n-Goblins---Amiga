@@ -8,7 +8,7 @@ import os, struct, sys
 import numpy as np
 import re
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', '..')
+ROOT = os.path.join(HERE, '..', '..', 'original')  # the original game's folder (original/: its sources, tools, files)
 sys.path.insert(0, os.path.join(ROOT, 'tools', 'verify'))
 from emu import Game, GLOBALS                                  # noqa: E402
 from unicorn import UC_HOOK_MEM_WRITE, UC_HOOK_CODE              # noqa: E402

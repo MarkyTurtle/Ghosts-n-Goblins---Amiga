@@ -176,7 +176,7 @@ def write_memory(S):
     chip = [
         (0, 0x80, 'vectors', 'the 68000 exception vectors (`CrashReset` for the CPU exceptions; level 1 / 3 autovectors `IrqLevel1` / `IrqLevel3`; `$60`: the sound driver\'s entry)'),
         (0x80, S['GLOBALS'], 'program', 'the program: code and tables (`gng_game.s`), entered at `$A0`'),
-        (S['GLOBALS'], S['MAP_LOW'], '`GLOBALS`', 'the globals block and the object slots (`a6`; `docs/GLOBALS.md`)'),
+        (S['GLOBALS'], S['MAP_LOW'], '`GLOBALS`', 'the globals block and the object slots (`a6`; `original/docs/GLOBALS.md`)'),
         (S['MUSIC_FILE'], S['MUSIC_FILE'] + S['SFX_AREA'], '`MUSIC_FILE`', 'the sound package (`SFX_AREA` bytes): see the machines below'),
         (S['COPPER_INIT'], S['ESHOT_GFX_BUF'], '`COPPER_INIT`', 'copper lists: the template and the progress map\'s list (`COPPER_MAP`); the playfield lists are in the scroller\'s storage'),
         (S['ESHOT_GFX_BUF'], eshot_end, '`ESHOT_GFX_BUF`', 'enemy shot BOBs (file `FID_ESHOTS`)'),

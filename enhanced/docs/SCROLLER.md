@@ -67,7 +67,7 @@ words per line, then by 10). The part still on screen shows the wrong lines. The
 in the 1MB build, whose masked graphics have twice the bytes a line; the 512K build kept it.
 `DrawSceneryOnRedraw` has it too (`$C2EA`). The enhanced code skips the right number, and the test
 compares against the original with that one instruction corrected. Now in the main README's bug
-list and `tools/verify/checks.py`.
+list and `original/tools/verify/checks.py`.
 
 ## Layout
 
@@ -133,7 +133,7 @@ patch sources, into `build/512k/` and `build/1mb/`:
   program moves (the tables `scroll.s` uses, `CellTiles` and so on, stay where they are). The
   labels come from the original's assembler listing (`orig_syms.i`, generated).
 
-and two disk images, made by `tools/disk/mkdisk.py` with the modules added on tracks 132 (512K)
+and two disk images, made by `original/tools/disk/mkdisk.py` with the modules added on tracks 132 (512K)
 and 133 (1MB) (`--add`: files no table lists); the build decodes each image again and checks
 that the bootblock and every file it changed read back exactly:
 
@@ -448,7 +448,7 @@ them (it indexes both tables with the byte sign extended). The largest level nee
 the area is 256 + 49 x 320 = 15,936 bytes: about 17 KB less than the resident tables (the 512K
 level data now ends at most at `$7A5E0`, before at `$7E806`). The program is 77,270 bytes
 (110,140 before). The tables are the original 512K program's data, read from
-`bin/main_512k.bin`; `build_game.py` checks that the map's readable span (`FrameOffsets1 -
+`original/bin/main_512k.bin`; `build_game.py` checks that the map's readable span (`FrameOffsets1 -
 WorldMap`) is still the one it assumed.
 
 **Two unused gaps joined to the level data (3 KB).** A scan of chip RAM (fill everything from
@@ -560,14 +560,14 @@ A plain 512K A500 now plays the music. The memory came from the work above: the 
 tables (17 KB), two joined gaps (3 KB), the old background save areas (24 KB) and the dead code
 (3 KB).
 
-*The package* (`sound/gng_music_512k.s`, 75,514 bytes, made by `sound/tools/make_music_512k.py`
+*The package* (`enhanced/sound/gng_music_512k.s`, 75,514 bytes, made by `enhanced/sound/tools/make_music_512k.py`
 from the two symbolic sources; do not edit it). The 512K and 1MB packages are the same driver
 with the same instrument numbers (0-9 the music's, 10-37 the effects'), so the new one is the
 1MB driver, tune table and tune instruments, the 512K effects' instruments, sequences and
 samples, and the 1MB tunes' voice data, patterns and samples (0-9). Instrument 9 is an effect's
 (the 512K file's Ins00); the unused instrument 7 loops on sample 9 instead of the 1MB effect
 sample 10, which is not included. Every tune plays as in the 1MB package and every effect as in
-the 512K one: `sound/tools/check_music_512k.py` runs the driver in `sndemu` and compares the
+the 512K one: `enhanced/sound/tools/check_music_512k.py` runs the driver in `sndemu` and compares the
 Paula writes over 600 frames for all 15 tunes (against the 1MB package) and all 30 effects
 (against the 512K package). The effects on 512K stay the 512K set (the 1MB package's extra
 effects need its samples).
@@ -778,7 +778,7 @@ checks it from the game's own tables. (The first disks of the one program did no
 **Disk** (`build/gng_game.adf`): the bootblock (memory survey, always loads to `$80`) loads
 the program from tracks 134-150 (it is 17 tracks now); effects package at 126 (assembled for
 the program's `MUSIC_FILE`), music package at 64; the original programs' tracks are empty.
-`tools/disk/mkdisk.py --one` builds it.
+`original/tools/disk/mkdisk.py --one` builds it.
 
 ### Two-button joysticks (made on branch `enhanced/joystick`, merged; tried in WinUAE)
 
@@ -829,7 +829,7 @@ the jump input, C the cheat. Moves and fire count when newly pressed (`g_Joy` ag
 on `PLAYER 1 START` starts a game in the same frame as the original's fire did, and the
 comparisons stay in step.
 
-The sound, sprite and input tests (`docs/TODO.md`, 8) are to go on the test page. Memory: the
+The sound, sprite and input tests (`enhanced/docs/TODO.md`, 8) are to go on the test page. Memory: the
 program is 206 bytes longer (the menu, less the original's instruction code and texts); stages
 1 and 2 now pre-mask one small enemy set fewer.
 
@@ -1016,7 +1016,7 @@ nothing loads (the floppy model refuses, as a real empty drive would).
   drawing the same state (a second check, independent of the two games staying in step).
 * `tools/amiga.py`: harness: 68000 + blitter + copper + display renderer.
 * `tools/original.py`: drives the original game's display code in the harness (the reference).
-* `tools/check_harness.py`: checks the harness against the level pictures in `render/out/`.
+* `tools/check_harness.py`: checks the harness against the level pictures in `original/render/out/`.
 * `src/boot_patches.s`: the bootblock's memory survey; `tools/test_bootinfo.py` tests it.
 * `tools/test_jump.py`: the two-button joystick settings (jump on up or on button 2).
 * `tools/test_menu.py`: the title menu.
@@ -1032,13 +1032,13 @@ python3 compare_runs.py 5000 1 --build 1mb               # the 1MB program   [--
 python3 check_harness.py
 ```
 
-## Next steps (as planned at the time; all done - the current list is `docs/TODO.md`)
+## Next steps (as planned at the time; all done - the current list is `enhanced/docs/TODO.md`)
 
 0. **Fold the scroller into the game source.** Today the enhanced program is the original binary
    with patches written over it, plus the module loaded from track 132. The aim is one source on
    this branch (`gng_main.s`, edited here) that assembles the enhanced program directly - both
    builds, since `gng_main.s` on `main` now holds the 512K and the 1MB program in one source
-   (`ifd BUILD_1MB` blocks; `tools/merge_src.py`, both byte-identical):
+   (`ifd BUILD_1MB` blocks; `original/tools/merge_src.py`, both byte-identical):
    * **First make the source relocatable** (on `main`, still byte-identical; this is the 512K side
      only, the 1MB code is already position independent): about 36
      instructions still give addresses as numbers (`lea $371e8.l`, `move.l #$1a250,COP2LCH`,
@@ -1057,7 +1057,7 @@ python3 check_harness.py
      `DrawSceneryOnRedraw`, the save areas).
    * **Check**: the same side-by-side runs as now (all levels, teleporting), with the harness taking
      its addresses (VblIRQ, Level1Logic, LoadFile...) from the listing instead of constants.
-   * Note: `gng_main.s` is generated on `main` (`tools/gen.py`, `gen1m.py`, then
+   * Note: `gng_main.s` is generated on `main` (`original/tools/gen.py`, `gen1m.py`, then
      `merge_src.py`); on this branch it would be edited by hand from then on, so later annotation
      changes on `main` merge as text. Doing the relocation step on `main` first keeps those merges
      small.
@@ -1084,7 +1084,7 @@ python3 check_harness.py
      identical. On a 512K A500 in WinUAE it holds 50 fps except in busy scenes, where it drops to
      25 fps; the CPU/blitter overlap above is what would keep those at 50.
 2. **Use the freed memory** (43 KB of screens, the 24 KB of save areas): the first step towards
-   music on 512K machines and the other items in `docs/TODO.md`.
+   music on 512K machines and the other items in `enhanced/docs/TODO.md`.
 3. **One-plane masks** stored per frame (or the on-demand cache) instead of the 512K build's 2
    mask-building blits (the 1MB build already has pre-masked graphics, and its scroller uses
    them).
