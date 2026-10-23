@@ -13,7 +13,7 @@ need these steps to build from the source.
 
 | Tool | Needed for | Notes |
 |---|---|---|
-| [vasm](http://sun.hasenbraten.de/vasm/) (`vasmm68k_mot`), the 68000 assembler with Motorola syntax | every build | Built from its source: there are no prebuilt binaries for Windows or Linux (steps below). Tested with vasm 2.0f |
+| [vasm](http://www.compilers.de/vasm.html) (`vasmm68k_mot`), the 68000 assembler with Motorola syntax | every build | Built from its source: there are no prebuilt binaries for Windows or Linux (steps below). Tested with vasm 2.0f |
 | [Python](https://www.python.org/) 3 | the enhanced build, its tests, the tools | Tested with Python 3.13; use 3.12 or later |
 | Python packages `unicorn`, `numpy`, `pillow`, `scipy`, `capstone` | see below | Installed with `pip` |
 | [Git](https://git-scm.com/) | getting the source | On Windows, Git for Windows also provides Git Bash (`sh`, `sha1sum`) for `build.sh` |
