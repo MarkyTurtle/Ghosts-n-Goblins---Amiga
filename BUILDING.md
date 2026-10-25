@@ -9,10 +9,10 @@ Ready-made enhanced disks are attached to each
 [release](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/releases/latest). You only
 need these steps to build from the source.
 
-These steps are run automatically on Windows and Linux on every push, by the repository's
-[build workflow](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/build.yml)
-(`.github/workflows/build.yml`). If something here doesn't work for you, that workflow is a
-working example to compare with.
+These steps are run automatically on Windows and Linux by the repository's GitHub Actions:
+[original](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/original.yml) and [enhanced](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/enhanced.yml)
+(`.github/workflows/`; vasm is built by `.github/actions/vasm`). If something here doesn't work
+for you, their runs are a working example to compare with.
 
 ## What you need
 
@@ -45,7 +45,7 @@ Either of these gives the vasm source; the steps below build it.
   [compilers.de](http://www.compilers.de/vasm.html). Download *Last release source*
   (`vasm.tar.gz`) and unpack it (`tar xzf vasm.tar.gz`, which works in Linux, PowerShell and Git
   Bash). This gives a folder `vasm`.
-* **A copy on GitHub**: a mirror of the official source, which the build workflow uses:
+* **A copy on GitHub**: a mirror of the official source, which the workflows use:
   ```
   git clone https://github.com/StarWolf3000/vasm-mirror.git vasm
   ```
@@ -146,10 +146,12 @@ tools, the renderers).
 ## Building the enhanced game (`enhanced/`)
 
 ```
-cd enhanced/tools
-python build_game.py        # -> enhanced/build/gng_game.adf
+python enhanced/build.py     # -> enhanced/build/gng_game.adf and gng_game_raster.adf
 ```
-`build_game.py` does the following, in a few seconds:
+`enhanced/build.py` builds the game disk and the timing build's, and prints each one's SHA-1.
+`--check SHA1` also checks the game disk against a SHA-1. It runs
+`enhanced/tools/build_game.py`, which builds one disk; run that directly, in `enhanced/tools`,
+for its options (below). Each `build_game.py` run does the following, in a few seconds:
 
 * assembles the program, the bootblock and the BOB viewer;
 * makes the 512K music package;
@@ -209,9 +211,23 @@ Each test prints `all as expected` (or `ok` per check). The longer ones take a f
 | `main.bin: MISMATCH` | vasm older than 2.0 may assemble differently, so check its version. Also check that `-no-opt` is used (it is in `build.py` and `build.sh`). |
 | `git status` shows `enhanced/sound/gng_music_512k.s` (or another generated file) as changed after a build, but `git diff` shows nothing | The checkout has Windows line endings. That happens with a clone made before `.gitattributes` was added; the repository now keeps Linux line endings on every system. Check out the files again: `git rm -r --cached -q .` then `git reset --hard` (this discards uncommitted changes), or make a fresh clone. |
 
-If you are stuck, compare with the
-[build workflow's runs](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/build.yml).
-They show every step on a clean Windows and Linux machine, with its output.
+If you are stuck, compare with the runs of the [original](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/original.yml) and
+[enhanced](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/enhanced.yml) workflows. They show every step on a clean Windows
+and Linux machine, with its output.
+
+## Making a release
+
+1. If the game has changed since the last release, update `ADF_SHA1` at the top of
+   `.github/workflows/enhanced.yml` to the new disk's SHA-1 (`python enhanced/build.py` prints
+   it), so the enhanced workflow checks against the new disk.
+2. On GitHub, under *Releases → Draft a new release*:
+   * type a new tag (for example `V1.1`) and choose *Create new tag on publish*;
+   * set the target to `main`;
+   * write the notes, then *Publish release*.
+3. The [release workflow](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/release.yml) then builds the disks from that tag
+   and attaches them to the release, as `GhostsNGoblins_Enhanced_<tag>.adf` and
+   `..._raster.adf`, after a few minutes. If it fails, run it again from the Actions tab
+   (*release → Run workflow*, giving the tag); it replaces any disks it attached before.
 
 ## Playing the disk
 

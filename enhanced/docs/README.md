@@ -18,6 +18,7 @@ Build and check (needs [vasm](http://sun.hasenbraten.de/vasm/) as `vasmm68k_mot`
 Linux: [`../../BUILDING.md`](../../BUILDING.md)):
 
 ```
+python3 enhanced/build.py        # both disks, with their SHA-1 (from the repository's root)
 cd enhanced/tools
 python3 build_game.py           # ../build/gng_game.adf  (--raster, --nasty-wait, --music-rate N/D)
 python3 make_docs.py            # ../docs/DISK.md, MEMORY.md

@@ -1,5 +1,8 @@
 # Ghosts'n Goblins (Elite, 1990) for the Amiga - enhanced, and the original annotated
 
+[![original](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/original.yml/badge.svg)](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/original.yml)
+[![enhanced](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/enhanced.yml/badge.svg)](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/enhanced.yml)
+
 This repository holds two things, side by side:
 
 * **[`enhanced/`](enhanced)**: an enhanced version of the game. It is one program for every
@@ -57,14 +60,20 @@ tests, and the game was tried in WinUAE on an A500, A500 + 512K, A500+, A600 and
 [`BUILDING.md`](BUILDING.md) lists what to install (vasm, Python and its packages) on Windows and
 Linux, and how to build and test both versions:
 
-* the original game: `original/build.py` (or `build.sh`), which checks the three programs against the originals'
-  SHA-1;
-* the enhanced disk: `enhanced/tools/build_game.py`, which writes `enhanced/build/gng_game.adf`.
+* the original game: `python original/build.py`, which assembles the three programs and checks
+  them against the originals' SHA-1;
+* the enhanced game: `python enhanced/build.py`, which writes the disks
+  (`enhanced/build/gng_game.adf` and the timing build) and prints their SHA-1.
 
-Python 3.11 to 3.13 and vasm 2.0f are what it is tested with. A
-[GitHub Actions workflow](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/build.yml)
-builds vasm and both games on Windows and on Linux at every push, and checks the results against
-the originals and the released disk.
+They are tested with Python 3.11 to 3.13 and vasm 2.0f. GitHub Actions run both builds on Windows
+and Linux whenever their folders change (the badges above):
+
+* [original](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/original.yml): the three programs against the originals, and
+  the bug-note checks;
+* [enhanced](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/enhanced.yml): the disks, the tests, and the disks to download
+  from each run's page;
+* [release](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/release.yml): when a release is published, its disks are built
+  and attached to it.
 
 ## Layout
 

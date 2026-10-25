@@ -1,0 +1,62 @@
+# The enhanced game: build its disks on Windows and Linux (enhanced/build.py, as BUILDING.md
+# describes), check the game disk's SHA-1, run the tests, and keep the disks as the run's
+# artifacts (downloadable from the run's page). The enhanced build reads the original's files,
+# so changes there run it too.
+name: enhanced
+
+on:
+  push:
+    paths: ['enhanced/**', 'original/**', 'requirements.txt', '.gitattributes', '.github/workflows/enhanced.yml', '.github/actions/**']
+  pull_request:
+    paths: ['enhanced/**', 'original/**', 'requirements.txt', '.gitattributes', '.github/workflows/enhanced.yml', '.github/actions/**']
+  workflow_dispatch:
+
+env:
+  # The game disk's SHA-1 while the game is unchanged since release v1.0. A change to the game
+  # changes it: update this line with the new SHA-1 (enhanced/build.py prints it).
+  ADF_SHA1: 38304a756d7edf5a8fa91adcfb86b1018766fcea
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, python: '3.13'}
+          - {os: ubuntu-latest, python: '3.11'}            # the oldest Python tested
+          - {os: ubuntu-latest, python: '3.13'}
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }}, Python ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Python packages
+        shell: bash
+        run: |
+          python -m pip install -r requirements.txt > "$RUNNER_TEMP/pip.log" 2>&1 || { tail -n 25 "$RUNNER_TEMP/pip.log" | sed 's/^/::error::/'; exit 1; }
+      - uses: ./.github/actions/vasm
+      - name: Build the disks and check the game's SHA-1 (enhanced/build.py)
+        run: python enhanced/build.py --check ${{ env.ADF_SHA1 }}
+      - name: Tests (enhanced/tools)
+        working-directory: enhanced/tools
+        run: |
+          python build_enh.py
+          python test_bootinfo.py
+          python test_boot4489.py
+          python test_jump.py
+          python test_menu.py
+      - name: The generated docs are current (make_docs.py)
+        working-directory: enhanced/tools
+        run: python make_docs.py
+      - name: The checkout is unchanged
+        shell: bash
+        run: |
+          test -z "$(git status --porcelain)" || { git status --porcelain | sed 's/^/::error::changed by the build - /'; git --no-pager diff --stat | sed 's/^/::error::/'; exit 1; }
+      - uses: actions/upload-artifact@v5
+        with:
+          name: disks-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            enhanced/build/gng_game.adf
+            enhanced/build/gng_game_raster.adf
