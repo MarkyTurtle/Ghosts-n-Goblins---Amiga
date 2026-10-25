@@ -1,7 +1,7 @@
 ;==============================================================================
 ; scroller.s - the enhanced game's own code that is not the original game's: the incremental
 ; scroller and its glue, faster BOB drawing, playfield text, the title menu. Included by
-; gng_game.s (BUILD_ONE); tools/make_game.py puts the calls into the game's routines (see
+; gng_game.s (BUILD_ONE), whose routines call into it (see
 ; enhanced/docs/FEATURES.md for what each feature does):
 ;
 ;   the scroller (scroll.s, included here: ScrFullDraw, ScrScrollTo, ScrPrepare / ScrPrepareRow,
