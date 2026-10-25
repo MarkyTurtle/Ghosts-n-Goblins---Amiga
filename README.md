@@ -93,25 +93,14 @@ the one at the top installs both.
 
 ## Branches
 
-| Branch | What it holds |
-|---|---|
-| `main` | both: the original game and the enhanced game. New work goes on a branch of its own and is merged here. |
-| `enhanced/main` | the enhanced game as it was developed, up to release v1.0, before the two were brought together on `main`: the whole tree as it was then (the original's files at the top, `enhanced/` beside them). Kept for the record; v1.0 is tagged there. Until October 2026 it was called `enhanced/scroll`, after the scroller the work started with. |
+`main` holds both games. New work goes on a branch of its own, is tried in WinUAE, merged here
+and the branch deleted.
 
-The feature branches are below. Each feature was made on a branch of its own, tried in WinUAE and
-merged into `enhanced/main`. All are merged and kept for the record, in the old layout:
-
-| Branch | Feature |
-|---|---|
-| `enhanced/byteloader` | the AmigaDOS-format disk and the 4489_byteloader (bootblock and game); the progress map's tune started when the map appears |
-| `enhanced/music512` | music on a plain 512K A500: the combined package (now `enhanced/sound/gng_music_512k.s`) |
-| `enhanced/joystick` | two-button joysticks |
-| `enhanced/titlemenu` | the title menu and its test page |
-| `enhanced/musicquality` | the 512K music package at 3/4 of the tunes' sample rate (`build_game.py --music-rate` for others) |
-| `enhanced/testmenu` | the test page's sound, input and sprite tests, and the BOB viewer (1MB of chip RAM or more) |
-| `enhanced/memory` | loading less: only the level's enemy sets, and a file cache in expansion memory |
-| `enhanced/display` | clean changes of display between a level and the progress map; the loading picture kept whole on 1MB machines |
-| `enhanced/bootdrive` | boot from any drive (Kickstart 2.0 and later) |
+The enhanced game was developed on `enhanced/scroll` (later `enhanced/main`), with each feature
+on a branch of its own (`enhanced/byteloader`, `music512`, `joystick`, `titlemenu`,
+`musicquality`, `testmenu`, `memory`, `display`, `bootdrive`), up to release v1.0, and then
+brought together with the original on `main`. Those branches are all merged and deleted; their
+commits are all in `main`'s history, and the tag `V1.0` marks the release.
 
 ---
 
