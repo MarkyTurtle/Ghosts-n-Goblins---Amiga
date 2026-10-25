@@ -247,7 +247,12 @@ module (`tools/build_enh.py`, `src/module.s`, `src/patches.s`) - are still here 
 
 ## Testing
 
-All in a 68000 emulator (Unicorn) with a model of the blitter, copper, display and disk drive
+The repository's build workflow (`.github/workflows/build.yml`) builds vasm and both games on
+Windows (Python 3.13, Visual Studio's `nmake`) and Linux (Python 3.11 and 3.13, `make`) at every
+push. It checks the original programs' and the disk's SHA-1, runs the bootblock, machine
+description, jump and menu tests, and checks that the build leaves the checkout unchanged.
+
+The tests themselves run in a 68000 emulator (Unicorn) with a model of the blitter, copper, display and disk drive
 (`tools/amiga.py`, `tools/game.py`, `tools/floppy.py`):
 
 | Tool | Checks |

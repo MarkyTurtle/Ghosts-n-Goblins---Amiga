@@ -44,9 +44,10 @@ FILES = {
 
 
 def file_records(S):
-    """file id -> (destination expression, its value on 512K) from the program's FENTRY lines"""
+    """file id -> (destination expression, its value on 512K) from the program's FENTRY lines
+    (in gng_game.s and the files it includes: support.s has the enhanced files' records)"""
     out = {}
-    src = open(os.path.join(ENH, 'src', 'gng_game.s')).read()
+    src = '\n'.join(open(os.path.join(ENH, 'src', f)).read() for f in ('gng_game.s', 'support.s', 'scroller.s'))
     for m in re.finditer(r'^\tFENTRY\t([^,\n]+),[^,\n]+,(FID_\w+)(?:\+(\d))?', src, re.M):
         fid = S[m.group(2)] + int(m.group(3) or 0)
         expr = m.group(1).strip()
