@@ -97,7 +97,8 @@ jobs:
           python test_jump.py
           python test_menu.py
       - name: The checkout is unchanged (no generated file rewritten)
-        run: test -z "$(git status --porcelain)" || { git status --porcelain | sed 's/^/::error::changed by the build: /'; exit 1; }
+        run: |
+          test -z "$(git status --porcelain)" || { git status --porcelain | sed 's/^/::error::changed by the build - /'; exit 1; }
       - uses: actions/upload-artifact@v5
         with:
           name: gng_game-linux-py${{ matrix.python }}
