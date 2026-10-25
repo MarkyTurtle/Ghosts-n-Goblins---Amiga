@@ -1,0 +1,15 @@
+# Text files keep LF line endings in the checkout on every system (Windows included): the build
+# writes its generated files (the 512K music source, the generated docs) with LF, so a CRLF
+# checkout would show them as changed after every build. vasm and Python read LF on Windows.
+* text=auto eol=lf
+
+# Binary files: never converted
+*.bin   binary
+*.raw   binary
+*.hunk  binary
+*.rle   binary
+*.adf   binary
+*.png   binary
+*.mp3   binary
+*.wav   binary
+*.xlsx  binary

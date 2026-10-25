@@ -207,7 +207,7 @@ Each test prints `all as expected` (or `ok` per check). The longer ones take a f
 | `pip install` fails building `unicorn`, `numpy` or `scipy` from source | Your Python has no ready-made packages: use 64-bit Python 3.11, 3.12 or 3.13. |
 | `ModuleNotFoundError: No module named 'unicorn'` (or `numpy`, `scipy`) | Activate the virtual environment first (`.venv\Scripts\Activate.ps1`, or `. .venv/bin/activate`). |
 | `main.bin: MISMATCH` | vasm older than 2.0 may assemble differently, so check its version. Also check that `-no-opt` is used (it is in `build.py` and `build.sh`). |
-| `git status` shows generated files as changed after a build | That shouldn't happen: generated files are written with Linux line endings on every system. Please report it with the file's name. |
+| `git status` shows `enhanced/sound/gng_music_512k.s` (or another generated file) as changed after a build, but `git diff` shows nothing | The checkout has Windows line endings. That happens with a clone made before `.gitattributes` was added; the repository now keeps Linux line endings on every system. Check out the files again: `git rm -r --cached -q .` then `git reset --hard` (this discards uncommitted changes), or make a fresh clone. |
 
 If you are stuck, compare with the
 [build workflow's runs](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/build.yml).
