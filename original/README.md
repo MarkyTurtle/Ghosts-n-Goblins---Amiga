@@ -10,7 +10,7 @@
 | `gng_main.s` | Main program, **both builds** from one source: the 512K build (tracks 110-125, runs at `$80`) and, with `-DBUILD_1MB=1`, the expanded-memory (1MB) build (tracks 17-32, position independent, assembled at org 0). ~27,000 lines; the ~160 places where the builds differ are `ifd BUILD_1MB` / `else` blocks (edited by hand since October 2026: see *Extending the annotations*) |
 | `gng_equates.i` | Custom-chip / CIA registers, memory map, all named `a6` globals, object slot fields (both builds: the memory map differs, the globals are `G_SHIFT` further on in the 1MB build) |
 | `gng_boot.s` | Bootblock + trackloader (track 0) |
-| `build.sh` | Assembles the three programs (two from `gng_main.s`) with vasm and checks SHA-1 against the originals |
+| `build.py`, `build.sh` | Assemble the three programs (two from `gng_main.s`) with vasm and check SHA-1 against the originals (`build.py` on any system, `build.sh` with a Unix shell) |
 | `bin/` | The original binaries the sources reproduce |
 | `tools/` | The tracer / generator used to produce `gng_main.s` (see below), `compare_builds.py`; `tools/budget/` (memory and size measurements for the enhanced game's plan, `../enhanced/docs/TODO.md`: `level_sizes.py`, `enemy_windows.py`, `gfx_redundancy.py`, `program_breakdown.py`; `sound/tools/sample_rates.py` and `tune_samples.py` for the samples); `tools/build1mb/` produces the 1MB build's source and `tools/merge_src.py` merges the two into `gng_main.s`; `tools/verify/checks.py` runs the real code in a 68000 emulator to check the bug notes; `tools/refdocs.py` writes `docs/GLOBALS.md` and `docs/XREF.md` |
 | `sound/` | Sound driver and music/sfx data: annotated sources, samples, renders (`sound/SOUND.md`) |
@@ -366,7 +366,7 @@ starts (the builder stops with a message otherwise). A file at a new track is gi
 
 ```
 python3 tools/disk/mkdisk.py -o gng.adf                      # the original disk
-sh build.sh                                                  # assemble main.bin, main_1mb.bin, boot.bin
+python3 build.py                                             # assemble main.bin, main_1mb.bin, boot.bin (or: sh build.sh)
 python3 tools/disk/mkdisk.py -o mine.adf --main512 main.bin --main1mb main_1mb.bin --boot boot.bin
 python3 tools/disk/mkdisk.py --check mine.adf               # decode it again and compare
 python3 tools/disk/mkdisk.py --layout                        # the layout read from the tables
@@ -439,7 +439,7 @@ the enhanced game can move the program and its memory map; it still assembles by
 both original programs). The generator still runs and reproduces the source as it was before that
 change - the same code, with numbers where the source now has names - and `docs/GLOBALS.md` and
 `docs/XREF.md` still come from it (`tools/refdocs.py`, run in `tools/` after `gen.py`). So edit
-`gng_main.s` directly, check with `sh build.sh`, and do not run `merge_src.py` over it: that writes
+`gng_main.s` directly, check with `python3 build.py` (or `sh build.sh`), and do not run `merge_src.py` over it: that writes
 the generated version back to `gng_main.s` and loses the names.
 
 The generator, for reference: edit `tools/anno_db.py` (and `tools/anno_bosses.py`,

@@ -197,7 +197,7 @@ moved, resized or added by rebuilding the directory alone, without reassembling 
 
 **Open questions** (answered since: the file table is read from the disk into the program's own
 `FileDir`; `main` keeps the byte-identical sources and the enhanced game is a separate tree,
-`enhanced/src/gng_game.s`, made from them by `make_game.py`)
+`enhanced/src/gng_game.s`, made from them by `make_game.py` and edited by hand since)
 
 * Fixed address for the directory in both builds (chip RAM, not overwritten by screens / caches).
 * Whether to keep byte-identical original sources alongside a modified "mod" build (e.g. an

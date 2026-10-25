@@ -53,6 +53,8 @@ jobs:
           if ($changed) {
             foreach ($l in $changed) { echo "::error::changed by the build: $l" }
             git --no-pager diff --stat | ForEach-Object { echo "::error::$_" }
+            git --no-pager diff | Select-Object -First 30 | ForEach-Object { echo "::error::diff: $_" }
+            git config --show-origin --get-all core.autocrlf | ForEach-Object { echo "::error::autocrlf: $_" }
             throw "the build changed files in the checkout"
           }
       - uses: actions/upload-artifact@v5
@@ -73,7 +75,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Python packages
         run: |
-          python -m pip install -r requirements.txt > pip.log 2>&1 || { tail -n 25 pip.log | sed 's/^/::error::/'; exit 1; }
+          python -m pip install -r requirements.txt > "$RUNNER_TEMP/pip.log" 2>&1 || { tail -n 25 "$RUNNER_TEMP/pip.log" | sed 's/^/::error::/'; exit 1; }
           python -m pip list
       - name: Build vasm (make)
         run: |
