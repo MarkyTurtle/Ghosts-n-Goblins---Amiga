@@ -25,7 +25,10 @@ for you, their runs are a working example to compare with.
 | [Git](https://git-scm.com/) | getting the source (and vasm's, the easy way) | any recent version |
 | An Amiga emulator and a Kickstart ROM | playing the disk | [WinUAE](https://www.winuae.net/) (Windows), [FS-UAE](https://fs-uae.net/) or [Amiberry](https://github.com/BlitterStudio/amiberry) (Linux). Kickstart ROMs are copyrighted: [Amiga Forever](https://www.amigaforever.com/) sells them legally. The game needs Kickstart 1.3 or later |
 
-Which Python package each part needs (`pip install -r requirements.txt` installs them all):
+Each game's folder has its own list, `original/requirements.txt` and
+`enhanced/requirements.txt`; the `requirements.txt` at the top includes both, so
+`pip install -r requirements.txt` installs everything, and `pip install -r enhanced/requirements.txt`
+just what the enhanced game needs. Which package each part needs:
 
 | Package | Used by |
 |---|---|

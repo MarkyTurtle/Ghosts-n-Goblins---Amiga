@@ -82,13 +82,14 @@ and Linux whenever their folders change (the badges above):
 | `original/` | the annotated disassembly (`gng_main.s`, `gng_equates.i`, `gng_boot.s`), the original binaries and the disk's files, the tools that made and check it, rendered graphics, the sound driver and data, and the notes - start with [`original/README.md`](original/README.md) |
 | `enhanced/src/` | the enhanced game's sources: `gng_game.s` (the program), `support.s` (its start-up, loading and cache code), `scroller.s` and `scroll.s`, the bootblock, the BOB viewer |
 | `enhanced/tools/` | the build (`build_game.py`), the emulator harness and every test |
-| `enhanced/sound/` | the 512K music package (the original packages, from `original/sound/`, combined) |
+| `enhanced/disk/files/`, `enhanced/sound/`, `enhanced/data/` | the enhanced game's resources - graphics, sound packages and samples, level data - its own copies, taken from `original/` once (`enhanced/tools/take_resources.py`), so either game's can change without the other's; the build reads nothing from `original/` |
 | `enhanced/docs/` | features, memory and disk layouts, file formats, the development log and the plan: [`enhanced/docs/README.md`](enhanced/docs/README.md) |
 | `BUILDING.md` | what to install and how to build, on Windows and Linux |
 
 The enhanced game's source started as a copy of the original's: `enhanced/src/gng_game.s` was
 made from `original/gng_main.s` by a script. Since then it is edited directly, and `original/`
-stays the original game.
+stays the original game. Each folder has its own `requirements.txt` (the Python packages it needs);
+the one at the top installs both.
 
 ## Branches
 

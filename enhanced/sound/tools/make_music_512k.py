@@ -27,8 +27,9 @@ at $FFFF: $8000 x 2 is 1 in 65,536 short), so every note keeps its pitch. Sample
 single-cycle waveforms, 1,650 bytes) stay: their length is their pitch. The new samples go to
 enhanced/sound/samples/r<N>_<D>/ (made again each time; r3_4/ is kept in the repository, so
 the committed gng_music_512k.s assembles as it is). --rate 1: full quality, as the 1MB package.
-The original packages and their samples are read from original/sound/; the package assembles
-with both original/sound and enhanced/sound as include paths (its incbins: samples/...).
+It is made from the enhanced game's copies of the original packages, enhanced/sound/
+gng_music_1mb.s and gng_sfx_512k.s, and their samples (enhanced/sound/samples/); the package
+assembles with enhanced/sound as its include path (its incbins: samples/...).
 
   python3 enhanced/sound/tools/make_music_512k.py [--rate N/D] [--out FILE]
                                                   (default enhanced/sound/gng_music_512k.s)"""
@@ -36,10 +37,9 @@ import os, re, sys
 from fractions import Fraction
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SND = os.path.join(HERE, '..')                                    # enhanced/sound: what this makes
-ORIG_SND = os.path.join(HERE, '..', '..', '..', 'original', 'sound')  # the original packages
-M = open(os.path.join(ORIG_SND, 'gng_music_1mb.s')).read().split('\n')
-K = open(os.path.join(ORIG_SND, 'gng_sfx_512k.s')).read().split('\n')
+SND = os.path.join(HERE, '..')          # enhanced/sound: the packages it is made from, and what it makes
+M = open(os.path.join(SND, 'gng_music_1mb.s')).read().split('\n')
+K = open(os.path.join(SND, 'gng_sfx_512k.s')).read().split('\n')
 
 
 def at(lines, label):
@@ -114,7 +114,7 @@ def quality(lines, f):
     os.makedirs(d, exist_ok=True)
     size = {}
     for n in RESAMPLED:
-        raw = open(os.path.join(ORIG_SND, 'samples', f'gng_music_1mb_smp{n:02d}.raw'), 'rb').read()
+        raw = open(os.path.join(SND, 'samples', f'gng_music_1mb_smp{n:02d}.raw'), 'rb').read()
         new = resample(raw, f, n in LOOPS)
         open(os.path.join(d, f'gng_music_1mb_smp{n:02d}.raw'), 'wb').write(new)
         size[n] = len(new)

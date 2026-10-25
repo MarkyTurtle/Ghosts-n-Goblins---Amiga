@@ -19,6 +19,9 @@ This is the enhanced game's folder (`enhanced/`; the original game is in `origin
 | `TODO.md` | what is done and what is left |
 | `../../original/README.md` | the original game: the disassembly, its formats, findings and bugs |
 
+The game's resources (graphics, sound, level data) are its own copies, in `disk/files/`,
+`sound/` and `data/` (*Builds*, below).
+
 ## Playing it
 
 `enhanced/build/gng_game.adf` (made by `enhanced/tools/build_game.py`) is an ordinary 880K disk
@@ -240,6 +243,22 @@ and Linux, is in [`BUILDING.md`](../../BUILDING.md)) makes `enhanced/build/gng_g
 The program's source is `src/gng_game.s` (with `src/support.s`, `src/scroller.s` and the
 rest of `src/`), edited by hand. `make_docs.py` writes `DISK.md` and `MEMORY.md` from the
 build.
+
+The build reads nothing from `original/`: the resources it needs are the enhanced game's own
+copies, so they can change without touching the original game.
+
+| Folder | Resources |
+|---|---|
+| `disk/files/` | the graphics files the disk carries as they are: the loading picture, the progress map and copyright screens, Arthur's sprites, the BOBs, items, font and each level's tiles |
+| `sound/` | the 1MB music package and the 512K effects package (`gng_music_1mb.s`, `gng_sfx_512k.s`, their samples in `samples/`), and the 512K music package made from them (`gng_music_512k.s`, `samples/r3_4/`) |
+| `data/` | what the level map table files are made from: `level_map.bin` and `cell_tables.bin` (`FORMATS.md`) |
+
+They were taken from the original game once, by `tools/take_resources.py`, which records where
+each came from (`python3 take_resources.py` lists the ones changed since). To change one, change
+the copy here. If `level_map.bin`'s map changes, change the program's `WorldMap`, `LevelBounds`
+and `LevelMapTable` with it: the build checks that they are the same. The tests still use
+`original/` for the original game they compare the enhanced game with, and
+`sound/tools/check_music_512k.py` uses the original's sound driver emulator.
 
 The earlier enhanced builds - the original programs with the scroller patched in and loaded as a
 module (`tools/build_enh.py`, `src/module.s`, `src/patches.s`) - are still here for reference;

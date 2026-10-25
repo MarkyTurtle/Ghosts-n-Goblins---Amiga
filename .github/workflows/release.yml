@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Python packages
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install -r enhanced/requirements.txt
       - uses: ./.github/actions/vasm
       - name: Build the disks (enhanced/build.py)
         run: python enhanced/build.py

@@ -448,7 +448,7 @@ them (it indexes both tables with the byte sign extended). The largest level nee
 the area is 256 + 49 x 320 = 15,936 bytes: about 17 KB less than the resident tables (the 512K
 level data now ends at most at `$7A5E0`, before at `$7E806`). The program is 77,270 bytes
 (110,140 before). The tables are the original 512K program's data, read from
-`original/bin/main_512k.bin`; `build_game.py` checks that the map's readable span (`FrameOffsets1 -
+`original/bin/main_512k.bin` (since then from the enhanced game's own copy, `enhanced/data/`); `build_game.py` checks that the map's readable span (`FrameOffsets1 -
 WorldMap`) is still the one it assumed.
 
 **Two unused gaps joined to the level data (3 KB).** A scan of chip RAM (fill everything from

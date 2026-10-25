@@ -1,0 +1,7 @@
+# The original game's Python packages. build.py (and build.sh) need none of them: only vasm.
+# They are for the tools: checks.py and the tracers (unicorn), the renderers (pillow), the
+# disassembly tools (capstone), numpy for a few of them. Tested with the versions noted.
+unicorn>=2.1      # (tested 2.1.4) the 68000 emulator: tools/verify/checks.py, the tracers
+numpy>=2.0
+pillow>=10        # the graphics renderers (render/)
+capstone>=5.0     # the disassembly tools

@@ -27,8 +27,11 @@ import os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENH = os.path.join(HERE, '..')
-ROOT = os.path.join(ENH, '..', 'original')  # the original game's folder (original/: its sources, tools, files)
-ENH_SND = os.path.join(ENH, 'sound')                 # the enhanced game's sound: the 512K music package
+ENH_SND = os.path.join(ENH, 'sound')     # the sound packages (the 1MB music, the 512K effects and music)
+FILES = os.path.join(ENH, 'disk', 'files')  # the graphics files the disk carries as they are
+DATA = os.path.join(ENH, 'data')         # the level map and cell tables the level table files are made from
+# (the resources were taken from the original game in original/ - tools/take_resources.py - and
+# are the enhanced game's own: the build reads nothing from original/)
 RASTER = '--raster' in sys.argv
 NASTY = '--nasty-wait' in sys.argv
 MUSIC_RATE = sys.argv[sys.argv.index('--music-rate') + 1] if '--music-rate' in sys.argv else None
@@ -46,8 +49,8 @@ FILES_START = 0x600
 def vasm(src, out, listing=None, defs=(), incl=None):
     """assemble src to out (vasm, -Fbin -no-opt) with the include paths the game needs and -D
     for each (name, value) in defs; the listing too if asked; stops the build on an error"""
-    cmd = [VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', os.path.join(ENH, 'src'), '-I', ROOT,
-           '-I', os.path.join(ROOT, 'sound'), '-I', ENH_SND, '-o', out] + (['-I', incl] if incl else [])
+    cmd = [VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', os.path.join(ENH, 'src'),
+           '-I', ENH_SND, '-o', out] + (['-I', incl] if incl else [])
     if listing: cmd += ['-L', listing]
     cmd += [f'-D{k}={v}' for k, v in defs] + [src]
     try:
@@ -96,11 +99,14 @@ def reloc_table(offs):
 
 
 MAP_LIMIT = 0xB40                         # FrameOffsets1 - WorldMap: the map bytes MapTileAt reads
+MAP_DATA = 0x4466                         # data/level_map.bin: the memory from here (LevelBounds)
 
 
 def level_tables():
-    """the per-level map table files (LoadLevelTables), from the original 512K program's
-    BlockTiles and CellTiles -> (slots, [file bytes]). A level reads the map at
+    """the per-level map table files (LoadLevelTables), from data/level_map.bin (LevelBounds,
+    LevelMapTable, WorldMap and the bytes past it, as in the original 512K program) and
+    data/cell_tables.bin (BlockTiles and CellTiles for each cell byte, as the original reads
+    them: 64 + 256 bytes per cell, cells $00-$FF) -> (slots, [file bytes]). A level reads the map at
     g_MapPtr + (X >> 8) + (Y >> 8) * 32 (MapTileAt, the scroll), so a level's cells are the
     bytes at its origin (LevelMapTable) plus its size (LevelBounds) in cells, one cell more
     on every side (Arthur and the look-ahead at the edges), and columns 254 and 255 of each
@@ -110,12 +116,11 @@ def level_tables():
     extended, so cell $FA reads 6 entries before the start (zeros below the program).
     Cell $67 (empty) takes slot 0, and so does a cell the level never reads."""
     import struct
-    D = open(os.path.join(ROOT, 'bin', 'main_512k.bin'), 'rb').read(); B = 0x80
-    WM, LMT, LB, BT, CT = 0x44D6, 0x44BA, 0x4466, 0x114, 0x1222C
+    D = open(os.path.join(DATA, 'level_map.bin'), 'rb').read(); B = LB = MAP_DATA
+    WM, LMT = 0x44D6, 0x44BA
+    T = open(os.path.join(DATA, 'cell_tables.bin'), 'rb').read()
     LIMIT = MAP_LIMIT                     # FrameOffsets1 - WorldMap (checked against the build)
     rw = lambda a: struct.unpack('>H', D[a-B:a-B+2])[0]
-    def mem(a, n):                        # the original's memory (zeros outside the program)
-        return bytes(D[x-B] if B <= x < B + len(D) else 0 for x in range(a, a + n))
     sets = []
     for l in range(7):
         org = LMT + rw(LMT + 2*l)
@@ -132,11 +137,25 @@ def level_tables():
         for i, c in enumerate(cells): slot[c] = i
         blocks = bytearray(64 * slots); tiles = bytearray()
         for i, c in enumerate(cells):
-            sc = c - 256 if c >= 0x80 else c
-            blocks[64*i:64*i+64] = mem(BT + 64*sc, 64)
-            tiles += mem(CT + 256*sc, 256) if c != 0x67 else bytes(256)
+            blocks[64*i:64*i+64] = T[320*c:320*c+64]
+            tiles += T[320*c+64:320*c+320] if c != 0x67 else bytes(256)
         files.append(bytes(slot + blocks + tiles))
     return slots, files
+
+
+def check_map(prog, syms):
+    """the level tables were made from data/level_map.bin: the program's own LevelBounds,
+    LevelMapTable origins and WorldMap must be the same (change both together)"""
+    import struct
+    d, m = open(prog, 'rb').read(), open(os.path.join(DATA, 'level_map.bin'), 'rb').read()
+    p = lambda a, n: d[a - 0x80:a - 0x80 + n]
+    q = lambda a, n: m[a - MAP_DATA:a - MAP_DATA + n]
+    lb, lmt, wm = syms['LevelBounds'], syms['LevelMapTable'], syms['WorldMap']
+    org = lambda get, t, w: [t + o - w for o in struct.unpack('>7H', get(t, 14))]
+    if (p(lb, 28) != q(0x4466, 28) or p(wm, 32*11 + 1) != q(0x44D6, 32*11 + 1)
+            or org(p, lmt, wm) != org(q, 0x44BA, 0x44D6)):
+        sys.exit('the program\'s level map (LevelBounds, LevelMapTable, WorldMap) differs from '
+                 'data/level_map.bin, which the level tables are made from')
 
 
 def build(extra_defs=()):
@@ -180,15 +199,16 @@ def build(extra_defs=()):
     syms = s2
     if syms['FrameOffsets1'] - syms['WorldMap'] != MAP_LIMIT:
         sys.exit('MAP_LIMIT is not FrameOffsets1 - WorldMap: the level tables would miss cells')
+    check_map(prog, syms)
     sfx, music = os.path.join(OUT, 'sfx.bin'), os.path.join(OUT, 'music.bin')
-    vasm(os.path.join(ROOT, 'sound', 'gng_sfx_512k.s'), sfx, defs=(('SND_ORG', syms['MUSIC_FILE']),))
-    vasm(os.path.join(ROOT, 'sound', 'gng_music_1mb.s'), music, defs=(('SND_ORG', syms['MUSIC1M_FILE']),))
+    vasm(os.path.join(ENH_SND, 'gng_sfx_512k.s'), sfx, defs=(('SND_ORG', syms['MUSIC_FILE']),))
+    vasm(os.path.join(ENH_SND, 'gng_music_1mb.s'), music, defs=(('SND_ORG', syms['MUSIC1M_FILE']),))
     vasm(M512_SRC, music512, defs=(('SND_ORG', syms['MUSIC_FILE']),))
     # the relocation file (EnhRelocate): the program assembled 2MB on with the memory map where
     # it is, and the music package likewise; then the program again with the file's length
     moved, music2 = os.path.join(OUT, 'moved.bin'), os.path.join(OUT, 'music_moved.bin')
     vasm(src, moved, defs=tuple(extra_defs) + (('RELOC_ORG', 0x80 + RELOC_DELTA), ('MAP_FIX', syms['MAP_LOW'])))
-    vasm(os.path.join(ROOT, 'sound', 'gng_music_1mb.s'), music2, defs=(('SND_ORG', syms['MUSIC1M_FILE'] + RELOC_DELTA),))
+    vasm(os.path.join(ENH_SND, 'gng_music_1mb.s'), music2, defs=(('SND_ORG', syms['MUSIC1M_FILE'] + RELOC_DELTA),))
     rp = relocations(open(prog, 'rb').read(), open(moved, 'rb').read(), 'the program')
     rm = relocations(open(music, 'rb').read(), open(music2, 'rb').read(), 'the music package')
     relocs = os.path.join(OUT, 'relocs.bin')
@@ -240,7 +260,7 @@ def build(extra_defs=()):
 def disk_files(prog, sfx, music, relocs, out=None):
     """the disk's files, in file id order (gng_game.i FID_...): [(name, path)]"""
     out = out or OUT
-    D = lambda f: os.path.join(ROOT, 'disk', 'files', f)
+    D = lambda f: os.path.join(FILES, f)
     return ([('program', prog), ('loading picture', D('t001-016_loading_screen.bin')),
              ("Arthur's sprites", D('t033-036_arthur_sprites.bin')), ('small BOBs', D('t037_small_bob_sets.bin')),
              ('enemy BOBs', D('t038-056_enemy_bobs.bin')), ('items 2', D('t057_item_gfx_part2.bin')),

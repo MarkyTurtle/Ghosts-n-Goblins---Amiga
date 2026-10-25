@@ -1,0 +1,7 @@
+# The enhanced game's Python packages: build.py (tools/build_game.py) and the tests.
+# Tested with the versions noted.
+numpy>=2.0
+scipy>=1.13       # the 512K music package's resampled samples (sound/tools/make_music_512k.py)
+unicorn>=2.1      # (tested 2.1.4) the 68000 emulator: the tests
+pillow>=10        # the tests' screenshots
+capstone>=5.0     # tools/reloc_test.py

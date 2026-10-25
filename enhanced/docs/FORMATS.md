@@ -5,7 +5,8 @@ and sizes) and of the data the game builds from them in memory. All numbers are 
 (68000). *Line-interleaved* means a picture is stored line by line, each line holding the rows
 of all its bitplanes one after another (plane 0 first); a row is `width / 8` bytes.
 
-The files that come from the original disk are unchanged (`original/disk/files/`, `original/disk/FILES.md`);
+The files that come from the original disk are unchanged so far (the enhanced game's copies are in
+`enhanced/disk/files/`; the originals are described in `original/disk/FILES.md`);
 the main README's *Data formats* section has more on the world map, cells, collision and the
 game's tables, and `original/docs/SPAWNS.md` on the spawn tables. The files new to the enhanced disk
 are the map table files, the relocation file, the 512K music package and the file table.
@@ -109,8 +110,8 @@ both = `g_TextPaper`, neither = transparent (the background shows; colour 0 in t
 
 ### Map tables (`FID_TABLES0` + level; new on the enhanced disk)
 
-Made by `build_game.py` (`level_tables()`) from the original 512K program's `BlockTiles` and
-`CellTiles`, for the map cells the level can read (its rectangle of `WorldMap`, one cell more on
+Made by `build_game.py` (`level_tables()`) from `data/level_map.bin` and `data/cell_tables.bin`
+(below: the original 512K program's map, `BlockTiles` and `CellTiles`), for the map cells the level can read (its rectangle of `WorldMap`, one cell more on
 every side, and columns 254-255 of those rows; see `FEATURES.md`). Loaded to `LEVEL_TABLES`:
 
 | Offset | Bytes | |
@@ -122,6 +123,17 @@ every side, and columns 254-255 of those rows; see `FEATURES.md`). Loaded to `LE
 `TBL_SLOTS` is the most any level uses (49), so the block tiles are at the same place in every
 file; the files are 5,184-15,936 bytes. `MapTileAt` (collision) and the scroller's `DrawTile`
 look a cell's slot up first.
+
+What they are made from (`enhanced/data/`, taken from `original/bin/main_512k.bin` by
+`tools/take_resources.py`; not on the disk):
+
+| File | Bytes | |
+|---|---|---|
+| `level_map.bin` | 2,992 | the original 512K program's memory from `$4466` to `$5016`: `LevelBounds` (`$4466`, 4 bytes a level: x0, x1, y1, y0), `LevelMapTable` (`$44BA`, a word a level: the origin cell, from the table's start), `WorldMap` (`$44D6`, 32 x 11 cells + 1) and the bytes after it that `MapTileAt` reads, up to `FrameOffsets1` (`MAP_LIMIT`, `$B40` from `WorldMap`) |
+| `cell_tables.bin` | 81,920 | for each cell byte `$00`-`$FF`, 320 bytes: its 64 `BlockTiles` bytes, then its 256 `CellTiles` bytes, as the original reads them (the byte sign extended: cells `$80`-`$FF` read before the tables' start; zeros below the program). Only `$00`-`$66` are real cells; the others are what the original reads for bytes past the map |
+
+The build checks that the program's own `LevelBounds`, `LevelMapTable` origins and `WorldMap` are
+the same as `level_map.bin`'s, so the two cannot drift apart.
 
 ### World map, collision and spawn tables
 
@@ -148,9 +160,9 @@ reads the hunk header: the game loads the whole file to the address it was assem
 
 | Package | Bytes | Tunes | Effects | Used on |
 |---|---:|---|---|---|
-| `FID_MUSIC1M` (`original/sound/gng_music_1mb.s`, the original 1MB file) | 111,508 | 15, full quality | 30, the 1MB set | 1MB of chip RAM; 512K with the program moved |
+| `FID_MUSIC1M` (`enhanced/sound/gng_music_1mb.s`, the original 1MB file) | 111,508 | 15, full quality | 30, the 1MB set | 1MB of chip RAM; 512K with the program moved |
 | `FID_MUSIC512` (`enhanced/sound/gng_music_512k.s`, made by `make_music_512k.py`) | 67,332 | 15, the sampled instruments (samples 5-9) at 3/4 of their rate | 30, the 512K set | a plain 512K machine |
-| `FID_SFX` (`original/sound/gng_sfx_512k.s`, the original 512K file) | 32,100 | none | 30, the 512K set | no machine description |
+| `FID_SFX` (`enhanced/sound/gng_sfx_512k.s`, the original 512K file) | 32,100 | none | 30, the 512K set | no machine description |
 
 In the 512K music package the resampled instruments' period multipliers are divided by 3/4, so
 every note keeps its pitch; `enhanced/sound/tools/check_music_512k.py` checks every tune and effect

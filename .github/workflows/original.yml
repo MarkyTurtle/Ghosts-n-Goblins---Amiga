@@ -28,7 +28,7 @@ jobs:
       - name: Python packages
         shell: bash
         run: |
-          python -m pip install -r requirements.txt > "$RUNNER_TEMP/pip.log" 2>&1 || { tail -n 25 "$RUNNER_TEMP/pip.log" | sed 's/^/::error::/'; exit 1; }
+          python -m pip install -r original/requirements.txt > "$RUNNER_TEMP/pip.log" 2>&1 || { tail -n 25 "$RUNNER_TEMP/pip.log" | sed 's/^/::error::/'; exit 1; }
       - uses: ./.github/actions/vasm
       - name: Assemble and check (original/build.py)
         run: python original/build.py

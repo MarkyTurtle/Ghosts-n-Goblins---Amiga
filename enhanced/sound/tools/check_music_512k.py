@@ -10,9 +10,9 @@
 import os, re, subprocess, sys, tempfile
 VASM = os.environ.get('VASM', 'vasmm68k_mot')          # the assembler (VASM: its full path, if not on the PATH)
 HERE = os.path.dirname(os.path.abspath(__file__))
-SND = os.path.join(HERE, '..')                                    # enhanced/sound: the 512K package
-ORIG_SND = os.path.join(HERE, '..', '..', '..', 'original', 'sound')  # the original packages
-sys.path.insert(0, os.path.join(ORIG_SND, 'tools'))               # (sndemu: the driver emulated)
+SND = os.path.join(HERE, '..')          # enhanced/sound: the 512K package and the packages it is made from
+# (sndemu, the driver emulated, is the original game's tool)
+sys.path.insert(0, os.path.join(HERE, '..', '..', '..', 'original', 'sound', 'tools'))
 import sndemu
 
 FRAMES = int(sys.argv[1]) if len(sys.argv) > 1 else 1500
@@ -21,9 +21,8 @@ TMP = tempfile.mkdtemp()
 
 def build(src):
     out, lst = os.path.join(TMP, src + '.bin'), os.path.join(TMP, src + '.lst')
-    where = SND if os.path.exists(os.path.join(SND, src)) else ORIG_SND
-    subprocess.run([VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', ORIG_SND, '-I', SND,
-                    '-o', out, '-L', lst, src], cwd=where, check=True)
+    subprocess.run([VASM, '-Fbin', '-m68000', '-no-opt', '-quiet', '-I', SND,
+                    '-o', out, '-L', lst, src], cwd=SND, check=True)
     text = open(lst).read()
     part = text[text.index('Symbols by name:'):text.index('Symbols by value:')]
     syms = {m.group(1): int(m.group(2), 16) for m in re.finditer(r'^(\S+)\s+A:([0-9A-F]+)$', part, re.M)}

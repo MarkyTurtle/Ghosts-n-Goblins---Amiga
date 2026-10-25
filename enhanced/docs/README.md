@@ -13,9 +13,10 @@ Elsewhere: `../../original/README.md` (the original game's disassembly, its form
 `../../original/docs/GLOBALS.md` and `XREF.md` (every global and who uses it),
 `../../original/sound/SOUND.md` (the sound driver and its data).
 
-Build and check (needs [vasm](http://sun.hasenbraten.de/vasm/) as `vasmm68k_mot`, Python 3 with
-`unicorn`, `numpy`, `Pillow`, and `scipy` for the music package; installing them on Windows and
-Linux: [`../../BUILDING.md`](../../BUILDING.md)):
+Build and check (needs [vasm](http://sun.hasenbraten.de/vasm/) as `vasmm68k_mot`, and Python 3
+with the packages in [`../requirements.txt`](../requirements.txt); installing them on Windows and
+Linux: [`../../BUILDING.md`](../../BUILDING.md)). The game's resources - graphics, sound and level
+data - are its own copies in `../disk/files/`, `../sound/` and `../data/` (FEATURES.md, *Builds*):
 
 ```
 python3 enhanced/build.py        # both disks, with their SHA-1 (from the repository's root)
