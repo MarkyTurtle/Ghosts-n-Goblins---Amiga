@@ -1,0 +1,44 @@
+# The original game: assemble its three programs on Windows and Linux (original/build.py, as
+# BUILDING.md describes) and check them against the originals' SHA-1; run the bug-note checks.
+name: original
+
+on:
+  push:
+    paths: ['original/**', 'requirements.txt', '.gitattributes', '.github/workflows/original.yml', '.github/actions/**']
+  pull_request:
+    paths: ['original/**', 'requirements.txt', '.gitattributes', '.github/workflows/original.yml', '.github/actions/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, python: '3.13'}
+          - {os: ubuntu-latest, python: '3.11'}            # the oldest Python tested
+          - {os: ubuntu-latest, python: '3.13'}
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }}, Python ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Python packages
+        shell: bash
+        run: |
+          python -m pip install -r requirements.txt > "$RUNNER_TEMP/pip.log" 2>&1 || { tail -n 25 "$RUNNER_TEMP/pip.log" | sed 's/^/::error::/'; exit 1; }
+      - uses: ./.github/actions/vasm
+      - name: Assemble and check (original/build.py)
+        run: python original/build.py
+      - name: The same with build.sh (Linux)
+        if: runner.os != 'Windows'
+        run: sh original/build.sh
+      - name: The bug-note checks (original/tools/verify/checks.py)
+        working-directory: original
+        run: python tools/verify/checks.py
+      - name: The checkout is unchanged
+        shell: bash
+        run: |
+          test -z "$(git status --porcelain)" || { git status --porcelain | sed 's/^/::error::changed by the build - /'; exit 1; }

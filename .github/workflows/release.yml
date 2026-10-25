@@ -1,0 +1,42 @@
+# When a release is published on GitHub: build the enhanced disks from the release's tag and
+# attach them to it (GhostsNGoblins_Enhanced_<tag>.adf and ..._raster.adf), so they no longer
+# need uploading by hand. It can also be run by hand for an existing release (Actions -> release
+# -> Run workflow, with the release's tag); disks already attached under those names are replaced.
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release's tag (for example V1.1)
+        required: true
+
+permissions:
+  contents: write                                     # to attach files to the release
+
+jobs:
+  disks:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Python packages
+        run: python -m pip install -r requirements.txt
+      - uses: ./.github/actions/vasm
+      - name: Build the disks (enhanced/build.py)
+        run: python enhanced/build.py
+      - name: Attach them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp enhanced/build/gng_game.adf "GhostsNGoblins_Enhanced_${TAG}.adf"
+          cp enhanced/build/gng_game_raster.adf "GhostsNGoblins_Enhanced_${TAG}_raster.adf"
+          gh release upload "$TAG" "GhostsNGoblins_Enhanced_${TAG}.adf" "GhostsNGoblins_Enhanced_${TAG}_raster.adf" --clobber

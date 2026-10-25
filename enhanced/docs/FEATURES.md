@@ -247,10 +247,18 @@ module (`tools/build_enh.py`, `src/module.s`, `src/patches.s`) - are still here 
 
 ## Testing
 
-The repository's build workflow (`.github/workflows/build.yml`) builds vasm and both games on
-Windows (Python 3.13, Visual Studio's `nmake`) and Linux (Python 3.11 and 3.13, `make`) at every
-push. It checks the original programs' and the disk's SHA-1, runs the bootblock, machine
-description, jump and menu tests, and checks that the build leaves the checkout unchanged.
+The repository's GitHub Actions build vasm and both games on Windows (Python 3.13, Visual
+Studio's `nmake`) and Linux (Python 3.11 and 3.13, `make`):
+
+* `original.yml`: the original programs' SHA-1 and the bug-note checks;
+* `enhanced.yml`: the disks (`enhanced/build.py --check`), the bootblock, machine description,
+  jump and menu tests, the generated docs, and that the build leaves the checkout unchanged;
+* `release.yml`: the disks for a published release, attached to it.
+
+`enhanced.yml` checks the game disk against a fixed SHA-1, set by `ADF_SHA1` at the top of the
+workflow. While the game is unchanged since v1.0, that is the v1.0 disk's. A change to the game
+changes the disk, so `ADF_SHA1` has to be updated in the same commit (`enhanced/build.py`
+prints the new value).
 
 The tests themselves run in a 68000 emulator (Unicorn) with a model of the blitter, copper, display and disk drive
 (`tools/amiga.py`, `tools/game.py`, `tools/floppy.py`):

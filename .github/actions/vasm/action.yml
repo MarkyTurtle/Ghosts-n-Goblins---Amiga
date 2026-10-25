@@ -1,0 +1,24 @@
+# Build vasm (vasmm68k_mot, version 2.0f from the source mirror) the way BUILDING.md describes -
+# Visual Studio's nmake on Windows, make on Linux - and put it on the PATH for the later steps.
+name: vasm
+description: Build vasmm68k_mot from source and add it to the PATH
+runs:
+  using: composite
+  steps:
+    - if: runner.os == 'Windows'
+      uses: ilammy/msvc-dev-cmd@v1                     # cl and nmake, as the x64 Native Tools prompt
+    - if: runner.os == 'Windows'
+      shell: cmd
+      run: |
+        git clone --depth 1 https://github.com/StarWolf3000/vasm-mirror.git "%RUNNER_TEMP%\vasm" || exit /b 1
+        cd /d "%RUNNER_TEMP%\vasm"
+        nmake /f Makefile.Win32 CPU=m68k SYNTAX=mot || exit /b 1
+        if not exist vasmm68k_mot.exe exit /b 1
+        echo %RUNNER_TEMP%\vasm>> %GITHUB_PATH%
+    - if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        git clone --depth 1 https://github.com/StarWolf3000/vasm-mirror.git "$RUNNER_TEMP/vasm"
+        make -C "$RUNNER_TEMP/vasm" CPU=m68k SYNTAX=mot
+        test -x "$RUNNER_TEMP/vasm/vasmm68k_mot"
+        echo "$RUNNER_TEMP/vasm" >> "$GITHUB_PATH"
