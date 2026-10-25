@@ -57,9 +57,14 @@ tests, and the game was tried in WinUAE on an A500, A500 + 512K, A500+, A600 and
 [`BUILDING.md`](BUILDING.md) lists what to install (vasm, Python and its packages) on Windows and
 Linux, and how to build and test both versions:
 
-* the original game: `original/build.sh`, which checks the three programs against the originals'
+* the original game: `original/build.py` (or `build.sh`), which checks the three programs against the originals'
   SHA-1;
 * the enhanced disk: `enhanced/tools/build_game.py`, which writes `enhanced/build/gng_game.adf`.
+
+Python 3.11 to 3.13 and vasm 2.0f are what it is tested with. A
+[GitHub Actions workflow](https://github.com/MarkyTurtle/Ghosts-n-Goblins---Amiga/actions/workflows/build.yml)
+builds vasm and both games on Windows and on Linux at every push, and checks the results against
+the originals and the released disk.
 
 ## Layout
 

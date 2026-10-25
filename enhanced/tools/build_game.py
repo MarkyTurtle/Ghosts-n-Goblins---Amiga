@@ -50,7 +50,10 @@ def vasm(src, out, listing=None, defs=(), incl=None):
            '-I', os.path.join(ROOT, 'sound'), '-I', ENH_SND, '-o', out] + (['-I', incl] if incl else [])
     if listing: cmd += ['-L', listing]
     cmd += [f'-D{k}={v}' for k, v in defs] + [src]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        sys.exit(f'{VASM} not found: put vasmm68k_mot on the PATH, or set VASM to its full path')
     if r.returncode: sys.exit(f'vasm {os.path.basename(src)}:\n{r.stdout}{r.stderr}')
 
 
@@ -255,9 +258,11 @@ def disk_files(prog, sfx, music, relocs, out=None):
 
 
 def check_records(src, syms, files):
-    """every file record (FENTRY) with a number for its length asks for its file's length"""
+    """every file record (FENTRY) with a number for its length asks for its file's length (the
+    records in gng_game.s and the files it includes)"""
     if len(files) != syms['FID_COUNT']: sys.exit('disk_files() and the FID_ equates disagree')
-    for m in re.finditer(r'^\tFENTRY\t[^,\n]+,\$([0-9A-F]+),(FID_\w+)(?:\+(\d))?', open(src).read(), re.M):
+    text = '\n'.join(open(os.path.join(os.path.dirname(src), f)).read() for f in ('gng_game.s', 'support.s', 'scroller.s'))
+    for m in re.finditer(r'^\tFENTRY\t[^,\n]+,\$([0-9A-F]+),(FID_\w+)(?:\+(\d))?', text, re.M):
         fid = syms[m.group(2)] + int(m.group(3) or 0)
         name, path = files[fid]
         if int(m.group(1), 16) != os.path.getsize(path):

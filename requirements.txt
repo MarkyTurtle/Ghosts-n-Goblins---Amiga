@@ -1,0 +1,8 @@
+# Python packages for building and testing both games (see BUILDING.md):
+#   pip install -r requirements.txt
+# Works with Python 3.11, 3.12 and 3.13. Tested with the versions in the comments.
+unicorn>=2.1      # the 68000 emulator the tests run the game in (tested 2.1.4)
+numpy>=2.0        # the emulator's display, the 512K music resampling (tested 2.4.6, 2.5.3, 2.5.4)
+scipy>=1.13       # the 512K music resampling: needed to build the enhanced disk (tested 1.17.1, 1.18.1)
+pillow>=10        # screenshots, the pictures in original/render/ (tested 12.3.0, 13.0.0)
+capstone>=5.0     # the disassembly tools in original/tools/ (tested 5.0.7)

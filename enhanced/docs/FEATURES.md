@@ -117,7 +117,7 @@ the program, so the screens and graphics stay in chip RAM, and the chip RAM it l
 * the old background save areas and load buffers: the small BOBs and the progress map load into
   the screens, the disk's MFM buffer goes to the top of the level area (24 KB); two unused gaps
   joined to the level data (3 KB);
-* the original routines the scroller replaced and debug code removed (`drop_dead_code`, 3 KB).
+* the original routines the scroller replaced and debug code removed (3 KB).
 
 ## Sound
 
@@ -247,7 +247,12 @@ module (`tools/build_enh.py`, `src/module.s`, `src/patches.s`) - are still here 
 
 ## Testing
 
-All in a 68000 emulator (Unicorn) with a model of the blitter, copper, display and disk drive
+The repository's build workflow (`.github/workflows/build.yml`) builds vasm and both games on
+Windows (Python 3.13, Visual Studio's `nmake`) and Linux (Python 3.11 and 3.13, `make`) at every
+push. It checks the original programs' and the disk's SHA-1, runs the bootblock, machine
+description, jump and menu tests, and checks that the build leaves the checkout unchanged.
+
+The tests themselves run in a 68000 emulator (Unicorn) with a model of the blitter, copper, display and disk drive
 (`tools/amiga.py`, `tools/game.py`, `tools/floppy.py`):
 
 | Tool | Checks |

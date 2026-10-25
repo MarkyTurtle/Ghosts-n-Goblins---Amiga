@@ -45,7 +45,7 @@ for (lo, hi), fm in sorted(groups.items()):
     for o in sorted(fm):
         n, c = fm[o]; L.append(f'| `+${o:02X}` | `{n}` | {esc(c)} |')
     L.append('')
-open(os.path.join(out, 'GLOBALS.md'), 'w').write('\n'.join(L)+'\n')
+open(os.path.join(out, 'GLOBALS.md'), 'w', encoding='utf-8', newline='\n').write('\n'.join(L)+'\n')
 
 # ---------------------------------------------------------------- XREF.md
 named = {v for v in A.NAMES.values()}
@@ -75,5 +75,5 @@ L += ['', '## Routines and tables', '', '| Name | Used by |', '|---|---|']
 for n in sorted(uses, key=str.lower):
     if n in varnames: continue
     L.append(f'| `{n}` | {", ".join(sorted(uses[n]))} |')
-open(os.path.join(out, 'XREF.md'), 'w').write('\n'.join(L)+'\n')
+open(os.path.join(out, 'XREF.md'), 'w', encoding='utf-8', newline='\n').write('\n'.join(L)+'\n')
 print('GLOBALS.md', len(A.VARS), 'globals;', 'XREF.md', len(uses), 'symbols')

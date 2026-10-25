@@ -1,0 +1,107 @@
+# Build both games on Windows and Linux the way BUILDING.md describes, and check the results:
+# the original's three programs against the originals' SHA-1, the enhanced disk against the
+# v1.0 release (while the game is unchanged since v1.0; update ADF_SHA1 when it changes).
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  ADF_SHA1: 38304a756d7edf5a8fa91adcfb86b1018766fcea      # enhanced/build/gng_game.adf, v1.0
+  VASM_MIRROR: https://github.com/StarWolf3000/vasm-mirror.git
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Python packages
+        run: python -m pip install -r requirements.txt
+      - uses: ilammy/msvc-dev-cmd@v1                   # cl and nmake, as the x64 Native Tools prompt
+      - name: Build vasm (nmake, Makefile.Win32)
+        shell: cmd
+        run: |
+          git clone --depth 1 %VASM_MIRROR% "%RUNNER_TEMP%\vasm" || exit /b 1
+          cd /d "%RUNNER_TEMP%\vasm"
+          nmake /f Makefile.Win32 CPU=m68k SYNTAX=mot || exit /b 1
+          if not exist vasmm68k_mot.exe exit /b 1
+          echo %RUNNER_TEMP%\vasm>> %GITHUB_PATH%
+      - name: The original game (original/build.py)
+        run: python original/build.py
+      - name: The enhanced game (enhanced/tools/build_game.py)
+        working-directory: enhanced/tools
+        run: |
+          python build_game.py
+          $sha = (Get-FileHash -Algorithm SHA1 ../build/gng_game.adf).Hash.ToLower()
+          echo "gng_game.adf SHA-1 $sha"
+          if ($sha -ne $env:ADF_SHA1) { throw "gng_game.adf differs from the expected disk" }
+      - name: Tests
+        working-directory: enhanced/tools
+        run: |
+          python build_enh.py
+          python test_bootinfo.py
+          python test_boot4489.py
+          python test_jump.py
+      - name: The checkout is unchanged (no generated file rewritten)
+        run: |
+          $changed = git status --porcelain
+          if ($changed) {
+            foreach ($l in $changed) { echo "::error::changed by the build: $l" }
+            git --no-pager diff --stat | ForEach-Object { echo "::error::$_" }
+            git --no-pager diff | Select-Object -First 30 | ForEach-Object { echo "::error::diff: $_" }
+            git config --show-origin --get-all core.autocrlf | ForEach-Object { echo "::error::autocrlf: $_" }
+            throw "the build changed files in the checkout"
+          }
+      - uses: actions/upload-artifact@v5
+        with:
+          name: gng_game-windows
+          path: enhanced/build/gng_game.adf
+
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.13']                       # the oldest and the newest Python tested
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Python packages
+        run: |
+          python -m pip install -r requirements.txt > "$RUNNER_TEMP/pip.log" 2>&1 || { tail -n 25 "$RUNNER_TEMP/pip.log" | sed 's/^/::error::/'; exit 1; }
+          python -m pip list
+      - name: Build vasm (make)
+        run: |
+          git clone --depth 1 "$VASM_MIRROR" "$RUNNER_TEMP/vasm"
+          make -C "$RUNNER_TEMP/vasm" CPU=m68k SYNTAX=mot
+          test -x "$RUNNER_TEMP/vasm/vasmm68k_mot"
+          echo "$RUNNER_TEMP/vasm" >> "$GITHUB_PATH"
+      - name: The original game (original/build.sh)
+        run: sh original/build.sh
+      - name: The enhanced game (enhanced/tools/build_game.py)
+        working-directory: enhanced/tools
+        run: |
+          python build_game.py
+          echo "$ADF_SHA1  ../build/gng_game.adf" | sha1sum -c
+      - name: Tests
+        working-directory: enhanced/tools
+        run: |
+          python build_enh.py
+          python test_bootinfo.py
+          python test_boot4489.py
+          python test_jump.py
+          python test_menu.py
+      - name: The checkout is unchanged (no generated file rewritten)
+        run: |
+          test -z "$(git status --porcelain)" || { git status --porcelain | sed 's/^/::error::changed by the build - /'; exit 1; }
+      - uses: actions/upload-artifact@v5
+        with:
+          name: gng_game-linux-py${{ matrix.python }}
+          path: enhanced/build/gng_game.adf

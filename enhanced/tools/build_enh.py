@@ -61,7 +61,10 @@ def vasm(src, out, listing=None, defs=(), opt=False, inc=OUT):
     if not opt: cmd.append('-no-opt')
     if listing: cmd += ['-L', listing]
     cmd += [f'-D{k}={v}' for k, v in defs] + [src]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        sys.exit(f'{VASM} not found: put vasmm68k_mot on the PATH, or set VASM to its full path')
     if r.returncode:
         sys.exit(f'vasm {os.path.basename(src)}:\n{r.stdout}{r.stderr}')
 

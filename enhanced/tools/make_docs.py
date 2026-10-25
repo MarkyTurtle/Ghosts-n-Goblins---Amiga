@@ -44,9 +44,10 @@ FILES = {
 
 
 def file_records(S):
-    """file id -> (destination expression, its value on 512K) from the program's FENTRY lines"""
+    """file id -> (destination expression, its value on 512K) from the program's FENTRY lines
+    (in gng_game.s and the files it includes: support.s has the enhanced files' records)"""
     out = {}
-    src = open(os.path.join(ENH, 'src', 'gng_game.s')).read()
+    src = '\n'.join(open(os.path.join(ENH, 'src', f)).read() for f in ('gng_game.s', 'support.s', 'scroller.s'))
     for m in re.finditer(r'^\tFENTRY\t([^,\n]+),[^,\n]+,(FID_\w+)(?:\+(\d))?', src, re.M):
         fid = S[m.group(2)] + int(m.group(3) or 0)
         expr = m.group(1).strip()
@@ -150,7 +151,7 @@ included (the game's interrupt handlers set `a6` themselves: `IrqLevel1` / `IrqL
 4. `$4.w` = `$80`, and it enters the program at `$A0` (`ProgramEntry`), as the original did.
 A failed read is tried again; after 8 failures COLOR00 turns red while it keeps trying.
 """
-    open(os.path.join(DOCS, 'DISK.md'), 'w').write(text)
+    open(os.path.join(DOCS, 'DISK.md'), 'w', encoding='utf-8', newline='\n').write(text)      # (LF on every system)
 
 
 def table(rows):
@@ -297,7 +298,7 @@ in all) are kept after their first load, and later loads copy them from there.
 * **No machine description** (the program booted some other way): the plain 512K layout with the
   512K effects package and no music; the title's memory line is not shown.
 """
-    open(os.path.join(DOCS, 'MEMORY.md'), 'w').write(text)
+    open(os.path.join(DOCS, 'MEMORY.md'), 'w', encoding='utf-8', newline='\n').write(text)
 
 
 if __name__ == '__main__':

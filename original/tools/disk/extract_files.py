@@ -73,7 +73,7 @@ L += ['', '## Notes', '',
  '* The per-level tile file is reloaded at every level start in both builds.',
  '* Tracks 64-81 (1MB) and 126-131 (512K) hold the two versions of the sound driver; each build loads only its own.',
  '* Tracks 17-32 and 110-125 are the two builds of the main program; the bootblock loads one of them.']
-open('disk/FILES.md', 'w').write('\n'.join(L) + '\n')
+open('disk/FILES.md', 'w', encoding='utf-8', newline='\n').write('\n'.join(L) + '\n')
 
 M = ['# Disk map', '',
  'Ghosts\'n Goblins (Elite, 1990, v3) - 84 cylinders x 2 heads = tracks 0-167 (track = cylinder*2 + head).', '',
@@ -91,5 +91,5 @@ for tr in range(1, 168):
         M.append(f'| {tr} | {tr // 2} | {tr % 2} | `{name}` | {k + 1}/{nt} | {sl} |')
     else:
         M.append(f'| {tr} | {tr // 2} | {tr % 2} | {"unformatted" if tr >= 132 else "?"} | | |')
-open('disk/DISKMAP.md', 'w').write('\n'.join(M) + '\n')
+open('disk/DISKMAP.md', 'w', encoding='utf-8', newline='\n').write('\n'.join(M) + '\n')
 print('files', len(rows) + 1, 'tracks mapped', len(owner) + 1)

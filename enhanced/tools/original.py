@@ -42,4 +42,4 @@ if __name__ == '__main__':
     t = time.time()
     img = o.show(int(sys.argv[2]) if len(sys.argv) > 2 else 0, int(sys.argv[3]) if len(sys.argv) > 3 else 0)
     print(f'{o.blits} blits, {o.blit_words} words, {time.time()-t:.1f}s')
-    o.save_png(img, f'/tmp/claude-0/-home-claude/f208003a-532a-549d-984d-a12c42fdbbaa/scratchpad/orig_l{lv}.png')
+    o.save_png(img, f'orig_l{lv}.png')                 # (in the current folder)
