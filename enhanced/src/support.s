@@ -2,7 +2,7 @@
 ; ==================================================================
 ; One program for every machine (enhanced branch)
 ; ==================================================================
-; make_game.py appends this file to gng_game.s: the enhanced game's start-up and loading
+; support.s - included by gng_game.s: the enhanced game's start-up and loading
 ; code that has no place in the original's routines (enhanced/docs/FEATURES.md, MEMORY.md):
 ;   ReadProfile       the machine (Profile) from the bootblock's description
 ;   LoadSound         the sound package for the machine
@@ -193,12 +193,12 @@ CacheInit:
 LoadFile:
         movem.l d0-d7/a1-a4/a6,-(a7)
         tst.l   (CacheEnd).l
-        beq.b   lf_disk
+        beq.w   lf_disk
         moveq   #0,d4
         move.w  8(a1),d4                        ; file id
         move.l  (CacheMask).l,d0
         btst    d4,d0
-        beq.b   lf_disk
+        beq.w   lf_disk
         lea.l   (CacheTable).l,a2
         move.w  d4,d1
         lsl.w   #2,d1
@@ -206,7 +206,7 @@ LoadFile:
         bne.b   lf_copy
         lea.l   (FileDir).l,a3                  ; no: the whole file, if there is room
         cmpi.l  #'GNGF',(a3)
-        bne.b   lf_disk
+        bne.w   lf_disk
         move.w  d4,d0
         lsl.w   #3,d0
         move.l  FT_ENTRY+4(a3,d0.w),d3          ; its length
@@ -352,7 +352,7 @@ BootDrive:
 ; the sets the level does not use: the whole file is 118,850 bytes, a level's sets 22-65 KB.
 ; Sets less than a track (5,632 bytes) apart in the file load as one piece, the gap with them
 ; (into its place: nothing else is there), as the disk reads whole tracks anyway
-; (BobSetFileOrder: the sets by their offset in the file, made by make_game.py).
+; (BobSetFileOrder: the sets by their offset in the file).
 ;---------------------------------------------------------------------------
 LoadEnemySets:
         movem.l d0-d7/a0-a5,-(a7)
@@ -410,7 +410,7 @@ EnemyPiece:
         dc.l    0,0                             ; a file record for a piece (destination, length)
         dc.w    FID_ENEMYBOBS
 BobSetFileOrder:
-;<<BOBSET_ORDER>>
+	dc.b	19,6,1,5,12,17,2,13,8,0,18,4,20,9,10,3,11,14,7,15,$FF	; the sets by their offset in the file
         even
 ByteLoader:
 	include	"byteloader.i"
@@ -642,4 +642,3 @@ cg_longs:
         move.l  d1,(a0)+
         dbra    d0,cg_longs
         rts
-

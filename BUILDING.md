@@ -132,9 +132,10 @@ tools, the renderers).
 
 ```
 cd enhanced/tools
-python3 make_game.py         # ../src/gng_game.s from original/gng_main.s (only after changing either, or the tools)
 python3 build_game.py        # -> enhanced/build/gng_game.adf
 ```
+The program's source is `enhanced/src/gng_game.s`, with `support.s`, `scroller.s` and the
+other files in `enhanced/src`: edit those, then build.
 `build_game.py` assembles the program, the bootblock and the BOB viewer, makes the 512K music
 package and writes the disk, then reads every file back from it. It finishes with
 `gng_game.adf: 30 files, ... the files read back exactly`. It takes a few seconds.

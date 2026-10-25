@@ -1,4 +1,4 @@
-"""Changes of display (make_game.py: display_transitions; scroller.s: EnhDisplayOff,
+"""Changes of display (gng_game.s: LoadLevel, ProgressMap, SetupLevel; scroller.s: EnhDisplayOff,
 EnhDisplayOn): on a 512K and a 1MB machine, a game is started, the time is let run out (a life
 lost: the progress map, then the level again). The beam moves on at every read of VPOSR / VHPOSR,
 so the waits for the vertical blank are exercised. Checks:

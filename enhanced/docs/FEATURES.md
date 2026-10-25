@@ -84,8 +84,8 @@ for 5 seconds and the bonus for 3.
 
 ## Machines and memory
 
-**One program for every machine** (`gng_game.s`, made by `make_game.py` from the merged source
-of both original programs). The original disk has two programs, for 512K and for 1MB; the
+**One program for every machine** (`gng_game.s`, first made from the merged source of both
+original programs, `original/gng_main.s`; edited by hand since). The original disk has two programs, for 512K and for 1MB; the
 enhanced disk has one, loaded to `$80` everywhere, which decides at start-up what to use from a
 description of the machine the bootblock leaves (`ReadProfile`, `Profile`):
 
@@ -169,7 +169,7 @@ A500 neither does the progress map after a life is lost.
 
 ## Controls and menu
 
-**Two-button joysticks** (`two_buttons` in `make_game.py`; `ArthurReadUpDown`). The second
+**Two-button joysticks** (`ArthurReadUpDown`, and the vertical blank's joystick read). The second
 button of a Sega-style pad, a two-button stick or a CD32 pad's blue button (port 2, pin 9, read
 through `POTGO` / `POTINP`) can be jump. With it, up only climbs ladders; jumping from a ladder
 is not possible, as in the original. The setting is on the title menu (`INPUT`).
@@ -212,8 +212,8 @@ symbols (`viewer_syms.i`, written by `build_game.py`).
   skips twice the lines it should; the scroller's drawing does it right).
 * Disk errors are retried until the read succeeds; after 8 failures the background turns red
   while it keeps trying.
-* **Clean changes of display** (`EnhDisplayOff` / `EnhDisplayOn`, `display_transitions` in
-  `make_game.py`). The bitplanes are switched off and on only in the vertical blank, and are off
+* **Clean changes of display** (`EnhDisplayOff` / `EnhDisplayOn`, called from `LoadLevel`,
+  `ProgressMap`, `SetupLevel` and the opening scene). The bitplanes are switched off and on only in the vertical blank, and are off
   while the screens they would show are rewritten: the progress map is unpacked into the
   scroller's display buffers, and the next level is drawn into them while the map is on show.
   Before, the change from a level to the map and back showed a frame or two of half-built
@@ -237,9 +237,9 @@ and Linux, is in [`BUILDING.md`](../../BUILDING.md)) makes `enhanced/build/gng_g
 | `--nasty-wait` | blitter priority only while the CPU waits for the blitter (an experiment, not pursued: little to gain; `gng_game_nastywait.adf`) |
 | `--music-rate N/D` | the 512K music package at another quality (`--music-rate 1`: full quality) |
 
-`make_game.py` writes `src/gng_game.s` from the root `gng_main.s` (both original programs); run
-it after changing `gng_main.s`, `make_game.py` or `make_game_support.s`. `make_docs.py` writes
-`DISK.md` and `MEMORY.md` from the build.
+The program's source is `src/gng_game.s` (with `src/support.s`, `src/scroller.s` and the
+rest of `src/`), edited by hand. `make_docs.py` writes `DISK.md` and `MEMORY.md` from the
+build.
 
 The earlier enhanced builds - the original programs with the scroller patched in and loaded as a
 module (`tools/build_enh.py`, `src/module.s`, `src/patches.s`) - are still here for reference;

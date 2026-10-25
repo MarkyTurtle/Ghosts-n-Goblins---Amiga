@@ -1002,8 +1002,35 @@ description saying so) on 512K, 512K + slow RAM (the program moved) and 1MB, to 
 track reads and the same level data either way. With the disk in DF1 and the game reading DF0
 nothing loads (the floppy model refuses, as a real empty drive would).
 
+### The source edited by hand (October 2026)
+
+`src/gng_game.s` was made by a script, `tools/make_game.py`, from the merged original source
+(`original/gng_main.s`, both programs): it took the 512K program as the base, turned the places
+where the 1MB program differs into choices made at run time (`Profile`), and made every change
+described above - the hooks into the scroller, the title menu, two-button joysticks, the
+byteloader, the level loading, the display changes - as patches applied to the original's text,
+with the start-up, loading and cache code (`make_game_support.s`) appended. That kept every
+change repeatable while the original source was still being annotated.
+
+With the original source settled, the script was retired: its result, `gng_game.s` as built and
+tested, is now the source and is edited by hand. The appended code became its own file,
+`src/support.s`, included at the same place (with the widened branches and the enemy sets' load
+order the script had filled in). The program assembles to the same bytes as before - both disks
+are byte-identical to release v1.0. `make_game.py` and `make_game_support.s` are in the git
+history (the last commit with them is the parent of the one that retired them).
+
 ## Files
 
+* `src/gng_game.s`: the program, edited by hand: the original game's code (with the original
+  addresses in a column, for reading it alongside `original/gng_main.s`) and the enhanced game's
+  changes; `src/gng_game.i` its equates and memory map.
+* `src/support.s`: the enhanced start-up, loading and cache code (`ReadProfile`, `LoadSound`,
+  `LoadLevelTables`, `LoadEnemySets`, `CacheInit`, `LoadFile` / `LoadDisk`, `CacheGraphics`,
+  `EnhRelocate`).
+* `src/scroller.s`: the scroller's glue, faster BOB drawing, playfield text, the title menu,
+  the test page; `src/bobviewer.s`: the BOB viewer (1MB); `src/boot_4489.s`: the bootblock.
+* `tools/build_game.py`: builds the disk (`../build/gng_game.adf`); `tools/make_docs.py`:
+  `DISK.md` and `MEMORY.md` from the build.
 * `src/scroll.s`: the scroller core (`ScrFullDraw`, `ScrScrollTo`, `ScrBuildCopper`, `ScrRestore`,
   `ScrDrawBobs`, `CopyAll`).
 * `src/module.s`: the game module (scroller + glue); `src/patches.s`: the changes to the main

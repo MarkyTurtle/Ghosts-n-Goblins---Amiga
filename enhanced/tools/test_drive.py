@@ -1,4 +1,4 @@
-"""The game loading from the drive it was booted from (make_game_support.s: LoadDisk; the
+"""The game loading from the drive it was booted from (support.s: LoadDisk; the
 bootblock leaves the drive in the machine description, version 2: boot_4489.s MI_DRIVE).
 The disk image in DF0 and in DF1 (tools/floppy.py: the other drives are empty), on each machine
 of compare_game.py: the game started and a level loaded from the disk. Checks: the loads read

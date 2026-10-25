@@ -1,4 +1,4 @@
-"""The file cache and the level's enemy sets (make_game_support.s: CacheInit, LoadFile,
+"""The file cache and the level's enemy sets (support.s: CacheInit, LoadFile,
 LoadEnemySets), from the disk image (tools/floppy.py) on each machine of compare_game.py: a game
 started on a level, then the level loaded again (LoadLevel). Checks:
   * the cache's memory: none on a plain 512K machine; after the moved program on a machine with
