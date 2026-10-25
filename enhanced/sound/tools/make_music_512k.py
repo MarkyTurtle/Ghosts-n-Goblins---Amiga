@@ -144,5 +144,5 @@ if rate != 1:
     assert 0 < rate < 1, rate
     out = quality(out, rate)
     out[2] = out[2] + f' Tunes\' samples 5-9 at {rate} of their rate (--rate).'
-open(dest, 'w').write('\n'.join(out).rstrip('\n') + '\n')
+open(dest, 'w', newline='\n').write('\n'.join(out).rstrip('\n') + '\n')      # (LF on every system: it is committed)
 print(os.path.relpath(dest, os.path.join(SND, '..', '..')), 'written' + (f' (tunes\' samples 5-9 at {rate} of their rate)' if rate != 1 else ''))

@@ -50,7 +50,10 @@ def vasm(src, out, listing=None, defs=(), incl=None):
            '-I', os.path.join(ROOT, 'sound'), '-I', ENH_SND, '-o', out] + (['-I', incl] if incl else [])
     if listing: cmd += ['-L', listing]
     cmd += [f'-D{k}={v}' for k, v in defs] + [src]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        sys.exit(f'{VASM} not found: put vasmm68k_mot on the PATH, or set VASM to its full path')
     if r.returncode: sys.exit(f'vasm {os.path.basename(src)}:\n{r.stdout}{r.stderr}')
 
 

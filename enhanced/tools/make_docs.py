@@ -150,7 +150,7 @@ included (the game's interrupt handlers set `a6` themselves: `IrqLevel1` / `IrqL
 4. `$4.w` = `$80`, and it enters the program at `$A0` (`ProgramEntry`), as the original did.
 A failed read is tried again; after 8 failures COLOR00 turns red while it keeps trying.
 """
-    open(os.path.join(DOCS, 'DISK.md'), 'w').write(text)
+    open(os.path.join(DOCS, 'DISK.md'), 'w', encoding='utf-8', newline='\n').write(text)      # (LF on every system)
 
 
 def table(rows):
@@ -297,7 +297,7 @@ in all) are kept after their first load, and later loads copy them from there.
 * **No machine description** (the program booted some other way): the plain 512K layout with the
   512K effects package and no music; the title's memory line is not shown.
 """
-    open(os.path.join(DOCS, 'MEMORY.md'), 'w').write(text)
+    open(os.path.join(DOCS, 'MEMORY.md'), 'w', encoding='utf-8', newline='\n').write(text)
 
 
 if __name__ == '__main__':
