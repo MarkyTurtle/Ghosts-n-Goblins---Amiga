@@ -16,8 +16,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
       - name: Python packages
@@ -49,22 +49,32 @@ jobs:
           python test_jump.py
       - name: The checkout is unchanged (no generated file rewritten)
         run: |
-          git status --porcelain
-          if (git status --porcelain) { throw "the build changed files in the checkout" }
-      - uses: actions/upload-artifact@v4
+          $changed = git status --porcelain
+          if ($changed) {
+            foreach ($l in $changed) { echo "::error::changed by the build: $l" }
+            git --no-pager diff --stat | ForEach-Object { echo "::error::$_" }
+            throw "the build changed files in the checkout"
+          }
+      - uses: actions/upload-artifact@v5
         with:
           name: gng_game-windows
           path: enhanced/build/gng_game.adf
 
   linux:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.13']                       # the oldest and the newest Python tested
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: '3.11'                       # the oldest Python the build is tested with
+          python-version: ${{ matrix.python }}
       - name: Python packages
-        run: python -m pip install -r requirements.txt
+        run: |
+          python -m pip install -r requirements.txt > pip.log 2>&1 || { tail -n 25 pip.log | sed 's/^/::error::/'; exit 1; }
+          python -m pip list
       - name: Build vasm (make)
         run: |
           git clone --depth 1 "$VASM_MIRROR" "$RUNNER_TEMP/vasm"
@@ -87,8 +97,8 @@ jobs:
           python test_jump.py
           python test_menu.py
       - name: The checkout is unchanged (no generated file rewritten)
-        run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
-      - uses: actions/upload-artifact@v4
+        run: test -z "$(git status --porcelain)" || { git status --porcelain | sed 's/^/::error::changed by the build: /'; exit 1; }
+      - uses: actions/upload-artifact@v5
         with:
-          name: gng_game-linux
+          name: gng_game-linux-py${{ matrix.python }}
           path: enhanced/build/gng_game.adf
